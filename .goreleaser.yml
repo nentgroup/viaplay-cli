@@ -16,7 +16,9 @@ builds:
     ldflags:
       - -s -w
       - -X github.com/nentgroup/viaplay-cli/internal/cli.Version={{.Version}}
-      - -X github.com/nentgroup/viaplay-cli/internal/gh.defaultClientID={{.Env.GITHUB_CLIENT_ID}}
+      - -X github.com/nentgroup/viaplay-cli/internal/cli.BuildDate={{.Date}}
+      - -X github.com/nentgroup/viaplay-cli/internal/cli.Commit={{.Commit}}
+      - -X github.com/nentgroup/viaplay-cli/internal/gh.defaultClientID={{.Env.CLIENT_ID}}
 archives:
   -
     format_overrides:
@@ -41,7 +43,7 @@ homebrew_casks:
     homepage: "https://example.com/" # TODO: Replace with your actual homepage
     description: "CLI tool for Gecko Generators."
     url:
-      template: "https://github.com/nentgroup/viaply-cli-2/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+      template: "https://github.com/nentgroup/viaplay-cli-2/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
       using: "GitHubPrivateRepositoryReleaseDownloadStrategy"
     custom_block: |
       require File.expand_path("lib/custom_download_strategy.rb", __dir__)
