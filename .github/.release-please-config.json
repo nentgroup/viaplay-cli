@@ -5,7 +5,7 @@
         ".": {
             "package-name": "vip",
             "changelog-path": "/CHANGELOG.md",
-            "release-as": "0.1.0",
+            "initial-version": "0.1.0",
             "prerelease": true,
             "prerelease-type": "beta"
         }
