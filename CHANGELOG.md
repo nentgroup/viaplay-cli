@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.1...v0.1.2) (2025-08-04)
+
+
+### Bug Fixes
+
+* update brew formula ([7568187](https://github.com/nentgroup/viaplay-cli-2/commit/756818797b952f89a97c55b31ed86ad9ff7156d0))
+
+
+### Documentation
+
+* update readme ([049229f](https://github.com/nentgroup/viaplay-cli-2/commit/049229f8c848ea298e6432c2e4b4cbb7da6855d4))
+
 ## [0.1.1](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.0...v0.1.1) (2025-08-04)
 
 
