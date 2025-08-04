@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.8...v0.2.0) (2025-08-04)
+
+
+### Features
+
+* add binary name flag ([00c4773](https://github.com/nentgroup/viaplay-cli-2/commit/00c4773a0d6af1bf01c818fd81f077c9cf42069a))
+
 ## [0.1.8](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.7...v0.1.8) (2025-08-04)
 
 
