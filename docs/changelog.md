@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.3...v0.1.4) (2025-08-04)
+
+
+### Bug Fixes
+
+* add uninstall uninstall formula ([2fcb9fe](https://github.com/nentgroup/viaplay-cli-2/commit/2fcb9fe6d161eb5ce904f119c0464c93ea0819cb))
+
 ## [0.1.2](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.1...v0.1.2) (2025-08-04)
 
 
