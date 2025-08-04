@@ -4,7 +4,7 @@ cask "vip" do
 
   desc "CLI tool for Gecko Generators."
   homepage "https://nentgroup.github.io/viaplay-cli-2"
-  version "0.1.3"
+  version "0.1.5"
 
   livecheck do
     skip "Auto-generated on release."
@@ -14,27 +14,27 @@ cask "vip" do
 
   on_macos do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.3/viaplay-cli-2_0.1.3_darwin_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.5/viaplay-cli-2_0.1.5_darwin_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "5d014dcc5e1a81743e8967935a1ebd5f68e4b5027f21c5cc8b01970b592b372b"
+      sha256 "9bfe3c5e9ff541592811a65751ce763beae7f3611b9cb78e97685c985f00fbdf"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.3/viaplay-cli-2_0.1.3_darwin_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.5/viaplay-cli-2_0.1.5_darwin_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "3b7a6c87862cbc0fd17c57d69c402218feaed7ffa95cfd143dba71a45c13e2a5"
+      sha256 "035c73466fd49fd32acc8209a764c051c62134478c7a204a4f2cc2800ec51c30"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.3/viaplay-cli-2_0.1.3_linux_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.5/viaplay-cli-2_0.1.5_linux_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "d235b98b8248f0ae73013595dcd06c21b434ba6b408fe9a2e79f0367b1e59c6c"
+      sha256 "4c6d7d3b619104a82011f600100c4e025b5e194b9cadb149add482e8bf910e0f"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.3/viaplay-cli-2_0.1.3_linux_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.5/viaplay-cli-2_0.1.5_linux_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "8201341154a80e3f3423c9e633d269f6f4beba2a889bee239829e24759e8c19f"
+      sha256 "d7beead980fdb44d6c133ba730b8a21420e8621bb9db52dc0968025b2ebba9e4"
     end
   end
 
@@ -43,6 +43,14 @@ cask "vip" do
       system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/vip"]
     end
   end
+
+  caveats do
+    "If you have an existing binary at /opt/homebrew/bin/vip, remove it before installing: rm /opt/homebrew/bin/vip"
+  end
+
+  uninstall delete: [
+      "/opt/homebrew/bin/vip",
+    ]
 
   # No zap stanza required
 end
