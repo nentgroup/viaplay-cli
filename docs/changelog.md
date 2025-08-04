@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.6...v0.1.7) (2025-08-04)
+
+
+### Bug Fixes
+
+* fix typo when blueprinting config files ([06f54c4](https://github.com/nentgroup/viaplay-cli-2/commit/06f54c4970baa9de031cfb0c09c9c8c96ee802be))
+
 ## [0.1.6](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.5...v0.1.6) (2025-08-04)
 
 
