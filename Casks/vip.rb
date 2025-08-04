@@ -4,7 +4,7 @@ cask "vip" do
 
   desc "CLI tool for Gecko Generators."
   homepage "https://nentgroup.github.io/viaplay-cli-2"
-  version "0.1.6"
+  version "0.1.7"
 
   livecheck do
     skip "Auto-generated on release."
@@ -14,27 +14,27 @@ cask "vip" do
 
   on_macos do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.6/viaplay-cli-2_0.1.6_darwin_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.7/viaplay-cli-2_0.1.7_darwin_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "944ecb78eda10cd5676cb4f4a82d06703486d3fb2a8072561d171aab629202c0"
+      sha256 "3fb4f32559b59a7420f381c8431e88bf2a3453b0f03294d415782045e9ce9621"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.6/viaplay-cli-2_0.1.6_darwin_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.7/viaplay-cli-2_0.1.7_darwin_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "c456a9325400310f07d9a4db9741b41d619f030b6e647ee89c3cb623edef1ab8"
+      sha256 "f8d9a93c307e31a6ae7083e8c5ec721c4ac232862ce79190ea754e605397a6af"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.6/viaplay-cli-2_0.1.6_linux_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.7/viaplay-cli-2_0.1.7_linux_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "4a0197329d8081654c5922ef074e61ae9168ceb14e466f63ede6f8ff3d964b12"
+      sha256 "5d0496c81088ada1d96be6d06859d479cef368a8575ff434d605f18d0d895c22"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.6/viaplay-cli-2_0.1.6_linux_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.7/viaplay-cli-2_0.1.7_linux_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "20c4f918280110a551cb068fb3b6ff54863d12647945b6af3659b951db0d599f"
+      sha256 "67fa1fffa855ac36b1176e450c1f74040f432bd5d9a2fc11ed1c067b3beddb89"
     end
   end
 
