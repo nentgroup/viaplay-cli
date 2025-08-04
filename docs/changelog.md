@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.5...v0.1.6) (2025-08-04)
+
+
+### Bug Fixes
+
+* fix gh login bug caused by serialisation issues ([602a381](https://github.com/nentgroup/viaplay-cli-2/commit/602a3815ccea8179402fc3e03269f77384390e0d))
+
 ## [0.1.5](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.4...v0.1.5) (2025-08-04)
 
 
