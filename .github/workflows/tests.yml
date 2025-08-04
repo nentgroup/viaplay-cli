@@ -1,0 +1,73 @@
+---
+
+name: 🧪 Tests
+
+on:
+  push:
+    branches:
+      - "feature/*"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - develop
+  workflow_call:
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source Git repo
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+      - name: Run tests
+        run: |
+          go test -v ./... -covermode=atomic -coverpkg=./... -race -coverprofile coverage.out
+          go tool cover -func=coverage.out -o=coverage.out
+      - name: temporary save the coverage badge
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 0
+
+  commitlint:
+    name: Check Commit Messages
+    runs-on: ubuntu-latest
+    env:
+      PR_TITLE: ${{ github.event.pull_request.title }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+      - name: Install commitlint
+        run: go install github.com/conventionalcommit/commitlint@latest
+
+      - name: Create custom PR title commitlint config
+        run: |
+          cat > pr-commitlint.yaml << EOF
+          version: v0.9.0
+          settings:
+            header-max-length:
+              argument: 100
+          EOF
+
+      - name: Lint PR title (for squash merges)
+        if: github.event_name == 'pull_request'
+        run: echo "$PR_TITLE" | commitlint lint -c pr-commitlint.yaml
+
+      - name: Lint last commit message (for direct pushes)
+        if: github.event_name == 'push'
+        run: git log -1 --pretty=format:"%s" | commitlint lint
+
+...

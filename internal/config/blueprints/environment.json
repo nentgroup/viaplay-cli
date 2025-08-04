@@ -1,0 +1,10 @@
+{
+  "name": "staging",
+  "wait_timer": 0,
+  "reviewers": [],
+  "deployment_branch_policy": {
+    "protected_branches": false,
+    "custom_branch_policies": true
+  }
+}
+

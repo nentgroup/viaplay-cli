@@ -1,0 +1,95 @@
+version: '3'
+
+env:
+  PLATFORM: local
+  APP_NAME: vip
+  GO_VERSION: '1.24'
+
+vars:
+  CURRENT_DATE:
+    sh: date +"%Y-%m-%d"
+
+tasks:
+  build:
+    desc: Build binaries for multiple platforms
+    cmds:
+      - mkdir -p bin
+      - echo "Building binaries for multiple platforms..."
+      - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/{{.APP_NAME}}_linux_amd64 cmd/{{.APP_NAME}}/main.go
+      - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o bin/{{.APP_NAME}}_linux_arm64 cmd/{{.APP_NAME}}/main.go
+      - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o bin/{{.APP_NAME}}_windows_amd64.exe cmd/{{.APP_NAME}}/main.go
+      - CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -o bin/{{.APP_NAME}}_windows_arm64.exe cmd/{{.APP_NAME}}/main.go
+      - CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o bin/{{.APP_NAME}}_darwin_amd64 cmd/{{.APP_NAME}}/main.go
+      - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o bin/{{.APP_NAME}}_darwin_arm64 cmd/{{.APP_NAME}}/main.go
+      - echo "✅ Binaries built successfully"
+
+  setup:lefthook:
+    desc: Install and configure lefthook for git hooks
+    cmds:
+      - echo "Setting up lefthook git hooks"
+      - chmod +x scripts/setup.sh
+      - ./scripts/setup.sh
+      - echo "✅ Lefthook setup complete"
+
+  setup:
+    desc: Setup everything needed for development
+    deps:
+      - setup:lefthook
+      - deps:install
+    cmds:
+      - echo "✅ Development environment setup complete"
+
+  lint:
+    desc: run linters
+    cmds:
+      - golangci-lint run --allow-parallel-runners --fix
+      - actionlint
+
+  deps:update:
+    desc: Check for dependency updates
+    cmds:
+      - echo "Checking for dependency updates"
+      - go get -u ./...
+      - go mod tidy
+      - echo "✅ Dependencies updated"
+
+  deps:install:
+    desc: Install all dependencies
+    cmds:
+      - echo "Installing dependencies"
+      - go mod download
+      - go mod tidy
+      - echo "✅ Dependencies installed"
+
+  test:coverage:
+    desc: Run tests with coverage report
+    cmds:
+      - echo "Running tests with coverage report"
+      - mkdir -p coverage
+      - go test -v ./... -coverprofile=coverage/coverage.out -covermode=count
+      - go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+      - echo "✅ Coverage report generated at coverage/coverage.html"
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - echo "Cleaning build artifacts and caches"
+      - rm -rf bin/*
+      - rm -rf release/*
+      - rm -rf coverage/*
+      - go clean -cache -testcache
+      - echo "✅ Cleaned build artifacts"
+
+  help:
+    desc: Show available tasks
+    cmds:
+      - echo "Available tasks:"
+      - task --list
+
+  install:local:
+    desc: Install the CLI tool locally
+    cmds:
+      - echo "Installing viaplay-cli locally"
+      - go install ./cmd/{{.APP_NAME}}
+      - echo "✅ Installed successfully. Run '{{.APP_NAME}}' to use the tool."
+

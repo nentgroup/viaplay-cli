@@ -1,0 +1,14 @@
+/build/
+/.idea/
+/bin/
+.env
+/.idea
+/tmp
+/volume
+.DS_Store
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+

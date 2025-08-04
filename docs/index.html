@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1.0, shrink-to-fit=no, viewport-fit=cover">
+  <meta name="description" content="">
+  <title>Viaplay CLI Documentation</title>
+
+  <!-- Themes (light + dark) -->
+  <link rel="stylesheet" media="(prefers-color-scheme: dark)" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple-dark.css">
+  <link rel="stylesheet" media="(prefers-color-scheme: light)" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple.css">
+
+  <!-- Custom Styles -->
+  <style>
+    :root {
+      --theme-color: #ffd600;
+      --cover-background: #181818;
+      --cover-title-color: #fff;
+      --cover-subtitle-color: #fff;
+      --cover-button-color: #181818;
+      --cover-button-background: #ffd600;
+      --cover-button-hover-background: #e6b800;
+      --cover-min-height: 100vh;
+      --cover-title-font-size: 3rem;
+      --cover-subtitle-font-size: 1.5rem;
+      --cover-title-font-family: 'PT Sans', 'Segoe UI', Arial, sans-serif;
+    }
+  </style>
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+  // Docsify Configuration
+  window.$docsify = {
+    name: 'Viaplay CLI',
+    repo: 'nentgroup/viaplay-cli',
+    loadSidebar: true,
+    subMaxLevel: 2,
+    search: 'auto',
+    auto2top: true,
+    homepage: 'README.md',
+    coverpage: true,
+    onlyCover: false,
+    coverpage: '_coverpage.md',
+  };
+</script>
+
+<!-- Required -->
+<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/js/docsify-themeable.min.js"></script>
+
+<!-- Recommended -->
+<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/zoom-image.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs@1.22/components/prism-json.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs@1.22/components/prism-yaml.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs@1.22/components/prism-go.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs@1.22/components/prism-rust.min.js"></script>
+</body>
+</html>

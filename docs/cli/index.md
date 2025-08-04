@@ -1,0 +1,16 @@
+# CLI Reference
+
+This section provides documentation for the most important viaplay-cli commands. For full usage, run `vip --help` or `vip <command> --help`.
+
+---
+
+- [Create](../cli/create.md): Scaffold a new project from a template and optionally create a remote repository.
+- [Config](../cli/config.md): Manage global, team, and project configuration.
+- [Secrets](../cli/secrets.md): Securely manage secrets for your projects and teams.
+- [Auth](../cli/auth.md): Authenticate with GitHub for repository and secret management.
+- [Cache](../cli/cache.md): Manage the local template cache (update or clear cached templates).
+- [Version](../cli/version.md): Show the current version of viaplay-cli.
+
+---
+
+For a quick overview, see the [Quick Start](../getting-started/quickstart.md) or [Project & Repo Creation](../project-creation.md) guides.

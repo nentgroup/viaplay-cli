@@ -1,0 +1,104 @@
+# viaplay-cli Configuration
+# This file controls the behaviour of the viaplay-cli tool
+# See https://github.com/nentgroup/viaplay-cli for documentation
+
+# -----------------------------------------------
+# Default Settings (used when no flags are provided)
+# -----------------------------------------------
+
+# Team name to use for loading configuration templates
+# This determines which team-specific templates to use from ~/.config/viaplay/teams/
+default_team: ""
+
+# GitHub account/organization name to use for repositories
+# For personal repos, use your GitHub username
+# For org repos, use the organization name
+default_account: ""
+
+# Whether the default_account is an organization (true) or personal account (false)
+# This affects repository creation behaviour
+is_org: false
+
+# Default programming language for new projects
+# Available options: go, typescript, rust, python
+default_language: "go"
+
+# Default project type for new projects
+# Available options: service, lambda, cli, package, app
+default_type: "service"
+
+# Default repository visibility
+# When true, repositories will be created as private by default
+# Use --private=false flag to override and create public repositories
+default_private: true
+
+# -----------------------------------------------
+# Project Templates
+# -----------------------------------------------
+
+# Repository templates for each language and project type
+# Format: templates.<language>.<type> = "<source>"
+# Source can be:
+# - GitHub repo: "github@<owner>/<repo>.git"
+# - Local path: "local@/path/to/template"
+# - Tarball URL: "url@https://example.com/template.tar.gz"
+templates:
+  # Go templates
+  "go":
+    "cli": "github@github.com/nentgroup/go-cli-template.git"
+    "lambda": "github@github.com/nentgroup/go-lambda-template.git"
+    "package": "github@github.com/nentgroup/go-package-template.git"
+    "service": "github@github.com/nentgroup/go-service-template.git"
+
+  # Rust templates
+  "rust":
+    "http-service": "local@/Users/alescole/.config/viaplay/templates_cache/rust/http-service"
+
+  # TypeScript templates
+  "typescript":
+    "service": "github@github.com/nentgroup/ts-service-template.git"
+    "lambda": "github@github.com/nentgroup/ts-lambda-template.git"
+
+  # Add more language templates as needed
+
+# -----------------------------------------------
+# Directory Configuration
+# -----------------------------------------------
+
+# Base directory for all configuration files
+# Default: ~/.config/viaplay
+config_dir: "~/.config/viaplay"
+
+# Directory for team-specific configurations
+# Default: ~/.config/viaplay/teams
+teams_dir: "~/.config/viaplay/teams"
+
+# Directory for global configurations (used as fallback if team config not found)
+# Default: ~/.config/viaplay/global
+global_dir: "~/.config/viaplay/global"
+
+# -----------------------------------------------
+# GitHub Configuration
+# -----------------------------------------------
+
+# Default branch name for new repositories
+default_branch: "main"
+
+# GitHub API endpoint (change for GitHub Enterprise)
+# Default: https://api.github.com
+github_api: "https://api.github.com"
+
+# -----------------------------------------------
+# Build and Deployment Settings
+# -----------------------------------------------
+
+# Default container registry for services
+# Options: "ecr", "gcr", "dockerhub", etc.
+container_registry: "ecr"
+
+# -----------------------------------------------
+# Advanced Settings
+# -----------------------------------------------
+
+# Debug mode (enables verbose logging)
+debug: false

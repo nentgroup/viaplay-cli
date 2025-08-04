@@ -1,0 +1,57 @@
+version: 2
+builds:
+  - id: main
+    main: ./cmd/vip
+    binary: vip
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X github.com/nentgroup/viaplay-cli/internal/cli.Version={{.Version}}
+      - -X github.com/nentgroup/viaplay-cli/internal/gh.defaultClientID={{.Env.GITHUB_CLIENT_ID}}
+archives:
+  -
+    format_overrides:
+      - goos: windows
+        formats: ['zip']
+homebrew_casks:
+  -
+    name: vip
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/vip"]
+          end
+    repository:
+      owner: nentgroup
+      name: viaplay-cli-2
+    commit_author:
+      name: Alessandro Coletti
+      email: alessandro.coletti@viaplaygroup.com
+    directory: Casks
+    homepage: "https://example.com/" # TODO: Replace with your actual homepage
+    description: "CLI tool for Gecko Generators."
+    url:
+      template: "https://github.com/nentgroup/viaply-cli-2/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+      using: "GitHubPrivateRepositoryReleaseDownloadStrategy"
+    custom_block: |
+      require File.expand_path("lib/custom_download_strategy.rb", __dir__)
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
