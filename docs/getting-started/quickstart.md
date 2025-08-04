@@ -6,7 +6,7 @@ Get up and running with **viaplay-cli** in just a few steps!
 
 ## 1. Install viaplay-cli
 
-See the [installation guide](installation.md) for details.
+See the [installation guide](/getting-started/installation.md) for details.
 
 ---
 

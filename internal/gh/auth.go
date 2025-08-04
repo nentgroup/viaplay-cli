@@ -69,6 +69,7 @@ func Authenticate() (string, error) {
 		return "", fmt.Errorf("error creating device code request: %w", err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Accept", "application/json") // Add this header to force JSON response
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return "", fmt.Errorf("error requesting device code: %w", err)
@@ -85,7 +86,21 @@ func Authenticate() (string, error) {
 		return "", fmt.Errorf("error parsing device code response: %w\nRaw response: %s", err, string(bodyBytes))
 	}
 
-	if err := browser.OpenURL(dcResp.VerificationURI); err != nil {
+	// Check if we got a valid verification URI
+	if dcResp.VerificationURI == "" {
+		return "", fmt.Errorf("invalid device code response: missing verification_uri\nRaw response: %s", string(bodyBytes))
+	}
+
+	// Use VerificationURIComplete if available, otherwise construct the URL
+	verificationURL := dcResp.VerificationURIComplete
+	if verificationURL == "" {
+		verificationURL = fmt.Sprintf("%s?user_code=%s", dcResp.VerificationURI, dcResp.UserCode)
+	}
+
+	fmt.Printf("To authorize, visit: %s\n", verificationURL)
+	fmt.Printf("Enter code: %s\n", dcResp.UserCode)
+
+	if err := browser.OpenURL(verificationURL); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to open browser: %v\n", err)
 	}
 	fmt.Println("Waiting for authorization in your browser...")
@@ -104,6 +119,7 @@ func Authenticate() (string, error) {
 			return "", fmt.Errorf("error creating access token request: %w", err)
 		}
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.Header.Set("Accept", "application/json") // Add this header to force JSON response
 		resp, err := http.DefaultClient.Do(request)
 		if err != nil {
 			return "", fmt.Errorf("error requesting access token: %w", err)
