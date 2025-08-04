@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.4...v0.1.5) (2025-08-04)
+
+
+### Bug Fixes
+
+* update goreleaser config ([cd50b3b](https://github.com/nentgroup/viaplay-cli-2/commit/cd50b3ba721d9604b6a767c3887b606892a0e21f))
+
 ## [0.1.4](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.3...v0.1.4) (2025-08-04)
 
 
