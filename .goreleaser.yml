@@ -27,6 +27,13 @@ archives:
 homebrew_casks:
   -
     name: vip
+    ids:
+      - main
+    caveats: "If you have an existing binary at /opt/homebrew/bin/vip, remove it before installing: rm /opt/homebrew/bin/vip"
+    binary: vip
+    uninstall:
+      delete:
+        - "/opt/homebrew/bin/vip"
     hooks:
       post:
         install: |

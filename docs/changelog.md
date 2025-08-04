@@ -1,21 +1,33 @@
-<!-- /docs/changelog.md -->
-
 # Changelog
 
-This page contains the complete release history of viaplay-cli.
+## [0.1.2](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.1...v0.1.2) (2025-08-04)
 
-<div id="changelog-content">Loading changelog...</div>
 
-<script>
-  // Fetch and render the CHANGELOG.md content
-  fetch('https://raw.githubusercontent.com/nentgroup/viaplay-cli/main/CHANGELOG.md')
-    .then(response => response.text())
-    .then(data => {
-      // Remove the first line (title) as we already have a title for this page
-      const content = data.split('\n').slice(1).join('\n');
-      document.getElementById('changelog-content').innerHTML = marked.parse(content);
-    })
-    .catch(error => {
-      document.getElementById('changelog-content').innerHTML = 'Failed to load changelog: ' + error;
-    });
-</script>
+### Bug Fixes
+
+* update brew formula ([7568187](https://github.com/nentgroup/viaplay-cli-2/commit/756818797b952f89a97c55b31ed86ad9ff7156d0))
+
+
+### Documentation
+
+* update readme ([049229f](https://github.com/nentgroup/viaplay-cli-2/commit/049229f8c848ea298e6432c2e4b4cbb7da6855d4))
+
+## [0.1.1](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.0...v0.1.1) (2025-08-04)
+
+
+### Bug Fixes
+
+* rename client_id variable ([5545e39](https://github.com/nentgroup/viaplay-cli-2/commit/5545e39a2f98657666fea8877d137149d2445523))
+* update release tags ([57bcc71](https://github.com/nentgroup/viaplay-cli-2/commit/57bcc71b34ae5d1839073483f1148c5229cd64b9))
+
+## 0.1.0 (2025-08-04)
+
+
+### Features
+
+* initial commit ([281a451](https://github.com/nentgroup/viaplay-cli-2/commit/281a45143c444ce687fdad9e46ec17ac9425a28f))
+
+
+### Bug Fixes
+
+* update release flow ([339d20e](https://github.com/nentgroup/viaplay-cli-2/commit/339d20e1eb2bc63efc10f1bf4604c3fd1e3e5dbe))
