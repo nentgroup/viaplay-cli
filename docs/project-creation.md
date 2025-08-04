@@ -31,6 +31,24 @@ viaplay-cli can scaffold new projects from templates and automate the creation o
 
 ---
 
+## Examples
+
+### Creating a Go Service with Custom Binary Name
+
+```bash
+vip create project --name my-awesome-service --language go --type service --team myteam --binary-name custombin
+```
+
+This will create a Go service project where the compiled binary will be named `custombin` instead of defaulting to the repository name.
+
+### Creating a TypeScript Web Application
+
+```bash
+vip create project --name my-web-app --language typescript --type webapp --team myteam
+```
+
+---
+
 ## Learn More
 
 - For detailed usage, flags, and subcommands, see the [create command reference](cli/create.md).

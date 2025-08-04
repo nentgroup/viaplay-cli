@@ -30,6 +30,7 @@ The `vip create` command is used to create projects and repositories with GitHub
 - `--type`: Project type (service, cli, etc.)
 - `--template-source`: Custom template source
 - `--output-dir`: Directory to create the project in
+- `--binary-name`: Name of the compiled binary (for compiled languages like Go and Rust)
 
 ---
 

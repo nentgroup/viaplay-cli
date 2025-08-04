@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-github/v74/github"
 	"github.com/zalando/go-keyring"
 
@@ -52,6 +54,7 @@ type CreateOptions struct {
 	Language    string
 	ProjectType string
 	Team        string
+	BinaryName  string // Name for compiled binary (for Go, Rust, etc.)
 
 	// Configuration options
 	ConfigDir     string
@@ -104,14 +107,61 @@ func NewCreator(ghClient *gh.GitHubClient, configDir string) *Creator {
 // Helper to convert CreateOptions to *template.Variables
 func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 	vars := template.NewTemplateVariables()
+
+	// Basic project information
 	vars.ProjectName = opts.RepoName
 	vars.ProjectDescription = opts.RepoDescription
+
+	// Repository information
 	vars.RepoOwner = opts.RepoOwner
 	vars.RepoName = opts.RepoName
 	vars.IsPrivate = opts.IsPrivate
+	vars.RepoURL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
+
+	// Project language and type
 	vars.Language = opts.Language
+	vars.ProjectType = opts.ProjectType
 	vars.Team = opts.Team
-	// Add more mappings as needed
+
+	// Additional values
+	vars.CreatedAt = time.Now()
+	vars.Year = time.Now().Year()
+
+	// Service information
+	vars.ServiceName = opts.RepoName
+	vars.ServiceOwner = opts.Team
+	vars.ServiceOwnerKey = strings.ToLower(strings.ReplaceAll(opts.Team, " ", "-"))
+
+	// Handle binary name for compiled languages (Go, Rust, etc.)
+	binaryName := opts.RepoName
+	if opts.BinaryName != "" {
+		// Use the custom binary name if provided
+		binaryName = opts.BinaryName
+	}
+
+	// Format BinaryName: remove spaces and special characters, convert to lowercase
+	binaryName = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		return -1 // Drop the character
+	}, binaryName)
+	// Convert to lowercase
+	binaryName = strings.ToLower(binaryName)
+
+	// Set binary name for compiled languages
+	if opts.Language == "go" || opts.Language == "rust" {
+		vars.BinaryName = binaryName
+	}
+
+	// Go-specific variables
+	if opts.Language == "go" {
+		vars.ModulePath = fmt.Sprintf("github.com/%s/%s", opts.RepoOwner, opts.RepoName)
+	}
+
+	// Docker variables
+	vars.DockerImageName = strings.ToLower(opts.RepoName)
+	spew.Dump(vars)
 	return vars
 }
 
@@ -152,20 +202,36 @@ func (c *Creator) CreateProject(opts CreateOptions) error {
 func (c *Creator) Create(opts CreateOptions) error {
 	output.VerboseMessage(fmt.Sprintf("Starting project creation with options: %+v", opts))
 
+	// Get authenticated user for CreatedBy field
+	username, err := c.GitHubClient.GetAuthenticatedUser()
+	if err != nil {
+		output.VerboseMessage(fmt.Sprintf("Failed to get authenticated username: %v", err))
+	}
+
+	// Convert options to template variables with additional info
+	templateVars := createOptionsToTemplateVariables(opts)
+
+	// Set authenticated username if available
+	if username != "" {
+		templateVars.CreatedBy = username
+		output.VerboseMessage(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", username))
+	}
+
 	if opts.CloneLocal {
 		output.VerboseMessage("Scaffolding project locally...")
-		if err := c.scaffoldProject(opts); err != nil {
+		fmt.Printf("Scaffolding project...")
+		if err := c.scaffoldProjectWithVariables(opts, templateVars); err != nil {
 			output.VerboseMessage(fmt.Sprintf("Project scaffolding failed: %v", err))
-			fmt.Println("failed")
+			fmt.Println(" failed")
 			return fmt.Errorf("failed to scaffold project: %w", err)
 		}
 		output.VerboseMessage("Project scaffolding complete.")
-		fmt.Println("done")
+		fmt.Println(" done")
 	}
 
 	output.VerboseMessage("Creating repository on GitHub...")
 	fmt.Printf("Creating repository...")
-	_, err := c.createRepository(opts)
+	_, err = c.createRepository(opts)
 	if err != nil {
 		output.VerboseMessage(fmt.Sprintf("Repository creation error: %v", err))
 		if !strings.Contains(err.Error(), "name already exists on this account") {
@@ -287,6 +353,38 @@ func (c *Creator) scaffoldProject(opts CreateOptions) error {
 	}
 
 	templateVars := createOptionsToTemplateVariables(opts)
+	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars); err != nil {
+		return fmt.Errorf("failed to scaffold project: %w", err)
+	}
+
+	return nil
+}
+
+// scaffoldProjectWithVariables scaffolds a project locally with pre-populated template variables
+func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars *template.Variables) error {
+	outputDir := opts.OutputDir
+	if outputDir == "" {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		outputDir = filepath.Join(currentDir, opts.RepoName)
+	}
+
+	templateSource := opts.TemplateSource
+	if templateSource == "" {
+		// Use the default template for the specified language and project type
+		template, err := c.TemplateRegistry.GetTemplate(opts.Language, opts.ProjectType)
+		if err != nil {
+			return fmt.Errorf("failed to find template for %s/%s: %w", opts.Language, opts.ProjectType, err)
+		}
+		templateSource = template.Source
+	}
+
+	output.VerboseMessage(fmt.Sprintf("Scaffolding project with template source: %s", templateSource))
+	output.VerboseMessage(fmt.Sprintf("Template variables: ProjectName=%s, Language=%s, Type=%s, CreatedBy=%s",
+		templateVars.ProjectName, templateVars.Language, templateVars.ProjectType, templateVars.CreatedBy))
+
 	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}

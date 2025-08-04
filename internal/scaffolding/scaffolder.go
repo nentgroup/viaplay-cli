@@ -106,34 +106,39 @@ func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(destPath, language, proj
 // copyTemplateFiles copies files from the template directory to the destination
 // with variable substitution using the template renderer
 func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, renderer *templ.Renderer) error {
+	// List of directories to skip
+	skipDirs := map[string]bool{
+		".git":         true,
+		"node_modules": true,
+		"vendor":       true,
+		"dist":         true,
+		"build":        true,
+	}
+
+	// List of files to skip
+	skipFiles := map[string]bool{
+		".DS_Store": true,
+		"Thumbs.db": true,
+		".env":      true, // Skip actual .env files (but allow .env.example)
+		".npmrc":    true, // Skip actual .npmrc files with tokens
+		".yarnrc":   true, // Skip actual .yarnrc files with tokens
+	}
+
 	// Walk through the template directory
 	return filepath.Walk(templatePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Skip .git directory
-		if info.IsDir() && info.Name() == ".git" {
-			return filepath.SkipDir
-		}
-
-		// Skip common directories that should not be copied
-		if info.IsDir() && (info.Name() == "node_modules" ||
-			info.Name() == ".idea" ||
-			info.Name() == ".vscode" ||
-			info.Name() == "vendor") {
-			return filepath.SkipDir
-		}
-
-		// Skip hidden files that are typically not meant to be included in templates
-		// but allow specifically useful ones like .gitignore, .github, etc.
 		baseName := filepath.Base(path)
-		if strings.HasPrefix(baseName, ".") &&
-			!info.IsDir() &&
-			baseName != ".gitignore" &&
-			baseName != ".editorconfig" &&
-			baseName != ".env.example" &&
-			!strings.HasPrefix(baseName, ".github") {
+
+		// Skip directories in the skipDirs list
+		if info.IsDir() && skipDirs[baseName] {
+			return filepath.SkipDir
+		}
+
+		// Skip files in the skipFiles list
+		if !info.IsDir() && skipFiles[baseName] {
 			return nil
 		}
 

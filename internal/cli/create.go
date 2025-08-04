@@ -34,6 +34,7 @@ var (
 	projectTypeFlag    string // Type of project (service, cli, etc.)
 	templateSourceFlag string // Custom template source
 	outputDirFlag      string // Directory to create the project in (defaults to current dir + repo name)
+	binaryNameFlag     string // Name of the compiled binary (for compiled languages like Go and Rust)
 )
 
 // createCmd is the parent command for all creation operations
@@ -163,6 +164,7 @@ func createProjectOrRepo(withScaffolding bool) error {
 		Language:    languageFlag,
 		ProjectType: projectTypeFlag,
 		Team:        team,
+		BinaryName:  binaryNameFlag, // Set the binary name from flag
 
 		// Configuration options
 		ConfigDir:     configDir,
@@ -236,4 +238,5 @@ func init() {
 	projectCmd.Flags().StringVar(&projectTypeFlag, "type", "", "Project type (service, cli, lambda, etc.)")
 	projectCmd.Flags().StringVar(&templateSourceFlag, "template-source", "", "Custom template source")
 	projectCmd.Flags().StringVar(&outputDirFlag, "output-dir", "", "Directory to create the project in (defaults to current dir + repo name)")
+	projectCmd.Flags().StringVar(&binaryNameFlag, "binary-name", "", "Name of the compiled binary (for compiled languages like Go and Rust)")
 }

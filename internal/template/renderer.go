@@ -75,8 +75,7 @@ type Variables struct {
 	Environments []string // List of supported environments
 
 	// Organisational information
-	Team           string // Team name
-	DepartmentCode string // Department code (for internal tracking)
+	Team string // Team name
 
 	// Metadata
 	CreatedAt time.Time // When the project was created

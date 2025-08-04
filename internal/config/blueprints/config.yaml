@@ -45,19 +45,19 @@ default_private: true
 templates:
   # Go templates
   "go":
-    "cli": "github@github.com/nentgroup/go-cli-template.git"
-    "lambda": "github@github.com/nentgroup/go-lambda-template.git"
-    "package": "github@github.com/nentgroup/go-package-template.git"
-    "service": "github@github.com/nentgroup/go-service-template.git"
+    "cli": "git@github.com/nentgroup/go-cli-template.git"
+    "lambda": "git@github.com/nentgroup/go-lambda-template.git"
+    "package": "git@github.com/nentgroup/go-package-template.git"
+    "service": "git@github.com/nentgroup/go-service-template.git"
 
   # Rust templates
   "rust":
-    "http-service": "local@/Users/alescole/.config/viaplay/templates_cache/rust/http-service"
+    "service": "git@github.com/nentgroup/rust-http-service-template-2.git"
 
   # TypeScript templates
   "typescript":
-    "service": "github@github.com/nentgroup/ts-service-template.git"
-    "lambda": "github@github.com/nentgroup/ts-lambda-template.git"
+    "service": "git@github.com/nentgroup/ts-service-template.git"
+    "lambda": "git@github.com/nentgroup/ts-lambda-template.git"
 
   # Add more language templates as needed
 

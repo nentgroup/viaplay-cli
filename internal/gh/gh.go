@@ -22,3 +22,12 @@ func NewGitHubClient(token string) *GitHubClient {
 		client: client,
 	}
 }
+
+// GetAuthenticatedUser returns the username of the authenticated GitHub user
+func (c *GitHubClient) GetAuthenticatedUser() (string, error) {
+	user, _, err := c.client.Users.Get(c.ctx, "")
+	if err != nil {
+		return "", err
+	}
+	return user.GetLogin(), nil
+}
