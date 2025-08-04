@@ -11,9 +11,15 @@
 ### Homebrew (macOS & Linux)
 
 ```bash
-brew tap nentgroup/viaplay-cli-2
-brew install vip
+# Set your GitHub token for accessing private repositories
+export HOMEBREW_GITHUB_API_TOKEN=your_github_token
+
+# Tap the repository and install
+brew tap nentgroup/viaplay-cli-2 https://github.com/nentgroup/viaplay-cli-2
+brew install --cask vip
 ```
+
+> **Note:** The `HOMEBREW_GITHUB_API_TOKEN` is required to access private repositories. You can generate a token with the `repo` scope at [GitHub Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens).
 
 ### Manual Installation
 
