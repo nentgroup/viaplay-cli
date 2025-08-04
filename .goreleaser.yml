@@ -40,7 +40,7 @@ homebrew_casks:
       name: Alessandro Coletti
       email: alessandro.coletti@viaplaygroup.com
     directory: Casks
-    homepage: "https://example.com/" # TODO: Replace with your actual homepage
+    homepage: "https://nentgroup.github.io/viaplay-cli-2"
     description: "CLI tool for Gecko Generators."
     url:
       template: "https://github.com/nentgroup/viaplay-cli-2/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
