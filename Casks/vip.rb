@@ -3,8 +3,8 @@ cask "vip" do
   require File.expand_path("lib/custom_download_strategy.rb", __dir__)
 
   desc "CLI tool for Gecko Generators."
-  homepage "https://example.com/"
-  version "0.1.1"
+  homepage "https://nentgroup.github.io/viaplay-cli-2"
+  version "0.1.2"
 
   livecheck do
     skip "Auto-generated on release."
@@ -14,27 +14,27 @@ cask "vip" do
 
   on_macos do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.1/viaplay-cli-2_0.1.1_darwin_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.2/viaplay-cli-2_0.1.2_darwin_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "5bcc8bcac0acd141b14f96211dd35a58e6082520b86568f8c98f07f46617be61"
+      sha256 "a148568f50b0b8f3bb2da3aa666a15b8e0451824a02253eb5fbec2206f7e0ce2"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.1/viaplay-cli-2_0.1.1_darwin_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.2/viaplay-cli-2_0.1.2_darwin_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "84cb90898ff6448282867a7dab8e57e35e703db60d5c1bf066f9783520c34e8f"
+      sha256 "45eba114650e661dfea56a4a57bec182cf5975f96d87c933c2e9baa6979db6ee"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.1/viaplay-cli-2_0.1.1_linux_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.2/viaplay-cli-2_0.1.2_linux_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "d90ef43284b1e3bc1b5252b6c646308d47bf7eb9bbd4f459e320f110a8ef8092"
+      sha256 "4e07f3a1a75aa7e6ed51d9b20c70e7bb40e02000f5e56b00f8f0de36d7bd691d"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.1/viaplay-cli-2_0.1.1_linux_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.1.2/viaplay-cli-2_0.1.2_linux_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "6d52cad12b40bfc56515a7a16236cde8d25121ffed4d5f514012f9a61dfc2773"
+      sha256 "c105eb25350a4c31d2bd48e4317fe729bcf51ab07c7a4da395c3e243b327e8a2"
     end
   end
 
