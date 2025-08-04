@@ -298,6 +298,16 @@ func (c *Creator) scaffoldProject(opts CreateOptions) error {
 // and should be implemented similarly to the functions in create.go
 
 func (c *Creator) applyTeamEnvs(owner, repo, teamDir string) {
+	// Expand tilde in path if it exists
+	if strings.HasPrefix(teamDir, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			output.ErrorMessage(fmt.Sprintf("Failed to get user home directory: %v", err))
+			return
+		}
+		teamDir = filepath.Join(home, teamDir[1:])
+	}
+
 	envsDir := filepath.Join(teamDir, "envs")
 
 	entries, err := os.ReadDir(envsDir)
