@@ -11,7 +11,7 @@ var blueprintFiles embed.FS
 
 // Blueprint file names
 const (
-	ConfigBlueprintFile      = "blueprints/config.yml"
+	ConfigBlueprintFile      = "blueprints/config.yaml" // Changed from config.yml to config.yaml
 	EnvironmentBlueprintFile = "blueprints/environment.json"
 	RulesetBlueprintFile     = "blueprints/ruleset.json"
 	SecretsBlueprintFile     = "blueprints/secrets.json"
@@ -22,7 +22,7 @@ func GetBlueprintContent(blueprintName string) ([]byte, error) {
 	// Map short names to full paths
 	blueprintPath := blueprintName
 	switch blueprintName {
-	case "config.yml":
+	case "config.yml", "config.yaml": // Accept both extensions
 		blueprintPath = ConfigBlueprintFile
 	case "environment.json":
 		blueprintPath = EnvironmentBlueprintFile
