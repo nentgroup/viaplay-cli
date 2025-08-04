@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.7...v0.1.8) (2025-08-04)
+
+
+### Bug Fixes
+
+* expand tilde ~ to homemapa when handling config files ([2535083](https://github.com/nentgroup/viaplay-cli-2/commit/2535083e6107281cf0a919834b63e18a317b3d57))
+
 ## [0.1.7](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.6...v0.1.7) (2025-08-04)
 
 
