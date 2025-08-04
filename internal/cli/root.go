@@ -99,8 +99,12 @@ func printBanner() {
 		"╚██╗ ██╔╝██║██╔══██║██╔═══╝ ██║     ██╔══██║  ╚██╔╝ ╚════╝██║     ██║     ██║",
 		" ╚████╔╝ ██║██║  ██║██║     ███████╗██║  ██║   ██║        ╚██████╗███████╗██║",
 		"  ╚═══╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝         ╚═════╝╚══════╝╚═╝",
-		"                                                                v1.0.0",
 	}
+
+	// Add the version as the last line of the banner
+	versionLine := fmt.Sprintf("                                                                v%s", Version)
+	bannerLines = append(bannerLines, versionLine)
+
 	p := termenv.ColorProfile()
 	colors := []string{"#e6007a", "#ff4e50"}
 	for i, line := range bannerLines {

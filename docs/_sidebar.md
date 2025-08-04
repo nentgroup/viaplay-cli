@@ -13,4 +13,5 @@
   - [Auth](cli/auth.md)
   - [Cache](cli/cache.md)
   - [Version](cli/version.md)
+- [Changelog](changelog.md)
 - [FAQ](faq.md)
