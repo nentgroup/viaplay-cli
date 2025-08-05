@@ -3,6 +3,7 @@ module github.com/nentgroup/viaplay-cli
 go 1.24.1
 
 require (
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/fatih/color v1.18.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/muesli/termenv v0.16.0
@@ -10,16 +11,15 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/zalando/go-keyring v0.2.6
-	golang.org/x/crypto v0.32.0
+	golang.org/x/crypto v0.35.0
 	golang.org/x/oauth2 v0.25.0
-	golang.org/x/term v0.28.0
+	golang.org/x/term v0.29.0
 )
 
 require (
 	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
