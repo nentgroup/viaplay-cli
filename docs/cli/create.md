@@ -31,6 +31,7 @@ The `vip create` command is used to create projects and repositories with GitHub
 - `--template-source`: Custom template source
 - `--output-dir`: Directory to create the project in
 - `--binary-name`: Name of the compiled binary (for compiled languages like Go and Rust)
+- `--run-hooks`: Enable execution of post-installation hooks defined in the template (default is true)
 
 ---
 
@@ -39,6 +40,7 @@ The `vip create` command is used to create projects and repositories with GitHub
 ```bash
 vip create project --name myservice --language go --type service --team myteam --verbose
 vip create repo --name myrepo --public --team myteam --verbose
+vip create project --name myservice --language rust --type service --binary-name custom-binary
 ```
 
 ---

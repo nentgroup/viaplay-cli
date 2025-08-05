@@ -22,6 +22,7 @@ var (
 	publicFlag      bool   = false // Default to private repositories
 	repoSecretsFlag string         // JSON string for repo-specific secrets
 	secretsFileFlag string         // Path to secrets file
+	noRepoFlag      bool   = false // Skip GitHub repository creation
 
 	// Team flags
 	teamFlag          string
@@ -30,11 +31,12 @@ var (
 	applySecretsFlag  bool
 
 	// Project-specific flags
-	languageFlag       string // Programming language for the project
-	projectTypeFlag    string // Type of project (service, cli, etc.)
-	templateSourceFlag string // Custom template source
-	outputDirFlag      string // Directory to create the project in (defaults to current dir + repo name)
-	binaryNameFlag     string // Name of the compiled binary (for compiled languages like Go and Rust)
+	languageFlag       string         // Programming language for the project
+	projectTypeFlag    string         // Type of project (service, cli, etc.)
+	templateSourceFlag string         // Custom template source
+	outputDirFlag      string         // Directory to create the project in (defaults to current dir + repo name)
+	binaryNameFlag     string         // Name of the compiled binary (for compiled languages like Go and Rust)
+	skipHooksFlag      bool   = false // Skip running post-installation hooks
 )
 
 // createCmd is the parent command for all creation operations
@@ -159,12 +161,14 @@ func createProjectOrRepo(withScaffolding bool) error {
 		RepoOwner:       owner,
 		IsPrivate:       !publicFlag, // Convert public flag to private flag
 		IsOrg:           viper.GetBool("is_org"),
+		SkipRepo:        noRepoFlag, // Skip GitHub repository creation if --no-repo is set
 
 		// Project options
 		Language:    languageFlag,
 		ProjectType: projectTypeFlag,
 		Team:        team,
 		BinaryName:  binaryNameFlag, // Set the binary name from flag
+		SkipHooks:   skipHooksFlag,  // Skip running post-installation hooks if flag is set
 
 		// Configuration options
 		ConfigDir:     configDir,
@@ -239,4 +243,6 @@ func init() {
 	projectCmd.Flags().StringVar(&templateSourceFlag, "template-source", "", "Custom template source")
 	projectCmd.Flags().StringVar(&outputDirFlag, "output-dir", "", "Directory to create the project in (defaults to current dir + repo name)")
 	projectCmd.Flags().StringVar(&binaryNameFlag, "binary-name", "", "Name of the compiled binary (for compiled languages like Go and Rust)")
+	projectCmd.Flags().BoolVar(&noRepoFlag, "no-repo", false, "Skip GitHub repository creation (local project only)")
+	projectCmd.Flags().BoolVar(&skipHooksFlag, "skip-hooks", false, "Skip running post-installation hooks")
 }

@@ -27,10 +27,11 @@ type Variables struct {
 	ProjectDescription string // Description of the project
 
 	// Repository information
-	RepoOwner string // GitHub username or organisation name
-	RepoName  string // Repository name (often same as ProjectName)
-	RepoURL   string // Full GitHub repository URL
-	IsPrivate bool   // Whether the repository is private
+	RepoOwner  string // GitHub username or organisation name
+	RepoName   string // Repository name (often same as ProjectName)
+	RepoURL    string // Full GitHub repository URL (HTTPS)
+	RepoSSHURL string // SSH URL for the repository
+	IsPrivate  bool   // Whether the repository is private
 
 	// Project language and type
 	Language    string // Programming language (e.g., "go", "typescript", "python")

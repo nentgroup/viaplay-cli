@@ -148,4 +148,4 @@ console.log(`Service {{{.ServiceName}}} ({{{.ServiceType}}}) running on port {{{
 
 ---
 
-For more on templates and teams, see the [Configuration](configuration.md) and [Project & Repo Creation](project-creation.md) sections.
+For more information on template variables, see [Template Variables](templates.md).

@@ -97,6 +97,68 @@ github_api: "https://api.github.com"
 container_registry: "ecr"
 
 # -----------------------------------------------
+# Post-Install Hooks
+# -----------------------------------------------
+
+# Hooks to run after a project is scaffolded
+# Uses a hierarchical structure:
+# hooks.post.install.[language].[project_type]
+hooks:
+  post:
+    install:
+      # Commands that run for all projects regardless of language or type
+      run:
+        - "echo 'Setting up new project: {{{.ProjectName}}}'"
+      # scripts:
+      #   - "global/setup.sh"
+
+      # Language-specific hooks
+      go:
+        # Hooks for all Go projects
+        run:
+          - "go mod tidy"
+          - |
+            echo "Running multi-line hook example"
+            echo "Creating go.work file for the project"
+            cat > go.work << EOF
+            go {{{.GoVersion}}}
+            
+            use .
+            EOF
+            echo "go.work file created"
+
+        # Project type specific hooks within Go
+        service:
+          run:
+            - "echo 'Building Go service...'"
+            - "go build ./..."
+            - "echo 'Setting up development environment...'"
+            - "mkdir -p .vscode"
+            - "touch .vscode/settings.json"
+
+        cli:
+          run:
+            - "go mod tidy"
+            - "go install ./cmd/{{{.BinaryName}}}"
+            - "echo 'CLI tool installed at: $(which {{{.BinaryName}}})'"
+
+      typescript:
+        # Hooks for all TypeScript projects
+        run:
+          - "npm install"
+
+        # Project type specific hooks within TypeScript
+        service:
+          run:
+            - "npm install"
+            - "npm run build"
+            - "echo 'TypeScript service built successfully'"
+
+        lambda:
+          scripts:
+            - "setup/ts-lambda-init.js"
+
+# -----------------------------------------------
 # Advanced Settings
 # -----------------------------------------------
 

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-github/v74/github"
 	"github.com/zalando/go-keyring"
 
@@ -49,12 +48,14 @@ type CreateOptions struct {
 	RepoOwner       string
 	IsPrivate       bool
 	IsOrg           bool
+	SkipRepo        bool // Skip GitHub repository creation
 
 	// Project options
 	Language    string
 	ProjectType string
 	Team        string
 	BinaryName  string // Name for compiled binary (for Go, Rust, etc.)
+	SkipHooks   bool   // Skip running post-installation hooks
 
 	// Configuration options
 	ConfigDir     string
@@ -93,7 +94,7 @@ func NewCreator(ghClient *gh.GitHubClient, configDir string) *Creator {
 	}
 
 	// Create scaffolder
-	scaffolder := scaffolding.NewProjectScaffolder(cacheManager)
+	scaffolder := scaffolding.NewProjectScaffolder(cacheManager, cfg)
 
 	return &Creator{
 		GitHubClient:     ghClient,
@@ -117,6 +118,7 @@ func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 	vars.RepoName = opts.RepoName
 	vars.IsPrivate = opts.IsPrivate
 	vars.RepoURL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
+	vars.RepoSSHURL = fmt.Sprintf("git@github.com:%s/%s.git", opts.RepoOwner, opts.RepoName)
 
 	// Project language and type
 	vars.Language = opts.Language
@@ -161,7 +163,6 @@ func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 
 	// Docker variables
 	vars.DockerImageName = strings.ToLower(opts.RepoName)
-	spew.Dump(vars)
 	return vars
 }
 
@@ -191,7 +192,7 @@ func (c *Creator) CreateProject(opts CreateOptions) error {
 
 	// Convert options to template variables
 	templateVars := createOptionsToTemplateVariables(opts)
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars); err != nil {
+	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 
@@ -229,19 +230,24 @@ func (c *Creator) Create(opts CreateOptions) error {
 		fmt.Println(" done")
 	}
 
-	output.VerboseMessage("Creating repository on GitHub...")
-	fmt.Printf("Creating repository...")
-	_, err = c.createRepository(opts)
-	if err != nil {
-		output.VerboseMessage(fmt.Sprintf("Repository creation error: %v", err))
-		if !strings.Contains(err.Error(), "name already exists on this account") {
-			fmt.Println(" failed")
-			return fmt.Errorf("failed to create repository: %w", err)
-		}
-		fmt.Println(" already exists, proceeding")
+	if opts.SkipRepo {
+		output.VerboseMessage("Skipping GitHub repository creation as per options.")
+		fmt.Println("skipped")
 	} else {
-		output.VerboseMessage("Repository created successfully.")
-		fmt.Println(" done")
+		output.VerboseMessage("Creating repository on GitHub...")
+		fmt.Printf("Creating repository...")
+		_, err = c.createRepository(opts)
+		if err != nil {
+			output.VerboseMessage(fmt.Sprintf("Repository creation error: %v", err))
+			if !strings.Contains(err.Error(), "name already exists on this account") {
+				fmt.Println(" failed")
+				return fmt.Errorf("failed to create repository: %w", err)
+			}
+			fmt.Println(" already exists, proceeding")
+		} else {
+			output.VerboseMessage("Repository created successfully.")
+			fmt.Println(" done")
+		}
 	}
 
 	output.VerboseMessage("Applying GitHub configurations (envs, rulesets, secrets)...")
@@ -305,6 +311,7 @@ func (c *Creator) applyGitHubConfigurations(opts CreateOptions) error {
 		output.VerboseMessage("Creating default 'staging' environment (team envs not applied)...")
 		// Create default staging environment if not applying team envs
 		err := c.GitHubClient.CreateEnvironment(opts.RepoOwner, opts.RepoName, "staging")
+		err = nil
 		if err != nil {
 			if !strings.Contains(err.Error(), "already exists") {
 				fmt.Printf("\nFailed to create environment: %v\n", err)
@@ -353,7 +360,7 @@ func (c *Creator) scaffoldProject(opts CreateOptions) error {
 	}
 
 	templateVars := createOptionsToTemplateVariables(opts)
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars); err != nil {
+	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 
@@ -362,13 +369,24 @@ func (c *Creator) scaffoldProject(opts CreateOptions) error {
 
 // scaffoldProjectWithVariables scaffolds a project locally with pre-populated template variables
 func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars *template.Variables) error {
+	// Determine output directory
 	outputDir := opts.OutputDir
 	if outputDir == "" {
+		// If no output directory is specified, use current directory
 		currentDir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("failed to get current directory: %w", err)
 		}
+		// Create a subdirectory with the project/repo name
 		outputDir = filepath.Join(currentDir, opts.RepoName)
+	} else {
+		// If output directory is specified, create a subdirectory with the project/repo name
+		outputDir = filepath.Join(outputDir, opts.RepoName)
+	}
+
+	// Ensure the output directory exists
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	templateSource := opts.TemplateSource
@@ -385,7 +403,7 @@ func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars 
 	output.VerboseMessage(fmt.Sprintf("Template variables: ProjectName=%s, Language=%s, Type=%s, CreatedBy=%s",
 		templateVars.ProjectName, templateVars.Language, templateVars.ProjectType, templateVars.CreatedBy))
 
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars); err != nil {
+	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 

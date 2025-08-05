@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/nentgroup/viaplay-cli/internal/cache"
+	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/git"
 	templ "github.com/nentgroup/viaplay-cli/internal/template"
 )
@@ -22,12 +23,14 @@ const (
 // ProjectScaffolder handles applying templates to create project structures
 type ProjectScaffolder struct {
 	CacheManager *cache.Manager
+	Config       *config.Configuration
 }
 
 // NewProjectScaffolder creates a new project scaffolder
-func NewProjectScaffolder(cacheManager *cache.Manager) *ProjectScaffolder {
+func NewProjectScaffolder(cacheManager *cache.Manager, cfg *config.Configuration) *ProjectScaffolder {
 	return &ProjectScaffolder{
 		CacheManager: cacheManager,
+		Config:       cfg,
 	}
 }
 
@@ -62,7 +65,7 @@ func (ps *ProjectScaffolder) ScaffoldProject(destPath, language, projectType, te
 	}
 
 	// Run any post-scaffolding commands
-	if err := ps.runPostScaffoldCommands(destPath, language, projectType); err != nil {
+	if err := ps.runPostScaffoldCommands(destPath, language, projectType, templateVars); err != nil {
 		return fmt.Errorf("failed to run post-scaffold commands: %w", err)
 	}
 
@@ -70,7 +73,7 @@ func (ps *ProjectScaffolder) ScaffoldProject(destPath, language, projectType, te
 }
 
 // ScaffoldProjectWithOptions creates a project structure from a template using a strongly-typed options struct
-func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(destPath, language, projectType, templateSource string, opts interface{}) error {
+func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(destPath, language, projectType, templateSource string, opts interface{}, skipHooks bool) error {
 	// Ensure the template is available in the cache
 	templatePath, err := ps.CacheManager.EnsureTemplate(language, projectType, templateSource)
 	if err != nil {
@@ -95,9 +98,13 @@ func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(destPath, language, proj
 		return fmt.Errorf("failed to copy template files: %w", err)
 	}
 
-	// Run any post-scaffolding commands
-	if err := ps.runPostScaffoldCommands(destPath, language, projectType); err != nil {
-		return fmt.Errorf("failed to run post-scaffold commands: %w", err)
+	// Run any post-scaffolding commands if hooks are not skipped
+	if !skipHooks {
+		if err := ps.runPostScaffoldCommands(destPath, language, projectType, templateVars); err != nil {
+			return fmt.Errorf("failed to run post-scaffold commands: %w", err)
+		}
+	} else {
+		fmt.Println("Skipping post-installation hooks...")
 	}
 
 	return nil
@@ -186,8 +193,8 @@ func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, re
 }
 
 // runPostScaffoldCommands runs any post-scaffold commands for the template
-func (ps *ProjectScaffolder) runPostScaffoldCommands(projectPath, language, projectType string) error {
-	// Check for post-scaffold script
+func (ps *ProjectScaffolder) runPostScaffoldCommands(projectPath, language, projectType string, templateVars *templ.Variables) error {
+	// Check for legacy post-scaffold script (for backward compatibility)
 	scriptPath := filepath.Join(projectPath, ".post-scaffold.sh")
 	if _, err := os.Stat(scriptPath); err == nil {
 		// Make the script executable
@@ -210,7 +217,17 @@ func (ps *ProjectScaffolder) runPostScaffoldCommands(projectPath, language, proj
 		}
 	}
 
-	// Language-specific initialization
+	// Get renderer for template variables
+	renderer := templ.NewRenderer(templateVars)
+
+	// Execute hooks from configuration
+	if ps.Config != nil {
+		if err := ps.runConfiguredHooks(projectPath, language, projectType, renderer); err != nil {
+			return fmt.Errorf("failed to run configured hooks: %w", err)
+		}
+	}
+
+	// Language-specific initialization (fallback for older templates)
 	switch language {
 	case "go":
 		if err := ps.initGoProject(projectPath); err != nil {
@@ -224,6 +241,104 @@ func (ps *ProjectScaffolder) runPostScaffoldCommands(projectPath, language, proj
 
 	return nil
 }
+
+// runConfiguredHooks executes hooks defined in the configuration
+func (ps *ProjectScaffolder) runConfiguredHooks(projectPath, language, projectType string, renderer *templ.Renderer) error {
+	// Check if we have hooks for this language and project type
+	hooks := ps.Config.GetPostInstallHooks(language, projectType)
+	if len(hooks) == 0 {
+		// No hooks configured
+		return nil
+	}
+
+	fmt.Printf("Running post-install hooks for %s %s project...\n", language, projectType)
+
+	// Execute hooks in order (general -> language-specific -> project-type-specific)
+	for _, hook := range hooks {
+		// Process commands
+		for _, cmd := range hook.GetAllCommands() {
+			// Render template variables in the command
+			renderedCmd, err := renderer.RenderString(cmd)
+			if err != nil {
+				return fmt.Errorf("failed to render run command template: %w", err)
+			}
+
+			fmt.Printf("Executing: %s\n", renderedCmd)
+
+			// Create a command that will run in the project directory
+			execCmd := exec.Command("sh", "-c", renderedCmd)
+			execCmd.Dir = projectPath
+			execCmd.Stdout = os.Stdout
+			execCmd.Stderr = os.Stderr
+
+			// Run the command
+			if err := execCmd.Run(); err != nil {
+				return fmt.Errorf("hook command failed: %w", err)
+			}
+		}
+
+		// Process scripts
+		for _, scriptPath := range hook.GetAllScripts() {
+			// Render template variables in the script path
+			renderedScriptPath, err := renderer.RenderString(scriptPath)
+			if err != nil {
+				return fmt.Errorf("failed to render script path template: %w", err)
+			}
+
+			// Check if this is a relative path or absolute
+			fullScriptPath := renderedScriptPath
+			if !filepath.IsAbs(renderedScriptPath) {
+				// If it's relative, look in the hooks directory
+				fullScriptPath = filepath.Join(ps.Config.GetHooksDir(), renderedScriptPath)
+			}
+
+			// Check if script exists
+			if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
+				return fmt.Errorf("hook script not found: %s", fullScriptPath)
+			}
+
+			fmt.Printf("Executing script: %s\n", fullScriptPath)
+
+			// Create a command to run the script
+			execCmd := exec.Command(fullScriptPath)
+			execCmd.Dir = projectPath
+			execCmd.Stdout = os.Stdout
+			execCmd.Stderr = os.Stderr
+
+			// Run the script
+			if err := execCmd.Run(); err != nil {
+				return fmt.Errorf("hook script failed: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+//// templateVarsToEnv converts template variables to environment variables
+//// that can be passed to scripts
+//func (ps *ProjectScaffolder) templateVarsToEnv(vars *templ.Variables) []string {
+//	env := []string{}
+//
+//	// Convert the template variables to a map
+//	varMap := vars.ToMap()
+//
+//	// Convert each variable to an environment variable
+//	for key, value := range varMap {
+//		// Skip empty values
+//		if value == "" {
+//			continue
+//		}
+//
+//		// Convert to uppercase environment variable format
+//		envKey := "VIP_" + strings.ToUpper(key)
+//		envValue := fmt.Sprintf("%v", value)
+//
+//		env = append(env, fmt.Sprintf("%s=%s", envKey, envValue))
+//	}
+//
+//	return env
+//}
 
 // initGoProject initialises a Go project with proper module setup
 func (ps *ProjectScaffolder) initGoProject(projectPath string) error {

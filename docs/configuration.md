@@ -111,8 +111,92 @@ Rulesets define branch protection and repository rules for GitHub repositories. 
 }
 ```
 
-- For more details on GitHub rulesets, see the [GitHub Ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets).
+- For more details on GitHub rulesets, see the [GitHub Ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets).
 - Reference your ruleset file in your config under the appropriate team or project section.
+
+---
+
+## Post-Installation Hooks
+
+Hooks allow you to run commands or scripts after project creation. They are defined in the global configuration file and run automatically unless disabled with the `--run-hooks=false` flag during project creation.
+
+### Hook Configuration Syntax
+
+Hooks are configured in the global config.yaml file under the `hooks` section:
+
+```yaml
+hooks:
+  post:
+    install:
+      # Commands that run for all projects
+      run:
+        - "echo 'Project setup complete!'"
+        - "git init && git add . && git commit -m 'Initial commit'"
+      
+      # Language-specific commands
+      go:
+        # Hooks for all Go projects
+        run:
+          - "go mod tidy"
+        
+        # Project type specific hooks within Go
+        cli:
+          run:
+            - "go build -o bin/{{{.BinaryName}}} ./cmd/{{{.BinaryName}}}"
+        
+        service:
+          run:
+            - "go build ./..."
+            - "docker build -t {{{.DockerImageName}}} ."
+      
+      typescript:
+        # Hooks for all TypeScript projects
+        run:
+          - "npm install"
+        
+        # Project type specific hooks within TypeScript
+        service:
+          run:
+            - "npm run build"
+```
+
+### Hook Organization
+
+Hooks are organized hierarchically:
+
+- **Stage** (`post`): When the hook runs (currently only post-installation is supported)
+- **Event** (`install`): The event that triggers the hook
+- **Language** (optional): Specify hooks for specific programming languages
+  - **Project Type** (optional): Further specify hooks for particular project types within a language
+- **Hook Type**:
+  - `run`: Inline shell commands to execute
+  - `scripts`: Paths to executable scripts to run
+
+During project creation, hooks are executed in order from most general to most specific:
+1. General hooks under `install/run`
+2. Language-specific hooks (e.g., `install/go/run`)
+3. Project type-specific hooks (e.g., `install/go/service/run`)
+
+### Hook Variables
+
+Hooks can use the same template variables available during project creation:
+
+```yaml
+hooks:
+  post:
+    install:
+      run:
+        - "echo 'Setting up {{{.ProjectName}}}'"
+        - "mkdir -p build/{{{.BinaryName}}}"
+```
+
+### Best Practices for Hooks
+
+- Keep hooks idempotent when possible
+- Handle errors gracefully
+- Use scripts for complex logic
+- Keep inline commands short and focused
+- Organize language-specific commands under their respective keys
 
 ---
 
