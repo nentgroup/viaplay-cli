@@ -5,6 +5,8 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -96,6 +98,9 @@ manually or migrate existing code to a new repository.`,
 // createProjectOrRepo is a shared function that handles both project and repo creation
 // The withScaffolding parameter determines whether to include scaffolding
 func createProjectOrRepo(withScaffolding bool) error {
+	// Start timing the operation
+	startTime := time.Now()
+
 	// Authenticate with GitHub
 	output.AuthMessage("Authenticating with GitHub...")
 	token, err := gh.Authenticate()
@@ -150,6 +155,36 @@ func createProjectOrRepo(withScaffolding bool) error {
 		secretsData = string(data)
 	}
 
+	// Determine the project directory path
+	projectDir := outputDirFlag
+	if projectDir == "" {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		projectDir = filepath.Join(currentDir, repoName)
+	} else {
+		projectDir = filepath.Join(projectDir, repoName)
+	}
+
+	// Check if the project directory already exists when scaffolding
+	if withScaffolding {
+		if _, err := os.Stat(projectDir); err == nil {
+			return fmt.Errorf("project directory already exists: %s", projectDir)
+		}
+	}
+
+	// Check if the repository already exists on GitHub when not skipping repo creation
+	if !noRepoFlag {
+		repoExists, err := ghClient.RepositoryExists(owner, repoName)
+		if err != nil {
+			return fmt.Errorf("failed to check if repository exists: %w", err)
+		}
+		if repoExists {
+			return fmt.Errorf("repository already exists: %s/%s", owner, repoName)
+		}
+	}
+
 	// Create project creator
 	creator := project.NewCreator(ghClient, configDir)
 
@@ -179,12 +214,101 @@ func createProjectOrRepo(withScaffolding bool) error {
 
 		// Template options (only used if withScaffolding is true)
 		TemplateSource: templateSourceFlag,
-		CloneLocal:     withScaffolding, // Always true for project, false for repo
+		Scaffold:       withScaffolding, // Always true for project, false for repo
 		OutputDir:      outputDirFlag,
 	}
 
 	// Execute the project creation workflow
-	return creator.Create(opts)
+	summary, err := creator.Create(opts)
+	if err != nil {
+		return err
+	}
+
+	// Calculate total execution time
+	executionTime := time.Since(startTime)
+
+	// Print the project summary with execution time
+	printProjectSummary(summary, executionTime)
+
+	return nil
+}
+
+// formatDuration formats a duration to be more human-readable
+func formatDuration(d time.Duration) string {
+	// For very short durations (less than a second), show milliseconds
+	if d < time.Second {
+		return fmt.Sprintf("%.2f ms", float64(d.Milliseconds()))
+	}
+
+	// For durations between 1 second and 1 minute
+	if d < time.Minute {
+		seconds := d.Seconds()
+		return fmt.Sprintf("%.2f seconds", seconds)
+	}
+
+	// For longer durations, use minutes and seconds
+	minutes := int(d.Minutes())
+	seconds := int(d.Seconds()) % 60
+	if seconds == 0 {
+		return fmt.Sprintf("%d minute%s", minutes, pluralS(minutes))
+	}
+	return fmt.Sprintf("%d minute%s %d second%s",
+		minutes, pluralS(minutes),
+		seconds, pluralS(seconds))
+}
+
+// pluralS returns "s" if count is not 1, otherwise empty string
+func pluralS(count int) string {
+	if count == 1 {
+		return ""
+	}
+	return "s"
+}
+
+// printProjectSummary prints the project creation summary in a nice format
+func printProjectSummary(summary *project.ProjectSummary, executionTime time.Duration) {
+	fmt.Println("\n📋 Project Summary:")
+	fmt.Println("-------------------")
+
+	fmt.Printf("📁 Project location: %s\n", summary.ProjectPath)
+
+	if summary.RepoURL != "" {
+		fmt.Printf("🔗 Repository URL: %s\n", summary.RepoURL)
+	}
+
+	fmt.Printf("⚙️  Project type: %s/%s\n", summary.Language, summary.ProjectType)
+
+	if summary.Team != "" {
+		fmt.Printf("👥 Team: %s\n", summary.Team)
+	}
+
+	if summary.AppliedEnvs {
+		fmt.Printf("🌍 Environments: Applied from team configuration\n")
+	} else {
+		fmt.Printf("🌍 Environments: Default staging environment\n")
+	}
+
+	if summary.AppliedRulesets {
+		fmt.Printf("🔒 Rulesets: Applied from team configuration\n")
+	}
+
+	if summary.AppliedSecrets {
+		fmt.Printf("🔑 Secrets: Applied from team configuration\n")
+	}
+
+	if summary.CustomSecrets {
+		fmt.Printf("🔑 Custom secrets: Applied\n")
+	}
+
+	// Print any non-fatal errors that occurred
+	if len(summary.Errors) > 0 {
+		fmt.Println("\n⚠️ Warnings:")
+		for _, err := range summary.Errors {
+			fmt.Printf("   - %s\n", err)
+		}
+	}
+
+	fmt.Printf("\nProject creation complete in %s\n", formatDuration(executionTime))
 }
 
 // Helper to set up project scaffolding options

@@ -22,6 +22,20 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/template"
 )
 
+// ProjectSummary contains details about the created project to be displayed to the user
+type ProjectSummary struct {
+	ProjectPath     string   // Full path to the project location
+	RepoURL         string   // GitHub repository URL
+	Language        string   // Programming language used
+	ProjectType     string   // Type of project (service, CLI, etc.)
+	Team            string   // Team assigned to the project
+	AppliedEnvs     bool     // Whether environments were applied
+	AppliedRulesets bool     // Whether rulesets were applied
+	AppliedSecrets  bool     // Whether secrets were applied
+	CustomSecrets   bool     // Whether custom secrets were applied
+	Errors          []string // Any non-fatal errors that occurred
+}
+
 // Creator manages the project creation workflow
 type Creator struct {
 	// GitHub client for repository operations
@@ -66,8 +80,8 @@ type CreateOptions struct {
 
 	// Template options
 	TemplateSource string
-	CloneLocal     bool   // Whether to clone the repo locally
-	OutputDir      string // Local directory for the project (if CloneLocal is true)
+	Scaffold       bool   // Wether to scaffold the project, always true for project creation
+	OutputDir      string // Local directory for the project (if Scaffold is true)
 }
 
 // NewCreator creates a new project creator with the given GitHub client and config directory
@@ -200,13 +214,26 @@ func (c *Creator) CreateProject(opts CreateOptions) error {
 }
 
 // Create handles the full project creation workflow
-func (c *Creator) Create(opts CreateOptions) error {
+func (c *Creator) Create(opts CreateOptions) (*ProjectSummary, error) {
 	output.VerboseMessage(fmt.Sprintf("Starting project creation with options: %+v", opts))
+
+	// Initialize project summary
+	summary := &ProjectSummary{
+		Language:        opts.Language,
+		ProjectType:     opts.ProjectType,
+		Team:            opts.Team,
+		AppliedEnvs:     opts.ApplyEnvs,
+		AppliedRulesets: opts.ApplyRulesets,
+		AppliedSecrets:  opts.ApplySecrets,
+		CustomSecrets:   opts.RepoSecrets != "",
+		Errors:          []string{},
+	}
 
 	// Get authenticated user for CreatedBy field
 	username, err := c.GitHubClient.GetAuthenticatedUser()
 	if err != nil {
 		output.VerboseMessage(fmt.Sprintf("Failed to get authenticated username: %v", err))
+		summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to get authenticated username: %v", err))
 	}
 
 	// Convert options to template variables with additional info
@@ -218,13 +245,26 @@ func (c *Creator) Create(opts CreateOptions) error {
 		output.VerboseMessage(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", username))
 	}
 
-	if opts.CloneLocal {
+	// Determine the project path
+	projectPath := opts.OutputDir
+	if projectPath == "" {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current directory: %w", err)
+		}
+		projectPath = filepath.Join(currentDir, opts.RepoName)
+	} else {
+		projectPath = filepath.Join(projectPath, opts.RepoName)
+	}
+	summary.ProjectPath = projectPath
+
+	if opts.Scaffold {
 		output.VerboseMessage("Scaffolding project locally...")
 		fmt.Printf("Scaffolding project...")
 		if err := c.scaffoldProjectWithVariables(opts, templateVars); err != nil {
 			output.VerboseMessage(fmt.Sprintf("Project scaffolding failed: %v", err))
 			fmt.Println(" failed")
-			return fmt.Errorf("failed to scaffold project: %w", err)
+			return nil, fmt.Errorf("failed to scaffold project: %w", err)
 		}
 		output.VerboseMessage("Project scaffolding complete.")
 		fmt.Println(" done")
@@ -232,7 +272,6 @@ func (c *Creator) Create(opts CreateOptions) error {
 
 	if opts.SkipRepo {
 		output.VerboseMessage("Skipping GitHub repository creation as per options.")
-		fmt.Println("skipped")
 	} else {
 		output.VerboseMessage("Creating repository on GitHub...")
 		fmt.Printf("Creating repository...")
@@ -241,50 +280,64 @@ func (c *Creator) Create(opts CreateOptions) error {
 			output.VerboseMessage(fmt.Sprintf("Repository creation error: %v", err))
 			if !strings.Contains(err.Error(), "name already exists on this account") {
 				fmt.Println(" failed")
-				return fmt.Errorf("failed to create repository: %w", err)
+				return nil, fmt.Errorf("failed to create repository: %w", err)
 			}
 			fmt.Println(" already exists, proceeding")
 		} else {
 			output.VerboseMessage("Repository created successfully.")
 			fmt.Println(" done")
 		}
+
+		// Set the repository URL in the summary
+		summary.RepoURL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
 	}
 
 	output.VerboseMessage("Applying GitHub configurations (envs, rulesets, secrets)...")
-	fmt.Printf("Creating default environment...")
+	fmt.Printf("Applying GitHub configurations...")
 	if err := c.applyGitHubConfigurations(opts); err != nil {
 		output.VerboseMessage(fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
 		fmt.Println(" failed")
-		return fmt.Errorf("failed to apply GitHub configurations: %w", err)
+		summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
 	}
 	output.VerboseMessage("GitHub configurations applied.")
 	fmt.Println(" done")
 
-	if opts.CloneLocal {
-		output.VerboseMessage("Pushing project to GitHub...")
-		repoURL := fmt.Sprintf("https://github.com/%s/%s.git", opts.RepoOwner, opts.RepoName)
+	// Run post-installation hooks only if they're not skipped and we've scaffolded locally
+	if opts.Scaffold && !opts.SkipHooks {
 		outputDir := opts.OutputDir
 		if outputDir == "" {
 			currentDir, err := os.Getwd()
 			if err != nil {
 				output.VerboseMessage(fmt.Sprintf("Failed to get current directory: %v", err))
-				fmt.Println("failed")
-				return fmt.Errorf("failed to get current directory: %w", err)
+				return nil, fmt.Errorf("failed to get current directory: %w", err)
 			}
 			outputDir = filepath.Join(currentDir, opts.RepoName)
+		} else {
+			outputDir = filepath.Join(outputDir, opts.RepoName)
 		}
-		if err := c.pushToRepository(outputDir, repoURL); err != nil {
-			output.VerboseMessage(fmt.Sprintf("Failed to push project to repository: %v", err))
-			fmt.Println("failed")
-			return fmt.Errorf("failed to push project to repository: %w", err)
+
+		output.VerboseMessage("Running post-installation hooks...")
+		fmt.Printf("Running post-installation hooks...")
+		if err := c.Scaffolder.RunPostInstallHooks(
+			outputDir,
+			opts.Language,
+			opts.ProjectType,
+			templateVars,
+		); err != nil {
+			output.VerboseMessage(fmt.Sprintf("Failed to run post-installation hooks: %v", err))
+			fmt.Println(" failed")
+			summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to run post-installation hooks: %v", err))
 		}
-		output.VerboseMessage("Project pushed to GitHub.")
-		fmt.Println("done")
+		output.VerboseMessage("Post-installation hooks completed successfully.")
+		fmt.Println(" done")
+	} else if opts.SkipHooks {
+		output.VerboseMessage("Skipping post-installation hooks as requested.")
+		fmt.Printf("Skipping post-installation hooks...")
+		fmt.Println(" done")
 	}
 
 	output.VerboseMessage("Project creation workflow complete.")
-	fmt.Printf("Project creation complete\n")
-	return nil
+	return summary, nil
 }
 
 // createRepository creates a GitHub repository
