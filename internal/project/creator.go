@@ -329,7 +329,6 @@ func (c *Creator) Create(opts CreateOptions) (*ProjectSummary, error) {
 			summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to run post-installation hooks: %v", err))
 		}
 		output.VerboseMessage("Post-installation hooks completed successfully.")
-		fmt.Println(" done")
 	} else if opts.SkipHooks {
 		output.VerboseMessage("Skipping post-installation hooks as requested.")
 		fmt.Printf("Skipping post-installation hooks...")

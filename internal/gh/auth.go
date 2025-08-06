@@ -63,7 +63,7 @@ func Authenticate() (string, error) {
 	ctx := context.Background()
 	form := url.Values{}
 	form.Set("client_id", clientID)
-	form.Set("scope", "repo user")
+	form.Set("scope", "repo read:org")
 	request, err := http.NewRequestWithContext(ctx, "POST", "https://github.com/login/device/code", strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("error creating device code request: %w", err)

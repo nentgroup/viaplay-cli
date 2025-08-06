@@ -102,13 +102,13 @@ func createProjectOrRepo(withScaffolding bool) error {
 	startTime := time.Now()
 
 	// Authenticate with GitHub
-	output.AuthMessage("Authenticating with GitHub...")
+	output.VerboseMessage("Authenticating with GitHub...")
 	token, err := gh.Authenticate()
 	if err != nil {
 		output.ErrorMessage("GitHub authentication failed")
 		return fmt.Errorf("GitHub authentication failed: %w", err)
 	}
-	output.SuccessMessage("GitHub authentication successful!")
+	output.VerboseMessage("GitHub authentication successful!")
 
 	// Initialise GitHub client
 	ghClient := gh.NewGitHubClient(token)
