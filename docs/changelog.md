@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.1](https://github.com/nentgroup/viaplay-cli/compare/v0.2.0...v0.2.1) (2025-08-06)
+
+
+### Dependencies
+
+* **deps:** update dependency font-awesome to v6.7.2 ([#7](https://github.com/nentgroup/viaplay-cli/issues/7)) ([65abfa6](https://github.com/nentgroup/viaplay-cli/commit/65abfa6928e3a492f6ba7bb50b01de63a9b9bca8))
+* **deps:** update module golang.org/x/crypto to v0.35.0 [security] ([#2](https://github.com/nentgroup/viaplay-cli/issues/2)) ([2e1ae1f](https://github.com/nentgroup/viaplay-cli/commit/2e1ae1f80f0382d52f551e213139f1b81c488b25))
+* **deps:** update module golang.org/x/crypto to v0.40.0 ([#18](https://github.com/nentgroup/viaplay-cli/issues/18)) ([39895c6](https://github.com/nentgroup/viaplay-cli/commit/39895c62f69b359e556639fbc13e3e68944ff023))
+* **deps:** update module golang.org/x/oauth2 to v0.27.0 [security] ([#3](https://github.com/nentgroup/viaplay-cli/issues/3)) ([afd0df8](https://github.com/nentgroup/viaplay-cli/commit/afd0df8418e43014044c678f15dce2205a4cf304))
+* **deps:** update module golang.org/x/oauth2 to v0.30.0 ([#19](https://github.com/nentgroup/viaplay-cli/issues/19)) ([000428b](https://github.com/nentgroup/viaplay-cli/commit/000428bb33aebfb6ebfc16f7bca9576fabf99043))
+
 ## [0.2.0](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.8...v0.2.0) (2025-08-04)
 
 
