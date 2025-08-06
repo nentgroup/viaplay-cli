@@ -31,7 +31,8 @@ The `vip create` command is used to create projects and repositories with GitHub
 - `--template-source`: Custom template source
 - `--output-dir`: Directory to create the project in
 - `--binary-name`: Name of the compiled binary (for compiled languages like Go and Rust)
-- `--run-hooks`: Enable execution of post-installation hooks defined in the template (default is true)
+- `--no-repo`: Do not create a GitHub repository (only scaffold locally)
+- `--skip-hooks`: Skip execution of post-installation hooks defined in the config file.
 
 ---
 
