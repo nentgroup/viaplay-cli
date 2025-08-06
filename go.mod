@@ -12,7 +12,7 @@ require (
 	github.com/spf13/viper v1.20.1
 	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/crypto v0.35.0
-	golang.org/x/oauth2 v0.25.0
+	golang.org/x/oauth2 v0.27.0
 	golang.org/x/term v0.29.0
 )
 
