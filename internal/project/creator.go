@@ -22,8 +22,8 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/template"
 )
 
-// ProjectSummary contains details about the created project to be displayed to the user
-type ProjectSummary struct {
+// Summary contains details about the created project to be displayed to the user
+type Summary struct {
 	ProjectPath     string   // Full path to the project location
 	RepoURL         string   // GitHub repository URL
 	Language        string   // Programming language used
@@ -214,11 +214,11 @@ func (c *Creator) CreateProject(opts CreateOptions) error {
 }
 
 // Create handles the full project creation workflow
-func (c *Creator) Create(opts CreateOptions) (*ProjectSummary, error) {
+func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 	output.VerboseMessage(fmt.Sprintf("Starting project creation with options: %+v", opts))
 
-	// Initialize project summary
-	summary := &ProjectSummary{
+	// Initialise project summary
+	summary := &Summary{
 		Language:        opts.Language,
 		ProjectType:     opts.ProjectType,
 		Team:            opts.Team,
@@ -363,7 +363,6 @@ func (c *Creator) applyGitHubConfigurations(opts CreateOptions) error {
 		output.VerboseMessage("Creating default 'staging' environment (team envs not applied)...")
 		// Create default staging environment if not applying team envs
 		err := c.GitHubClient.CreateEnvironment(opts.RepoOwner, opts.RepoName, "staging")
-		err = nil
 		if err != nil {
 			if !strings.Contains(err.Error(), "already exists") {
 				fmt.Printf("\nFailed to create environment: %v\n", err)
@@ -390,30 +389,6 @@ func (c *Creator) applyGitHubConfigurations(opts CreateOptions) error {
 			output.VerboseMessage(fmt.Sprintf("Failed to apply repository-specific secrets: %v", err))
 			return fmt.Errorf("failed to apply repository-specific secrets: %w", err)
 		}
-	}
-
-	return nil
-}
-
-// scaffoldProject scaffolds a project locally
-func (c *Creator) scaffoldProject(opts CreateOptions) error {
-	outputDir := opts.OutputDir
-	if outputDir == "" {
-		currentDir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get current directory: %w", err)
-		}
-		outputDir = filepath.Join(currentDir, opts.RepoName)
-	}
-
-	templateSource := opts.TemplateSource
-	if templateSource == "" {
-		return fmt.Errorf("template source not specified and could not be determined from config")
-	}
-
-	templateVars := createOptionsToTemplateVariables(opts)
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks); err != nil {
-		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 
 	return nil
@@ -708,24 +683,6 @@ func (c *Creator) applyRepoSpecificSecrets(owner, repo, secretsJSON string) erro
 	return nil
 }
 
-// pushToRepository initialises a Git repository in the local directory and pushes it to the remote GitHub repository
-func (c *Creator) pushToRepository(localDir, remoteURL string) error {
-	// TODO: Implement Git operations to push the local repository to GitHub
-	// For now, just display a message about manual pushing
-	output.InfoMessage(fmt.Sprintf("Repository created at: %s", localDir))
-	output.InfoMessage("To manually push to GitHub, run the following commands:")
-
-	// Use indentation for better readability of the commands
-	fmt.Printf("  cd %s\n", localDir)
-	fmt.Printf("  git init\n")
-	fmt.Printf("  git add .\n")
-	fmt.Printf("  git commit -m \"Initial commit\"\n")
-	fmt.Printf("  git remote add origin %s\n", remoteURL)
-	fmt.Printf("  git push -u origin main\n")
-
-	return nil
-}
-
 // Secret represents a secret or variable definition for use in team/repo configs
 // This matches the structure used in secretsConfig.Secrets
 // (duplicated here to avoid import cycles and for helper use)
@@ -736,6 +693,16 @@ type Secret struct {
 	Type      string
 	Reference string
 }
+
+// Source type constants
+const (
+	// SourceTypeConfig represents a configuration source type
+	SourceTypeConfig = "config"
+	// SourceTypeKeyring represents a keyring source type
+	SourceTypeKeyring = "keyring"
+	// SourceTypeEnv represents an environment variable source type
+	SourceTypeEnv = "env"
+)
 
 // Helper functions
 
@@ -784,23 +751,28 @@ func sanitizeSecretName(name string) string {
 	sanitized := strings.ReplaceAll(name, "-", "_")
 
 	// Ensure the name starts with a letter or underscore
-	if len(sanitized) > 0 && !((sanitized[0] >= 'a' && sanitized[0] <= 'z') ||
-		(sanitized[0] >= 'A' && sanitized[0] <= 'Z') ||
-		sanitized[0] == '_') {
+	if len(sanitized) > 0 && !(isAlpha(sanitized[0]) || sanitized[0] == '_') {
 		sanitized = "_" + sanitized
 	}
 
 	// Replace any other invalid characters with underscores
 	for i, char := range sanitized {
-		if !((char >= 'a' && char <= 'z') ||
-			(char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') ||
-			char == '_') {
+		if !(isAlphaNumeric(char) || char == '_') {
 			sanitized = sanitized[:i] + "_" + sanitized[i+1:]
 		}
 	}
 
 	return sanitized
+}
+
+// isAlpha checks if a byte is an alphabetic character (a-z, A-Z)
+func isAlpha(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+// isAlphaNumeric checks if a rune is an alphanumeric character (a-z, A-Z, 0-9)
+func isAlphaNumeric(c rune) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
 // resolveSecretValue resolves a secret value from various sources (config, keyring, env vars)

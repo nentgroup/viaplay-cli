@@ -23,7 +23,7 @@ func NewSimpleOutputWriter(title string) *SimpleOutputWriter {
 	return &SimpleOutputWriter{
 		title:       title,
 		content:     strings.Builder{},
-		borderColor: lipgloss.Color("#E6007A"), // Viaplay pink color
+		borderColor: "#E6007A", // Viaplay pink colour
 	}
 }
 

@@ -398,8 +398,8 @@ func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectT
 				if err != nil {
 					return fmt.Errorf("failed to render run command template: %w", err)
 				}
-				//fmt.Printf("▶️  Running command: %s\n", renderedCmd)
-				//fmt.Fprintf(stdout, "Running command: %s\n", renderedCmd)
+				// fmt.Printf("▶️  Running command: %s\n", renderedCmd)
+				// fmt.Fprintf(stdout, "Running command: %s\n", renderedCmd)
 				// Create a command that will run in the project directory
 				// Create a command that will run in the project directory
 				execCmd := exec.Command("sh", "-c", renderedCmd)
@@ -430,8 +430,8 @@ func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectT
 				if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
 					return fmt.Errorf("hook script not found: %s", fullScriptPath)
 				}
-				//fmt.Printf("▶️  Running script: %s\n", fullScriptPath)
-				//fmt.Fprintf(stdout, "Running script: %s\n", fullScriptPath)
+				// fmt.Printf("▶️  Running script: %s\n", fullScriptPath)
+				// fmt.Fprintf(stdout, "Running script: %s\n", fullScriptPath)
 				// Create a command to run the script
 				// Create a command to run the script
 				execCmd := exec.Command(fullScriptPath)
@@ -452,7 +452,6 @@ func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectT
 
 	// Display the hook output using our simplified UI
 	err := DisplayHookOutput(title, runHookFn)
-
 	// Display a simple message based on the result
 	if err != nil {
 		fmt.Println("Post-installation hooks failed")

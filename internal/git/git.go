@@ -71,11 +71,30 @@ func Clone(opts CloneOptions) error {
 	return cmd.Run()
 }
 
+// validateGitBranch checks if a branch name is valid and not malicious
+func validateGitBranch(branch string) bool {
+	// Branches shouldn't contain spaces, control characters, or escape sequences
+	for _, c := range branch {
+		if c <= 32 || c == 127 { // ASCII control characters or space
+			return false
+		}
+	}
+
+	// Branches shouldn't contain certain dangerous characters
+	dangerousChars := []string{";", "&&", "||", ">", "<", "`", "$", "\\", "\"", "'"}
+	for _, char := range dangerousChars {
+		if strings.Contains(branch, char) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Update updates a Git repository to the latest changes
 func Update(opts UpdateOptions) error {
 	// Verify the directory exists and is a git repository
-	gitDir := filepath.Join(opts.Directory, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+	if !IsGitRepository(opts.Directory) {
 		return fmt.Errorf("not a git repository: %s", opts.Directory)
 	}
 
@@ -95,8 +114,8 @@ func Update(opts UpdateOptions) error {
 		return fmt.Errorf("failed to change to repository directory: %w", err)
 	}
 
-	// Fetch updates
-	fetchCmd := exec.Command("git", "fetch", "--all")
+	// Fetch latest updates
+	fetchCmd := exec.Command("git", "fetch")
 	fetchCmd.Stdout = os.Stdout
 	fetchCmd.Stderr = os.Stderr
 	if err := fetchCmd.Run(); err != nil {
@@ -105,6 +124,11 @@ func Update(opts UpdateOptions) error {
 
 	// If a branch is specified, check it out
 	if opts.Branch != "" {
+		// Validate the branch name for security
+		if !validateGitBranch(opts.Branch) {
+			return fmt.Errorf("invalid branch name: %s", opts.Branch)
+		}
+
 		// Checkout the branch
 		checkoutCmd := exec.Command("git", "checkout", opts.Branch)
 		checkoutCmd.Stdout = os.Stdout
@@ -343,6 +367,66 @@ func Push(directory, remote, branch string) error {
 	}
 
 	return nil
+}
+
+// IsBehindRemote checks if the local repository is behind the remote branch.
+// Returns true if the local repo is behind the remote, false otherwise, and any error encountered.
+func IsBehindRemote(repoPath, remoteName, branch string) (bool, error) {
+	// Validate the input parameters for security
+	if !validateGitBranch(branch) {
+		return false, fmt.Errorf("invalid branch name: %s", branch)
+	}
+
+	if !validateGitRemote(remoteName) {
+		return false, fmt.Errorf("invalid remote name: %s", remoteName)
+	}
+
+	// Fetch latest from remote
+	fetchCmd := exec.Command("git", "fetch", remoteName)
+	fetchCmd.Dir = repoPath
+	if err := fetchCmd.Run(); err != nil {
+		return false, fmt.Errorf("failed to fetch from remote: %w", err)
+	}
+
+	// Get number of commits the local branch is behind remote
+	revListArg := fmt.Sprintf("HEAD..%s/%s", remoteName, branch)
+	behindCmd := exec.Command("git", "rev-list", "--count", revListArg)
+	behindCmd.Dir = repoPath
+	behindOutput, err := behindCmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to check commits behind: %w", err)
+	}
+
+	// Parse the output (should be a number)
+	behindCount := strings.TrimSpace(string(behindOutput))
+	// If the count is greater than 0, the local branch is behind remote
+	return behindCount != "0", nil
+}
+
+// validateGitRemote checks if a remote name is valid and not malicious
+func validateGitRemote(remote string) bool {
+	// Remote names should follow git naming conventions
+	// Only alphanumeric characters and some special characters are allowed
+	allowedSpecialChars := "-._"
+
+	for _, c := range remote {
+		if !((c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') ||
+			strings.ContainsRune(allowedSpecialChars, c)) {
+			return false
+		}
+	}
+
+	// Dangerous characters should be rejected
+	dangerousChars := []string{";", "&&", "||", ">", "<", "`", "$", "\\", "\"", "'", " "}
+	for _, char := range dangerousChars {
+		if strings.Contains(remote, char) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // ConvertToSSHURL converts an HTTPS GitHub URL to SSH format

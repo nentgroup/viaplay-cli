@@ -101,66 +101,136 @@ func createProjectOrRepo(withScaffolding bool) error {
 	// Start timing the operation
 	startTime := time.Now()
 
+	// Setup GitHub client and get config
+	ghClient, configDir, err := setupGitHubClient()
+	if err != nil {
+		return err
+	}
+
+	// Validate and prepare repository parameters
+	repoParams, err := validateRepoParameters(withScaffolding)
+	if err != nil {
+		return err
+	}
+
+	// Handle secrets data
+	secretsData, err := getSecretsData()
+	if err != nil {
+		return err
+	}
+
+	//// Validate project directory
+	//projectDir, err := validateProjectDirectory(repoParams.name, withScaffolding)
+	//if err != nil {
+	//	return err
+	//}
+
+	// Check if repository exists (if we're creating one)
+	if !noRepoFlag && !validateRepositoryDoesNotExist(ghClient, repoParams.owner, repoParams.name) {
+		return fmt.Errorf("repository already exists: %s/%s", repoParams.owner, repoParams.name)
+	}
+
+	// Create the project using the Creator
+	summary, err := executeProjectCreation(ghClient, configDir, repoParams, secretsData, withScaffolding)
+	if err != nil {
+		return err
+	}
+
+	// Calculate total execution time
+	executionTime := time.Since(startTime)
+
+	// Print the project summary with execution time
+	printProjectSummary(summary, executionTime)
+
+	return nil
+}
+
+// setupGitHubClient handles GitHub authentication and client setup
+func setupGitHubClient() (*gh.GitHubClient, string, error) {
 	// Authenticate with GitHub
 	output.VerboseMessage("Authenticating with GitHub...")
 	token, err := gh.Authenticate()
 	if err != nil {
 		output.ErrorMessage("GitHub authentication failed")
-		return fmt.Errorf("GitHub authentication failed: %w", err)
+		return nil, "", fmt.Errorf("GitHub authentication failed: %w", err)
 	}
 	output.VerboseMessage("GitHub authentication successful!")
 
-	// Initialise GitHub client
+	// Initialize GitHub client
 	ghClient := gh.NewGitHubClient(token)
 
 	// Get config directory
 	configDir := viper.GetString("config_dir")
 
-	// Get repo parameters from flags or config
-	owner := viper.GetString("default_account")
-	if owner == "" {
-		return fmt.Errorf("repository owner is required (set default_account in config)")
+	return ghClient, configDir, nil
+}
+
+// repoParameters holds validated repository parameters
+type repoParameters struct {
+	name        string
+	description string
+	owner       string
+	team        string
+}
+
+// validateRepoParameters validates and collects repository parameters from flags and config
+func validateRepoParameters(withScaffolding bool) (repoParameters, error) {
+	var params repoParameters
+
+	// Get repo owner from config
+	params.owner = viper.GetString("default_account")
+	if params.owner == "" {
+		return params, fmt.Errorf("repository owner is required (set default_account in config)")
 	}
 
-	repoName := repoNameFlag
-	if repoName == "" {
-		return fmt.Errorf("repository name is required (use --name flag)")
+	// Get repo name from flag
+	params.name = repoNameFlag
+	if params.name == "" {
+		return params, fmt.Errorf("repository name is required (use --name flag)")
 	}
 
-	description := descriptionFlag
-	if description == "" {
-		description = fmt.Sprintf("Repository for %s", repoName)
+	// Get or set description
+	params.description = descriptionFlag
+	if params.description == "" {
+		params.description = fmt.Sprintf("Repository for %s", params.name)
 	}
 
 	// Get team name
-	team := teamFlag
-	if team == "" {
-		team = viper.GetString("default_team")
+	params.team = teamFlag
+	if params.team == "" {
+		params.team = viper.GetString("default_team")
 	}
 
 	// For project creation, ensure language and project type are set
 	if withScaffolding {
 		if err := setupScaffoldingOptions(); err != nil {
-			return err
+			return params, err
 		}
 	}
 
-	// Handle secrets from file
+	return params, nil
+}
+
+// getSecretsData handles secrets data from flag or file
+func getSecretsData() (string, error) {
 	secretsData := repoSecretsFlag
 	if secretsFileFlag != "" {
 		data, err := os.ReadFile(secretsFileFlag)
 		if err != nil {
-			return fmt.Errorf("failed to read secrets file: %w", err)
+			return "", fmt.Errorf("failed to read secrets file: %w", err)
 		}
 		secretsData = string(data)
 	}
+	return secretsData, nil
+}
 
-	// Determine the project directory path
+// validateProjectDirectory checks if the project directory is valid
+func validateProjectDirectory(repoName string, withScaffolding bool) (string, error) {
 	projectDir := outputDirFlag
 	if projectDir == "" {
 		currentDir, err := os.Getwd()
 		if err != nil {
-			return fmt.Errorf("failed to get current directory: %w", err)
+			return "", fmt.Errorf("failed to get current directory: %w", err)
 		}
 		projectDir = filepath.Join(currentDir, repoName)
 	} else {
@@ -170,30 +240,34 @@ func createProjectOrRepo(withScaffolding bool) error {
 	// Check if the project directory already exists when scaffolding
 	if withScaffolding {
 		if _, err := os.Stat(projectDir); err == nil {
-			return fmt.Errorf("project directory already exists: %s", projectDir)
+			return "", fmt.Errorf("project directory already exists: %s", projectDir)
 		}
 	}
 
-	// Check if the repository already exists on GitHub when not skipping repo creation
-	if !noRepoFlag {
-		repoExists, err := ghClient.RepositoryExists(owner, repoName)
-		if err != nil {
-			return fmt.Errorf("failed to check if repository exists: %w", err)
-		}
-		if repoExists {
-			return fmt.Errorf("repository already exists: %s/%s", owner, repoName)
-		}
-	}
+	return projectDir, nil
+}
 
+// validateRepositoryDoesNotExist checks if the repository doesn't exist on GitHub
+func validateRepositoryDoesNotExist(ghClient *gh.GitHubClient, owner, repoName string) bool {
+	repoExists, err := ghClient.RepositoryExists(owner, repoName)
+	if err != nil {
+		output.VerboseMessage(fmt.Sprintf("Error checking if repository exists: %v", err))
+		return false
+	}
+	return !repoExists
+}
+
+// executeProjectCreation executes the project creation workflow
+func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params repoParameters, secretsData string, withScaffolding bool) (*project.Summary, error) {
 	// Create project creator
 	creator := project.NewCreator(ghClient, configDir)
 
 	// Set up options
 	opts := project.CreateOptions{
 		// Repository options
-		RepoName:        repoName,
-		RepoDescription: description,
-		RepoOwner:       owner,
+		RepoName:        params.name,
+		RepoDescription: params.description,
+		RepoOwner:       params.owner,
 		IsPrivate:       !publicFlag, // Convert public flag to private flag
 		IsOrg:           viper.GetBool("is_org"),
 		SkipRepo:        noRepoFlag, // Skip GitHub repository creation if --no-repo is set
@@ -201,7 +275,7 @@ func createProjectOrRepo(withScaffolding bool) error {
 		// Project options
 		Language:    languageFlag,
 		ProjectType: projectTypeFlag,
-		Team:        team,
+		Team:        params.team,
 		BinaryName:  binaryNameFlag, // Set the binary name from flag
 		SkipHooks:   skipHooksFlag,  // Skip running post-installation hooks if flag is set
 
@@ -219,18 +293,7 @@ func createProjectOrRepo(withScaffolding bool) error {
 	}
 
 	// Execute the project creation workflow
-	summary, err := creator.Create(opts)
-	if err != nil {
-		return err
-	}
-
-	// Calculate total execution time
-	executionTime := time.Since(startTime)
-
-	// Print the project summary with execution time
-	printProjectSummary(summary, executionTime)
-
-	return nil
+	return creator.Create(opts)
 }
 
 // formatDuration formats a duration to be more human-readable
@@ -266,7 +329,7 @@ func pluralS(count int) string {
 }
 
 // printProjectSummary prints the project creation summary in a nice format
-func printProjectSummary(summary *project.ProjectSummary, executionTime time.Duration) {
+func printProjectSummary(summary *project.Summary, executionTime time.Duration) {
 	fmt.Println("\n📋 Project Summary:")
 	fmt.Println("-------------------")
 
@@ -326,7 +389,7 @@ func setupScaffoldingOptions() error {
 		}
 	}
 	if templateSourceFlag == "" {
-		templateKey := fmt.Sprintf("templates.%s.%s", languageFlag, projectTypeFlag)
+		templateKey := fmt.Sprintf("templates.%s.%s.source", languageFlag, projectTypeFlag)
 		templateSourceFlag = viper.GetString(templateKey)
 		if templateSourceFlag == "" {
 			return fmt.Errorf("no template found for %s/%s, please specify with --template-source", languageFlag, projectTypeFlag)
@@ -358,7 +421,9 @@ func init() {
 		cmd.Flags().StringVar(&secretsFileFlag, "secrets-file", "", "Path to JSON file with repository-specific secrets")
 
 		// Mark required flags
-		cmd.MarkFlagRequired("name")
+		if err := cmd.MarkFlagRequired("name"); err != nil {
+			fmt.Printf("Failed to mark 'name' flag as required: %v\n", err)
+		}
 	}
 
 	// Add project-specific flags to the project command only

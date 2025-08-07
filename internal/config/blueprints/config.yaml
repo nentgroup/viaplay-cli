@@ -44,21 +44,29 @@ default_private: true
 # - Tarball URL: "url@https://example.com/template.tar.gz"
 templates:
   # Go templates
-  "go":
-    "cli": "git@github.com/nentgroup/go-cli-template.git"
-    "lambda": "git@github.com/nentgroup/go-lambda-template.git"
-    "package": "git@github.com/nentgroup/go-package-template.git"
-    "service": "git@github.com/nentgroup/go-service-template.git"
+  go:
+    cli:
+      source: "git@github.com:nentgroup/go-cli-template.git"
+    lambda:
+      source: "git@github.com:nentgroup/go-lambda-template.git"
+    package:
+      source: "git@github.com:nentgroup/go-package-template.git"
+    service:
+      source: "git@github.com:nentgroup/go-service-template.git"
+      hooks:
+        post:
+          install:
+            run:
+              - "echo 'Go service template installed successfully'"
 
   # Rust templates
-  "rust":
-    "service": "git@github.com/nentgroup/rust-http-service-template-2.git"
+  rust:
+    service: "git@github.com:nentgroup/rust-http-service-template-2.git"
 
   # TypeScript templates
-  "typescript":
-    "service": "git@github.com/nentgroup/ts-service-template.git"
-    "lambda": "git@github.com/nentgroup/ts-lambda-template.git"
-
+  typescript:
+    service: "git@github.com:nentgroup/ts-service-template.git"
+    lambda: "git@github.com:nentgroup/ts-lambda-template.git"
   # Add more language templates as needed
 
 # -----------------------------------------------
@@ -95,68 +103,6 @@ github_api: "https://api.github.com"
 # Default container registry for services
 # Options: "ecr", "gcr", "dockerhub", etc.
 container_registry: "ecr"
-
-# -----------------------------------------------
-# Post-Install Hooks
-# -----------------------------------------------
-
-# Hooks to run after a project is scaffolded
-# Uses a hierarchical structure:
-# hooks.post.install.[language].[project_type]
-hooks:
-  post:
-    install:
-      # Commands that run for all projects regardless of language or type
-      run:
-        - "echo 'Setting up new project: {{{.ProjectName}}}'"
-      # scripts:
-      #   - "global/setup.sh"
-
-      # Language-specific hooks
-      go:
-        # Hooks for all Go projects
-        run:
-          - "go mod tidy"
-          - |
-            echo "Running multi-line hook example"
-            echo "Creating go.work file for the project"
-            cat > go.work << EOF
-            go {{{.GoVersion}}}
-            
-            use .
-            EOF
-            echo "go.work file created"
-
-        # Project type specific hooks within Go
-        service:
-          run:
-            - "echo 'Building Go service...'"
-            - "go build ./..."
-            - "echo 'Setting up development environment...'"
-            - "mkdir -p .vscode"
-            - "touch .vscode/settings.json"
-
-        cli:
-          run:
-            - "go mod tidy"
-            - "go install ./cmd/{{{.BinaryName}}}"
-            - "echo 'CLI tool installed at: $(which {{{.BinaryName}}})'"
-
-      typescript:
-        # Hooks for all TypeScript projects
-        run:
-          - "npm install"
-
-        # Project type specific hooks within TypeScript
-        service:
-          run:
-            - "npm install"
-            - "npm run build"
-            - "echo 'TypeScript service built successfully'"
-
-        lambda:
-          scripts:
-            - "setup/ts-lambda-init.js"
 
 # -----------------------------------------------
 # Advanced Settings

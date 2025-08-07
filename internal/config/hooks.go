@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/spf13/viper"
@@ -51,69 +52,26 @@ func (h *PostInstallHook) GetAllScripts() []string {
 
 // GetPostInstallHooks returns the post-install hooks for a specific language and project type
 func (c *Configuration) GetPostInstallHooks(language, projectType string) []*PostInstallHook {
-	// Holds the hooks in order of execution (general to specific)
+	// Holds the hooks in order of execution
 	var hooks []*PostInstallHook
 
-	// Check if we have hooks configuration
-	hooksConfig := viper.Get("hooks")
-	if hooksConfig == nil {
-		return nil
-	}
+	// Check for template-specific hooks
+	// This is the approach where hooks are defined directly in the template configuration
+	templateKey := fmt.Sprintf("templates.%s.%s", language, projectType)
+	templateHooksRun := viper.GetStringSlice(templateKey + ".hooks.post.install.run")
+	templateHooksScripts := viper.GetStringSlice(templateKey + ".hooks.post.install.scripts")
 
-	// Try to get post-install hooks
-	postHooks := viper.GetStringMap("hooks.post.install")
-	if len(postHooks) == 0 {
-		return nil
-	}
-
-	// 1. Get general hooks that apply to all languages and project types
-	generalRun := viper.GetStringSlice("hooks.post.install.run")
-	if len(generalRun) > 0 {
-		hooks = append(hooks, &PostInstallHook{Run: generalRun})
-	}
-
-	generalScripts := viper.GetStringSlice("hooks.post.install.scripts")
-	if len(generalScripts) > 0 {
-		if len(hooks) > 0 && hooks[0].Run != nil {
-			// Add scripts to existing hook with commands
-			hooks[0].Scripts = generalScripts
-		} else {
-			// Create a new hook for scripts
-			hooks = append(hooks, &PostInstallHook{Scripts: generalScripts})
-		}
-	}
-
-	// 2. Get language-specific hooks
-	langKey := "hooks.post.install." + language
-
-	// Get language-level commands
-	langRun := viper.GetStringSlice(langKey + ".run")
-	langScripts := viper.GetStringSlice(langKey + ".scripts")
-
-	// Add language-level hook if we have commands or scripts
-	if len(langRun) > 0 || len(langScripts) > 0 {
+	// If we found template-specific hooks, use them
+	if len(templateHooksRun) > 0 || len(templateHooksScripts) > 0 {
 		hooks = append(hooks, &PostInstallHook{
-			Run:     langRun,
-			Scripts: langScripts,
+			Run:     templateHooksRun,
+			Scripts: templateHooksScripts,
 		})
+		return hooks
 	}
 
-	// 3. Get project-type specific hooks within this language
-	projectTypeKey := langKey + "." + projectType
-
-	// Get project-type level commands
-	projectRun := viper.GetStringSlice(projectTypeKey + ".run")
-	projectScripts := viper.GetStringSlice(projectTypeKey + ".scripts")
-
-	// Add project-type level hook if we have commands or scripts
-	if len(projectRun) > 0 || len(projectScripts) > 0 {
-		hooks = append(hooks, &PostInstallHook{
-			Run:     projectRun,
-			Scripts: projectScripts,
-		})
-	}
-
-	return hooks
+	// No hooks found
+	return nil
 }
 
 // GetHooksDir returns the directory where global hook scripts are stored

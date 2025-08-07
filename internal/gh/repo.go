@@ -1,6 +1,7 @@
 package gh
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/google/go-github/v74/github"
@@ -54,7 +55,8 @@ func (g *GitHubClient) RepositoryExists(owner, repo string) (bool, error) {
 	// If we get here with a non-nil error but it's not a 404, treat it as a special case
 	if err != nil {
 		// Check if it's a rate limit error or other specific GitHub API error
-		if _, ok := err.(*github.RateLimitError); ok {
+		var rateLimitError *github.RateLimitError
+		if errors.As(err, &rateLimitError) {
 			return false, fmt.Errorf("GitHub API rate limit exceeded: %w", err)
 		}
 
