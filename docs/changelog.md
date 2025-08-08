@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/nentgroup/viaplay-cli/compare/v0.2.1...v0.3.0) (2025-08-08)
+
+
+### Features
+
+* implement hooks feature ([#20](https://github.com/nentgroup/viaplay-cli/issues/20)) ([e6d1b91](https://github.com/nentgroup/viaplay-cli/commit/e6d1b91a2123a84ce6dca5e50281cb2ad9bc9b52))
+
+
+### Dependencies
+
+* **deps:** update dependency font-awesome to v7 ([#10](https://github.com/nentgroup/viaplay-cli/issues/10)) ([ccb66bd](https://github.com/nentgroup/viaplay-cli/commit/ccb66bdc6339422b029a10a7460e4a628913dfda))
+* **deps:** update module golang.org/x/crypto to v0.41.0 ([#22](https://github.com/nentgroup/viaplay-cli/issues/22)) ([6058acb](https://github.com/nentgroup/viaplay-cli/commit/6058acb17243ef6abc573b0b15020870975f020d))
+
 ## [0.2.1](https://github.com/nentgroup/viaplay-cli/compare/v0.2.0...v0.2.1) (2025-08-06)
 
 
