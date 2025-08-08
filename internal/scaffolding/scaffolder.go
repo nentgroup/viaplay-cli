@@ -43,13 +43,12 @@ func NewProjectScaffolder(cacheManager *cache.Manager, cfg *config.Configuration
 // - templateSource: The source of the template
 // - variables: Map of template variables to replace in the project
 // - forceUpdate: If true, forces update of the template cache
-func (ps *ProjectScaffolder) ScaffoldProject(destPath, language, projectType, templateSource string, opts interface{}, skipHooks bool, forceUpdate bool) error {
+func (ps *ProjectScaffolder) ScaffoldProject(destPath, language, projectType, templateSource string, opts interface{}, skipHooks, forceUpdate bool) error {
 	// Ensure the template is available in the cache
 	var templatePath string
 	var err error
 
 	templatePath, err = ps.CacheManager.EnsureTemplate(language, projectType, templateSource, forceUpdate)
-
 	if err != nil {
 		return fmt.Errorf("failed to ensure template is available: %w", err)
 	}

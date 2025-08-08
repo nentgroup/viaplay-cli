@@ -118,85 +118,94 @@ Rulesets define branch protection and repository rules for GitHub repositories. 
 
 ## Post-Installation Hooks
 
-Hooks allow you to run commands or scripts after project creation. They are defined in the global configuration file and run automatically unless disabled with the `--run-hooks=false` flag during project creation.
+Hooks allow you to run commands or scripts after project creation. They are defined in the template configurations and run automatically unless disabled with the `--skip-hooks` flag during project creation.
 
-### Hook Configuration Syntax
+### Hook Configuration
 
-Hooks are configured in the global config.yaml file under the `hooks` section:
-
-```yaml
-hooks:
-  post:
-    install:
-      # Commands that run for all projects
-      run:
-        - "echo 'Project setup complete!'"
-        - "git init && git add . && git commit -m 'Initial commit'"
-      
-      # Language-specific commands
-      go:
-        # Hooks for all Go projects
-        run:
-          - "go mod tidy"
-        
-        # Project type specific hooks within Go
-        cli:
-          run:
-            - "go build -o bin/{{{.BinaryName}}} ./cmd/{{{.BinaryName}}}"
-        
-        service:
-          run:
-            - "go build ./..."
-            - "docker build -t {{{.DockerImageName}}} ."
-      
-      typescript:
-        # Hooks for all TypeScript projects
-        run:
-          - "npm install"
-        
-        # Project type specific hooks within TypeScript
-        service:
-          run:
-            - "npm run build"
-```
-
-### Hook Organization
-
-Hooks are organized hierarchically:
-
-- **Stage** (`post`): When the hook runs (currently only post-installation is supported)
-- **Event** (`install`): The event that triggers the hook
-- **Language** (optional): Specify hooks for specific programming languages
-  - **Project Type** (optional): Further specify hooks for particular project types within a language
-- **Hook Type**:
-  - `run`: Inline shell commands to execute
-  - `scripts`: Paths to executable scripts to run
-
-During project creation, hooks are executed in order from most general to most specific:
-1. General hooks under `install/run`
-2. Language-specific hooks (e.g., `install/go/run`)
-3. Project type-specific hooks (e.g., `install/go/service/run`)
-
-### Hook Variables
-
-Hooks can use the same template variables available during project creation:
+Hooks are configured under the `templates` section in your config file, associated with specific language and project type combinations:
 
 ```yaml
-hooks:
-  post:
-    install:
-      run:
-        - "echo 'Setting up {{{.ProjectName}}}'"
-        - "mkdir -p build/{{{.BinaryName}}}"
+templates:
+  go:
+    service:
+      source: github@github.com/nentgroup/go-service-template.git
+      hooks:
+        post:
+          install:
+            run:
+              - "go mod tidy"
+              - "go generate ./..."
+            scripts:
+              - "setup-go-service.sh"
+  typescript:
+    lambda:
+      source: github@github.com/nentgroup/ts-lambda-template.git
+      hooks:
+        post:
+          install:
+            run:
+              - "npm install"
+              - "npm run build"
+            scripts:
+              - "setup-ts-lambda.sh"
 ```
+
+### Hook Types
+
+Hooks can be defined as:
+
+- **Commands (`run`)**: Shell commands executed in the project directory
+- **Scripts (`scripts`)**: Executable script files that are run in the project context
+
+### Template Variables in Hooks
+
+When hooks are executed, they have access to the same template variables used during project scaffolding. For example, in a shell script hook:
+
+```bash
+#!/bin/bash
+# This is an example post-install hook script
+
+echo "Project name: {{{ProjectName}}}"
+echo "Repository: {{{RepoURL}}}"
+
+# Set up a custom environment based on the project type
+if [ "{{{ProjectType}}}" = "service" ]; then
+  echo "Setting up service-specific environment..."
+fi
+```
+
+### Using Hooks
+
+Hooks are automatically executed after a project is scaffolded using the `vip create project` command, unless explicitly disabled:
+
+```bash
+# Create a project and execute hooks
+vip create project --name myservice --language go --type service
+
+# Create a project but skip executing hooks
+vip create project --name myservice --language go --type service --skip-hooks
+```
+
+### Locating Hook Scripts
+
+Hook scripts referenced in the `scripts` section are resolved in the following order:
+
+1. Absolute paths are used as-is
+2. Relative paths are resolved from the Viaplay CLI hooks directory (`~/.config/viaplay/hooks/`)
+
+To create a new hook script:
+
+1. Create a script file in your hooks directory
+2. Make it executable (`chmod +x myhook.sh`)
+3. Reference it in your template configuration
 
 ### Best Practices for Hooks
 
-- Keep hooks idempotent when possible
-- Handle errors gracefully
-- Use scripts for complex logic
-- Keep inline commands short and focused
-- Organize language-specific commands under their respective keys
+- **Keep hooks idempotent**: Hooks should be safe to run multiple times
+- **Handle errors gracefully**: Include error checking in your scripts
+- **Provide progress feedback**: Output meaningful information during hook execution
+- **Keep hooks focused**: Each hook should serve a specific purpose
+- **Test hooks thoroughly**: Ensure hooks work across different environments
 
 ---
 
