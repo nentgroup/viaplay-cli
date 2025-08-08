@@ -3,7 +3,7 @@ cask "vip" do
   require File.expand_path("lib/custom_download_strategy.rb", __dir__)
 
   desc "CLI tool for Gecko Generators."
-  homepage "https://nentgroup.github.io/viaplay-cli-2"
+  homepage "https://nentgroup.github.io/viaplay-cli"
   version "0.3.0"
 
   livecheck do
@@ -14,12 +14,12 @@ cask "vip" do
 
   on_macos do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.3.0/viaplay-cli_0.3.0_darwin_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v0.3.0/viaplay-cli_0.3.0_darwin_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
       sha256 "52d5a4fb140481c1ea8b794bf00bda7e97a1607f172d96443fef584fb31318c5"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.3.0/viaplay-cli_0.3.0_darwin_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v0.3.0/viaplay-cli_0.3.0_darwin_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
       sha256 "db58ffbbbd195a94831c4eec78cd2589227d95d5dd66def0963065efc02efcba"
     end
@@ -27,12 +27,12 @@ cask "vip" do
 
   on_linux do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.3.0/viaplay-cli_0.3.0_linux_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v0.3.0/viaplay-cli_0.3.0_linux_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
       sha256 "7909d1f293251f9ddd67047a709aa26cce786fb4f20fbd3c7746b672e0230fbb"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.3.0/viaplay-cli_0.3.0_linux_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v0.3.0/viaplay-cli_0.3.0_linux_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
       sha256 "77fcc800d406d479d290ff704f6154d2bc27f3888f07912822f1b34a52c96ae8"
     end

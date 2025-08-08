@@ -40,15 +40,15 @@ homebrew_casks:
           end
     repository:
       owner: nentgroup
-      name: viaplay-cli-2
+      name: viaplay-cli
     commit_author:
       name: Alessandro Coletti
       email: alessandro.coletti@viaplaygroup.com
     directory: Casks
-    homepage: "https://nentgroup.github.io/viaplay-cli-2"
+    homepage: "https://nentgroup.github.io/viaplay-cli"
     description: "CLI tool for Gecko Generators."
     url:
-      template: "https://github.com/nentgroup/viaplay-cli-2/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+      template: "https://github.com/nentgroup/viaplay-cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
       using: "GitHubPrivateRepositoryReleaseDownloadStrategy"
     custom_block: |
       require File.expand_path("lib/custom_download_strategy.rb", __dir__)

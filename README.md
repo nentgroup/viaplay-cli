@@ -15,7 +15,7 @@
 export HOMEBREW_GITHUB_API_TOKEN=your_github_token
 
 # Tap the repository and install
-brew tap nentgroup/viaplay-cli-2 https://github.com/nentgroup/viaplay-cli-2
+brew tap nentgroup/viaplay-cli https://github.com/nentgroup/viaplay-cli
 brew install --cask vip
 ```
 
@@ -130,18 +130,18 @@ go test ./...
 
 ## 📚 Documentation
 
-**Full documentation is available at: [https://nentgroup.github.io/viaplay-cli-2](https://nentgroup.github.io/viaplay-cli-2)**
+**Full documentation is available at: [https://nentgroup.github.io/viaplay-cli](https://nentgroup.github.io/viaplay-cli)**
 
 The documentation includes:
 
-- [Getting Started Guide](https://nentgroup.github.io/viaplay-cli-2/#/getting-started/quickstart)
-- [Installation Instructions](https://nentgroup.github.io/viaplay-cli-2/#/getting-started/installation)
-- [Full CLI Usage & Commands](https://nentgroup.github.io/viaplay-cli-2/#/cli/index)
-- [Project Creation Guide](https://nentgroup.github.io/viaplay-cli-2/#/project-creation)
-- [Configuration Reference](https://nentgroup.github.io/viaplay-cli-2/#/configuration)
-- [Templates & Teams](https://nentgroup.github.io/viaplay-cli-2/#/teams-and-templates)
-- [Environments & Rulesets](https://nentgroup.github.io/viaplay-cli-2/#/envs)
-- [Secrets Management](https://nentgroup.github.io/viaplay-cli-2/#/secrets)
+- [Getting Started Guide](https://nentgroup.github.io/viaplay-cli/#/getting-started/quickstart)
+- [Installation Instructions](https://nentgroup.github.io/viaplay-cli/#/getting-started/installation)
+- [Full CLI Usage & Commands](https://nentgroup.github.io/viaplay-cli/#/cli/index)
+- [Project Creation Guide](https://nentgroup.github.io/viaplay-cli/#/project-creation)
+- [Configuration Reference](https://nentgroup.github.io/viaplay-cli/#/configuration)
+- [Templates & Teams](https://nentgroup.github.io/viaplay-cli/#/teams-and-templates)
+- [Environments & Rulesets](https://nentgroup.github.io/viaplay-cli/#/envs)
+- [Secrets Management](https://nentgroup.github.io/viaplay-cli/#/secrets)
 
 ## 🧩 Features
 

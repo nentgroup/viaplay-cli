@@ -16,7 +16,7 @@ If you are on macOS <i class="fa-brands fa-apple" style="color:#888;"></i> or Li
 
 ```bash
 # Tap the repository and install
-brew tap nentgroup/viaplay-cli-2 https://github.com/nentgroup/viaplay-cli-2
+brew tap nentgroup/viaplay-cli https://github.com/nentgroup/viaplay-cli
 brew install --cask vip
 ```
 

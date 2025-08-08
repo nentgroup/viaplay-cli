@@ -24,76 +24,76 @@
 * **deps:** update module golang.org/x/oauth2 to v0.27.0 [security] ([#3](https://github.com/nentgroup/viaplay-cli/issues/3)) ([afd0df8](https://github.com/nentgroup/viaplay-cli/commit/afd0df8418e43014044c678f15dce2205a4cf304))
 * **deps:** update module golang.org/x/oauth2 to v0.30.0 ([#19](https://github.com/nentgroup/viaplay-cli/issues/19)) ([000428b](https://github.com/nentgroup/viaplay-cli/commit/000428bb33aebfb6ebfc16f7bca9576fabf99043))
 
-## [0.2.0](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.8...v0.2.0) (2025-08-04)
+## [0.2.0](https://github.com/nentgroup/viaplay-cli/compare/v0.1.8...v0.2.0) (2025-08-04)
 
 
 ### Features
 
-* add binary name flag ([00c4773](https://github.com/nentgroup/viaplay-cli-2/commit/00c4773a0d6af1bf01c818fd81f077c9cf42069a))
+* add binary name flag ([00c4773](https://github.com/nentgroup/viaplay-cli/commit/00c4773a0d6af1bf01c818fd81f077c9cf42069a))
 
-## [0.1.8](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.7...v0.1.8) (2025-08-04)
-
-
-### Bug Fixes
-
-* expand tilde ~ to homemapa when handling config files ([2535083](https://github.com/nentgroup/viaplay-cli-2/commit/2535083e6107281cf0a919834b63e18a317b3d57))
-
-## [0.1.7](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.6...v0.1.7) (2025-08-04)
+## [0.1.8](https://github.com/nentgroup/viaplay-cli/compare/v0.1.7...v0.1.8) (2025-08-04)
 
 
 ### Bug Fixes
 
-* fix typo when blueprinting config files ([06f54c4](https://github.com/nentgroup/viaplay-cli-2/commit/06f54c4970baa9de031cfb0c09c9c8c96ee802be))
+* expand tilde ~ to homemapa when handling config files ([2535083](https://github.com/nentgroup/viaplay-cli/commit/2535083e6107281cf0a919834b63e18a317b3d57))
 
-## [0.1.6](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.5...v0.1.6) (2025-08-04)
-
-
-### Bug Fixes
-
-* fix gh login bug caused by serialisation issues ([602a381](https://github.com/nentgroup/viaplay-cli-2/commit/602a3815ccea8179402fc3e03269f77384390e0d))
-
-## [0.1.5](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.4...v0.1.5) (2025-08-04)
+## [0.1.7](https://github.com/nentgroup/viaplay-cli/compare/v0.1.6...v0.1.7) (2025-08-04)
 
 
 ### Bug Fixes
 
-* update goreleaser config ([cd50b3b](https://github.com/nentgroup/viaplay-cli-2/commit/cd50b3ba721d9604b6a767c3887b606892a0e21f))
+* fix typo when blueprinting config files ([06f54c4](https://github.com/nentgroup/viaplay-cli/commit/06f54c4970baa9de031cfb0c09c9c8c96ee802be))
 
-## [0.1.4](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.3...v0.1.4) (2025-08-04)
-
-
-### Bug Fixes
-
-* add uninstall uninstall formula ([2fcb9fe](https://github.com/nentgroup/viaplay-cli-2/commit/2fcb9fe6d161eb5ce904f119c0464c93ea0819cb))
-
-## [0.1.2](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.1...v0.1.2) (2025-08-04)
+## [0.1.6](https://github.com/nentgroup/viaplay-cli/compare/v0.1.5...v0.1.6) (2025-08-04)
 
 
 ### Bug Fixes
 
-* update brew formula ([7568187](https://github.com/nentgroup/viaplay-cli-2/commit/756818797b952f89a97c55b31ed86ad9ff7156d0))
+* fix gh login bug caused by serialisation issues ([602a381](https://github.com/nentgroup/viaplay-cli/commit/602a3815ccea8179402fc3e03269f77384390e0d))
+
+## [0.1.5](https://github.com/nentgroup/viaplay-cli/compare/v0.1.4...v0.1.5) (2025-08-04)
+
+
+### Bug Fixes
+
+* update goreleaser config ([cd50b3b](https://github.com/nentgroup/viaplay-cli/commit/cd50b3ba721d9604b6a767c3887b606892a0e21f))
+
+## [0.1.4](https://github.com/nentgroup/viaplay-cli/compare/v0.1.3...v0.1.4) (2025-08-04)
+
+
+### Bug Fixes
+
+* add uninstall uninstall formula ([2fcb9fe](https://github.com/nentgroup/viaplay-cli/commit/2fcb9fe6d161eb5ce904f119c0464c93ea0819cb))
+
+## [0.1.2](https://github.com/nentgroup/viaplay-cli/compare/v0.1.1...v0.1.2) (2025-08-04)
+
+
+### Bug Fixes
+
+* update brew formula ([7568187](https://github.com/nentgroup/viaplay-cli/commit/756818797b952f89a97c55b31ed86ad9ff7156d0))
 
 
 ### Documentation
 
-* update readme ([049229f](https://github.com/nentgroup/viaplay-cli-2/commit/049229f8c848ea298e6432c2e4b4cbb7da6855d4))
+* update readme ([049229f](https://github.com/nentgroup/viaplay-cli/commit/049229f8c848ea298e6432c2e4b4cbb7da6855d4))
 
-## [0.1.1](https://github.com/nentgroup/viaplay-cli-2/compare/v0.1.0...v0.1.1) (2025-08-04)
+## [0.1.1](https://github.com/nentgroup/viaplay-cli/compare/v0.1.0...v0.1.1) (2025-08-04)
 
 
 ### Bug Fixes
 
-* rename client_id variable ([5545e39](https://github.com/nentgroup/viaplay-cli-2/commit/5545e39a2f98657666fea8877d137149d2445523))
-* update release tags ([57bcc71](https://github.com/nentgroup/viaplay-cli-2/commit/57bcc71b34ae5d1839073483f1148c5229cd64b9))
+* rename client_id variable ([5545e39](https://github.com/nentgroup/viaplay-cli/commit/5545e39a2f98657666fea8877d137149d2445523))
+* update release tags ([57bcc71](https://github.com/nentgroup/viaplay-cli/commit/57bcc71b34ae5d1839073483f1148c5229cd64b9))
 
 ## 0.1.0 (2025-08-04)
 
 
 ### Features
 
-* initial commit ([281a451](https://github.com/nentgroup/viaplay-cli-2/commit/281a45143c444ce687fdad9e46ec17ac9425a28f))
+* initial commit ([281a451](https://github.com/nentgroup/viaplay-cli/commit/281a45143c444ce687fdad9e46ec17ac9425a28f))
 
 
 ### Bug Fixes
 
-* update release flow ([339d20e](https://github.com/nentgroup/viaplay-cli-2/commit/339d20e1eb2bc63efc10f1bf4604c3fd1e3e5dbe))
+* update release flow ([339d20e](https://github.com/nentgroup/viaplay-cli/commit/339d20e1eb2bc63efc10f1bf4604c3fd1e3e5dbe))
