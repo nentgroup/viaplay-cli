@@ -201,7 +201,7 @@ func (m *Manager) GetTemplatePath(language, templateType string) string {
 }
 
 // EnsureTemplate ensures a template is available in the cache
-func (m *Manager) EnsureTemplate(language, templateType, sourceStr string) (string, error) {
+func (m *Manager) EnsureTemplate(language, templateType, sourceStr string, forceUpdate bool) (string, error) {
 	output.VerboseMessage(fmt.Sprintf("Ensuring template for %s/%s from source: %s", language, templateType, sourceStr))
 
 	// Parse the template source
@@ -222,8 +222,16 @@ func (m *Manager) EnsureTemplate(language, templateType, sourceStr string) (stri
 	// Check if the template exists in the cache
 	exists := git.IsGitRepository(cachePath)
 
-	// Check if force update is needed
-	if shouldForceUpdate(exists) {
+	// Check if we should force an update
+
+	// If template exists and no force update requested, simply use the cached version
+	if exists && !forceUpdate {
+		output.VerboseMessage("Using cached template (use --no-cache to check for updates)")
+		return cachePath, nil
+	}
+
+	// If force update is requested and template exists, remove it first
+	if exists && forceUpdate {
 		output.VerboseMessage(fmt.Sprintf("Force update requested, removing existing template at: %s", cachePath))
 		if err := os.RemoveAll(cachePath); err != nil {
 			return "", fmt.Errorf("failed to remove existing template for force update: %w", err)
@@ -231,10 +239,7 @@ func (m *Manager) EnsureTemplate(language, templateType, sourceStr string) (stri
 		exists = false
 	}
 
-	if exists {
-		return handleExistingTemplate(cachePath, source)
-	}
-
+	// At this point, either the template doesn't exist or we removed it for a force update
 	return handleNewTemplate(cachePath, source)
 }
 
@@ -249,14 +254,26 @@ func handleLocalTemplate(source Source) (string, error) {
 	return source.Location, nil
 }
 
-// shouldForceUpdate checks if a force update is requested via environment variable
-func shouldForceUpdate(exists bool) bool {
+// shouldForceUpdate checks if a force update is requested via environment variable or flag
+func shouldForceUpdate(exists bool, forceUpdate ...bool) bool {
+	// Check if forceUpdate parameter is provided and true
+	if len(forceUpdate) > 0 && forceUpdate[0] {
+		return exists
+	}
+	// Otherwise check environment variable
 	return os.Getenv("VIAPLAY_CLI_FORCE_UPDATE") == "true" && exists
 }
 
 // handleExistingTemplate handles logic for an existing template in the cache
-func handleExistingTemplate(cachePath string, source Source) (string, error) {
+func handleExistingTemplate(cachePath string, source Source, forceUpdate ...bool) (string, error) {
 	output.VerboseMessage(fmt.Sprintf("Template already exists in cache at: %s", cachePath))
+
+	// Check if the force update is requested
+	forcedUpdate := false
+	if len(forceUpdate) > 0 && forceUpdate[0] {
+		output.VerboseMessage("Force update requested via --no-cache flag")
+		forcedUpdate = true
+	}
 
 	// Check if the template is too old (older than 24 hours)
 	// If it is, we'll force an update check
@@ -265,15 +282,24 @@ func handleExistingTemplate(cachePath string, source Source) (string, error) {
 		output.VerboseMessage("Template is older than 24 hours, checking for updates")
 	}
 
-	// Check if the template needs to be updated
-	needsUpdate, err := checkIfTemplateNeedsUpdate(cachePath)
-	if err != nil && !forcedCheck {
-		// If there's an error checking updates, use cached version anyway
-		output.VerboseMessage(fmt.Sprintf("Error checking updates: %v, using cached template", err))
-		return cachePath, nil
+	// Only check for updates if we're forcing an update or the template is too old
+	needsUpdate := false
+	var err error
+
+	if forcedUpdate || forcedCheck {
+		// Check if the template needs to be updated
+		needsUpdate, err = checkIfTemplateNeedsUpdate(cachePath)
+		if err != nil {
+			// If there's an error checking updates, use cached version anyway
+			output.VerboseMessage(fmt.Sprintf("Error checking updates: %v, using cached template", err))
+			return cachePath, nil
+		}
+	} else {
+		// When not forcing an update and template is recent, skip the remote check entirely
+		output.VerboseMessage("Using cached template without checking remote (use --no-cache to force check)")
 	}
 
-	if needsUpdate || forcedCheck {
+	if needsUpdate || forcedCheck || forcedUpdate {
 		output.VerboseMessage("Updating template...")
 		if err := updateExistingTemplate(cachePath, source); err != nil {
 			// If update fails, use cached version anyway
@@ -542,7 +568,7 @@ func (m *Manager) UpdateAllTemplates() (int, int, error) {
 			fmt.Printf("Updating template: %s/%s from %s\n", t.Language, t.Type, sourceStr)
 
 			// Use EnsureTemplate to update the template
-			_, err := m.EnsureTemplate(t.Language, t.Type, sourceStr)
+			_, err := m.EnsureTemplate(t.Language, t.Type, sourceStr, true) // Force update when explicitly updating templates
 			if err != nil {
 				fmt.Printf("Error updating template %s/%s: %v\n", t.Language, t.Type, err)
 				mu.Lock()

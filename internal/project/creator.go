@@ -86,6 +86,7 @@ type CreateOptions struct {
 	TemplateSource string
 	Scaffold       bool   // Wether to scaffold the project, always true for project creation
 	OutputDir      string // Local directory for the project (if Scaffold is true)
+	NoCache        bool   // Force update of template cache before using it
 }
 
 // NewCreator creates a new project creator with the given GitHub client and config directory
@@ -227,7 +228,7 @@ func (c *Creator) CreateProject(opts CreateOptions) error {
 
 	// Convert options to template variables
 	templateVars := createOptionsToTemplateVariables(opts)
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks); err != nil {
+	if err := c.Scaffolder.ScaffoldProject(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks, opts.NoCache); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 
@@ -437,7 +438,7 @@ func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars 
 		templateSource = template.Source
 	}
 
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks); err != nil {
+	if err := c.Scaffolder.ScaffoldProject(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks, opts.NoCache); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 

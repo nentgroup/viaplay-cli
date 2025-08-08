@@ -40,6 +40,7 @@ type CreateCommandOptions struct {
 	OutputDir      string
 	BinaryName     string
 	SkipHooks      bool
+	NoCache        bool // Force template cache update
 }
 
 // createCmd is the parent command for all creation operations
@@ -108,6 +109,7 @@ Use this for a complete project setup experience.`,
 	cmd.Flags().StringVar(&opts.BinaryName, "binary-name", "", "Name of the compiled binary (for compiled languages like Go and Rust)")
 	cmd.Flags().BoolVar(&opts.NoRepo, "no-repo", false, "Skip GitHub repository creation (local project only)")
 	cmd.Flags().BoolVar(&opts.SkipHooks, "skip-hooks", false, "Skip running post-installation hooks")
+	cmd.Flags().BoolVar(&opts.NoCache, "no-cache", false, "Force update of template cache (ignore cached templates)")
 
 	return cmd
 }
@@ -366,6 +368,7 @@ func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params 
 		TemplateSource: opts.TemplateSource,
 		Scaffold:       withScaffolding, // Always true for project, false for repo
 		OutputDir:      opts.OutputDir,
+		NoCache:        opts.NoCache, // Force update of template cache if flag is set
 	}
 
 	// Execute the project creation workflow

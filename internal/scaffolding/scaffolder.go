@@ -42,41 +42,14 @@ func NewProjectScaffolder(cacheManager *cache.Manager, cfg *config.Configuration
 // - projectType: The type of project (service, lambda, cli, etc.)
 // - templateSource: The source of the template
 // - variables: Map of template variables to replace in the project
-func (ps *ProjectScaffolder) ScaffoldProject(destPath, language, projectType, templateSource string, variables map[string]string) error {
+// - forceUpdate: If true, forces update of the template cache
+func (ps *ProjectScaffolder) ScaffoldProject(destPath, language, projectType, templateSource string, opts interface{}, skipHooks bool, forceUpdate bool) error {
 	// Ensure the template is available in the cache
-	templatePath, err := ps.CacheManager.EnsureTemplate(language, projectType, templateSource)
-	if err != nil {
-		return fmt.Errorf("failed to ensure template is available: %w", err)
-	}
+	var templatePath string
+	var err error
 
-	// Create the destination directory if it doesn't exist
-	if err := os.MkdirAll(destPath, 0o755); err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
-	}
+	templatePath, err = ps.CacheManager.EnsureTemplate(language, projectType, templateSource, forceUpdate)
 
-	// Convert simple variables map to structured template variables
-	templateVars := templ.NewTemplateVariables().FromMap(variables)
-
-	// Create a renderer
-	renderer := templ.NewRenderer(templateVars)
-
-	// Copy the template files to the destination with variable substitution
-	if err := ps.copyTemplateFiles(templatePath, destPath, renderer); err != nil {
-		return fmt.Errorf("failed to copy template files: %w", err)
-	}
-
-	// Run any post-scaffolding commands
-	if err := ps.runPostScaffoldCommands(destPath, language, projectType, templateVars); err != nil {
-		return fmt.Errorf("failed to run post-scaffold commands: %w", err)
-	}
-
-	return nil
-}
-
-// ScaffoldProjectWithOptions creates a project structure from a template using a strongly-typed options struct
-func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(destPath, language, projectType, templateSource string, opts interface{}, skipHooks bool) error {
-	// Ensure the template is available in the cache
-	templatePath, err := ps.CacheManager.EnsureTemplate(language, projectType, templateSource)
 	if err != nil {
 		return fmt.Errorf("failed to ensure template is available: %w", err)
 	}
@@ -333,7 +306,7 @@ func (ps *ProjectScaffolder) CloneToRepo(projectPath, repoURL string) error {
 }
 
 // RunPostInstallHooks runs the post-installation hooks for a project
-// This is separated from ScaffoldProjectWithOptions to allow running hooks after repository creation
+// This is separated from ScaffoldProject to allow running hooks after repository creation
 func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectType string, templateVars *templ.Variables) error {
 	// Create a function that will run the hooks and write output to provided writers
 	runHookFn := func(stdout, stderr io.Writer) error {
