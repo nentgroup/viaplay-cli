@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/nentgroup/viaplay-cli/compare/v0.3.0...v0.3.1) (2025-08-08)
+
+
+### Bug Fixes
+
+* update all references to old repo name ([a53abd8](https://github.com/nentgroup/viaplay-cli/commit/a53abd8919c368f638a8006667848f5f02be49b4))
+
 ## [0.3.0](https://github.com/nentgroup/viaplay-cli/compare/v0.2.1...v0.3.0) (2025-08-08)
 
 
