@@ -4,7 +4,7 @@ cask "vip" do
 
   desc "CLI tool for Gecko Generators."
   homepage "https://nentgroup.github.io/viaplay-cli-2"
-  version "0.2.1"
+  version "0.3.0"
 
   livecheck do
     skip "Auto-generated on release."
@@ -14,27 +14,27 @@ cask "vip" do
 
   on_macos do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.2.1/viaplay-cli_0.2.1_darwin_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.3.0/viaplay-cli_0.3.0_darwin_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "e54bc487811173394ce3f3b11c743895508fb8d3875e343f6a74f06005140324"
+      sha256 "52d5a4fb140481c1ea8b794bf00bda7e97a1607f172d96443fef584fb31318c5"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.2.1/viaplay-cli_0.2.1_darwin_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.3.0/viaplay-cli_0.3.0_darwin_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "e007886e03f1f487323b8919252449e47a9c8eac83d90024fd4f90e11a0048f8"
+      sha256 "db58ffbbbd195a94831c4eec78cd2589227d95d5dd66def0963065efc02efcba"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.2.1/viaplay-cli_0.2.1_linux_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.3.0/viaplay-cli_0.3.0_linux_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "6ac2e64c5826ede9d77f8dcfd21fade268c9a7bf052ad2c2624998250d597e03"
+      sha256 "7909d1f293251f9ddd67047a709aa26cce786fb4f20fbd3c7746b672e0230fbb"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.2.1/viaplay-cli_0.2.1_linux_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli-2/releases/download/v0.3.0/viaplay-cli_0.3.0_linux_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "d754c59c44bebc84e485c985d077efe89a7ded09d360fbe6a6dafa7e9cad2c07"
+      sha256 "77fcc800d406d479d290ff704f6154d2bc27f3888f07912822f1b34a52c96ae8"
     end
   end
 
