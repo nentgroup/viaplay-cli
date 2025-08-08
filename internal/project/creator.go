@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-github/v74/github"
 	"github.com/zalando/go-keyring"
 
@@ -18,10 +17,25 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/output"
+	"github.com/nentgroup/viaplay-cli/internal/progress"
 	"github.com/nentgroup/viaplay-cli/internal/registry"
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
 	"github.com/nentgroup/viaplay-cli/internal/template"
 )
+
+// Summary contains details about the created project to be displayed to the user
+type Summary struct {
+	ProjectPath     string   // Full path to the project location
+	RepoURL         string   // GitHub repository URL
+	Language        string   // Programming language used
+	ProjectType     string   // Type of project (service, CLI, etc.)
+	Team            string   // Team assigned to the project
+	AppliedEnvs     bool     // Whether environments were applied
+	AppliedRulesets bool     // Whether rulesets were applied
+	AppliedSecrets  bool     // Whether secrets were applied
+	CustomSecrets   bool     // Whether custom secrets were applied
+	Errors          []string // Any non-fatal errors that occurred
+}
 
 // Creator manages the project creation workflow
 type Creator struct {
@@ -39,6 +53,9 @@ type Creator struct {
 
 	// Project scaffolder for applying templates
 	Scaffolder *scaffolding.ProjectScaffolder
+
+	// Progress reporter for tracking operation progress
+	Reporter progress.Reporter
 }
 
 // CreateOptions contains all options for creating a new project
@@ -49,12 +66,14 @@ type CreateOptions struct {
 	RepoOwner       string
 	IsPrivate       bool
 	IsOrg           bool
+	SkipRepo        bool // Skip GitHub repository creation
 
 	// Project options
 	Language    string
 	ProjectType string
 	Team        string
 	BinaryName  string // Name for compiled binary (for Go, Rust, etc.)
+	SkipHooks   bool   // Skip running post-installation hooks
 
 	// Configuration options
 	ConfigDir     string
@@ -65,8 +84,9 @@ type CreateOptions struct {
 
 	// Template options
 	TemplateSource string
-	CloneLocal     bool   // Whether to clone the repo locally
-	OutputDir      string // Local directory for the project (if CloneLocal is true)
+	Scaffold       bool   // Wether to scaffold the project, always true for project creation
+	OutputDir      string // Local directory for the project (if Scaffold is true)
+	NoCache        bool   // Force update of template cache before using it
 }
 
 // NewCreator creates a new project creator with the given GitHub client and config directory
@@ -93,7 +113,7 @@ func NewCreator(ghClient *gh.GitHubClient, configDir string) *Creator {
 	}
 
 	// Create scaffolder
-	scaffolder := scaffolding.NewProjectScaffolder(cacheManager)
+	scaffolder := scaffolding.NewProjectScaffolder(cacheManager, cfg)
 
 	return &Creator{
 		GitHubClient:     ghClient,
@@ -101,7 +121,24 @@ func NewCreator(ghClient *gh.GitHubClient, configDir string) *Creator {
 		TemplateRegistry: templateRegistry,
 		CacheManager:     cacheManager,
 		Scaffolder:       scaffolder,
+		Reporter:         progress.NewNoopReporter(), // Default to noop reporter
 	}
+}
+
+// NewCreatorWithReporter creates a new project creator with a custom progress reporter
+func NewCreatorWithReporter(ghClient *gh.GitHubClient, configDir string, reporter progress.Reporter) *Creator {
+	creator := NewCreator(ghClient, configDir)
+	creator.Reporter = reporter
+	return creator
+}
+
+// SetReporter sets a custom reporter for the creator
+func (c *Creator) SetReporter(reporter progress.Reporter) {
+	if reporter == nil {
+		c.Reporter = progress.NewNoopReporter()
+		return
+	}
+	c.Reporter = reporter
 }
 
 // Helper to convert CreateOptions to *template.Variables
@@ -117,6 +154,7 @@ func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 	vars.RepoName = opts.RepoName
 	vars.IsPrivate = opts.IsPrivate
 	vars.RepoURL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
+	vars.RepoSSHURL = fmt.Sprintf("git@github.com:%s/%s.git", opts.RepoOwner, opts.RepoName)
 
 	// Project language and type
 	vars.Language = opts.Language
@@ -161,7 +199,6 @@ func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 
 	// Docker variables
 	vars.DockerImageName = strings.ToLower(opts.RepoName)
-	spew.Dump(vars)
 	return vars
 }
 
@@ -191,7 +228,7 @@ func (c *Creator) CreateProject(opts CreateOptions) error {
 
 	// Convert options to template variables
 	templateVars := createOptionsToTemplateVariables(opts)
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars); err != nil {
+	if err := c.Scaffolder.ScaffoldProject(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks, opts.NoCache); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 
@@ -199,13 +236,30 @@ func (c *Creator) CreateProject(opts CreateOptions) error {
 }
 
 // Create handles the full project creation workflow
-func (c *Creator) Create(opts CreateOptions) error {
-	output.VerboseMessage(fmt.Sprintf("Starting project creation with options: %+v", opts))
+func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
+	// Debug info when available
+	c.Reporter.Debug(fmt.Sprintf("Starting project creation with options: %+v", opts))
+
+	// Initialise project summary
+	summary := &Summary{
+		Language:        opts.Language,
+		ProjectType:     opts.ProjectType,
+		Team:            opts.Team,
+		AppliedEnvs:     opts.ApplyEnvs,
+		AppliedRulesets: opts.ApplyRulesets,
+		AppliedSecrets:  opts.ApplySecrets,
+		CustomSecrets:   opts.RepoSecrets != "",
+		Errors:          []string{},
+	}
 
 	// Get authenticated user for CreatedBy field
+	c.Reporter.Start("Getting authenticated user", "")
 	username, err := c.GitHubClient.GetAuthenticatedUser()
 	if err != nil {
-		output.VerboseMessage(fmt.Sprintf("Failed to get authenticated username: %v", err))
+		c.Reporter.Failed("Getting authenticated user", err, "")
+		summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to get authenticated username: %v", err))
+	} else {
+		c.Reporter.Complete("Getting authenticated user", "")
 	}
 
 	// Convert options to template variables with additional info
@@ -214,71 +268,90 @@ func (c *Creator) Create(opts CreateOptions) error {
 	// Set authenticated username if available
 	if username != "" {
 		templateVars.CreatedBy = username
-		output.VerboseMessage(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", username))
+		c.Reporter.Debug(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", username))
 	}
 
-	if opts.CloneLocal {
-		output.VerboseMessage("Scaffolding project locally...")
-		fmt.Printf("Scaffolding project...")
-		if err := c.scaffoldProjectWithVariables(opts, templateVars); err != nil {
-			output.VerboseMessage(fmt.Sprintf("Project scaffolding failed: %v", err))
-			fmt.Println(" failed")
-			return fmt.Errorf("failed to scaffold project: %w", err)
+	// Determine the project path
+	projectPath := opts.OutputDir
+	if projectPath == "" {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current directory: %w", err)
 		}
-		output.VerboseMessage("Project scaffolding complete.")
-		fmt.Println(" done")
-	}
-
-	output.VerboseMessage("Creating repository on GitHub...")
-	fmt.Printf("Creating repository...")
-	_, err = c.createRepository(opts)
-	if err != nil {
-		output.VerboseMessage(fmt.Sprintf("Repository creation error: %v", err))
-		if !strings.Contains(err.Error(), "name already exists on this account") {
-			fmt.Println(" failed")
-			return fmt.Errorf("failed to create repository: %w", err)
-		}
-		fmt.Println(" already exists, proceeding")
+		projectPath = filepath.Join(currentDir, opts.RepoName)
 	} else {
-		output.VerboseMessage("Repository created successfully.")
-		fmt.Println(" done")
+		projectPath = filepath.Join(projectPath, opts.RepoName)
+	}
+	summary.ProjectPath = projectPath
+
+	// Scaffold the project if requested
+	if opts.Scaffold {
+		c.Reporter.Start("Scaffolding project", "")
+		if err := c.scaffoldProjectWithVariables(opts, templateVars); err != nil {
+			return nil, fmt.Errorf("failed to scaffold project: %w", err)
+		}
+		c.Reporter.Complete("Scaffolding project", "complete!")
 	}
 
-	output.VerboseMessage("Applying GitHub configurations (envs, rulesets, secrets)...")
-	fmt.Printf("Creating default environment...")
+	// Create GitHub repository if not skipped
+	if opts.SkipRepo {
+		c.Reporter.Skip("Creating GitHub repository", "Skipped as per user request")
+	} else {
+		c.Reporter.Start("Creating GitHub repository", "")
+		_, err = c.createRepository(opts)
+		if err != nil {
+			if strings.Contains(err.Error(), "name already exists on this account") {
+				c.Reporter.Skip("Creating GitHub repository", "Repository already exists")
+			} else {
+				c.Reporter.Failed("Creating GitHub repository", err, "")
+				return nil, fmt.Errorf("failed to create repository: %w", err)
+			}
+		} else {
+			c.Reporter.Complete("Creating GitHub repository", "")
+		}
+
+		// Set the repository URL in the summary
+		summary.RepoURL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
+	}
+
+	// Apply GitHub configurations
+	c.Reporter.Start("Applying GitHub configurations", "")
 	if err := c.applyGitHubConfigurations(opts); err != nil {
-		output.VerboseMessage(fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
-		fmt.Println(" failed")
-		return fmt.Errorf("failed to apply GitHub configurations: %w", err)
+		summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
+	} else {
+		c.Reporter.Complete("Applying GitHub configurations", "")
 	}
-	output.VerboseMessage("GitHub configurations applied.")
-	fmt.Println(" done")
 
-	if opts.CloneLocal {
-		output.VerboseMessage("Pushing project to GitHub...")
-		repoURL := fmt.Sprintf("https://github.com/%s/%s.git", opts.RepoOwner, opts.RepoName)
+	// Run post-installation hooks if scaffolding was done and hooks aren't skipped
+	if opts.Scaffold && !opts.SkipHooks {
 		outputDir := opts.OutputDir
 		if outputDir == "" {
 			currentDir, err := os.Getwd()
 			if err != nil {
-				output.VerboseMessage(fmt.Sprintf("Failed to get current directory: %v", err))
-				fmt.Println("failed")
-				return fmt.Errorf("failed to get current directory: %w", err)
+				return nil, fmt.Errorf("failed to get current directory: %w", err)
 			}
 			outputDir = filepath.Join(currentDir, opts.RepoName)
+		} else {
+			outputDir = filepath.Join(outputDir, opts.RepoName)
 		}
-		if err := c.pushToRepository(outputDir, repoURL); err != nil {
-			output.VerboseMessage(fmt.Sprintf("Failed to push project to repository: %v", err))
-			fmt.Println("failed")
-			return fmt.Errorf("failed to push project to repository: %w", err)
+
+		c.Reporter.Start("Running post-installation hooks \n", "")
+		if err := c.Scaffolder.RunPostInstallHooks(
+			outputDir,
+			opts.Language,
+			opts.ProjectType,
+			templateVars,
+		); err != nil {
+			summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to run post-installation hooks: %v", err))
+		} else {
+			c.Reporter.Complete("Running post-installation hooks", "complete!")
 		}
-		output.VerboseMessage("Project pushed to GitHub.")
-		fmt.Println("done")
+	} else if opts.SkipHooks {
+		c.Reporter.Skip("Running post-installation hooks", "Skipped as per user request")
 	}
 
-	output.VerboseMessage("Project creation workflow complete.")
-	fmt.Printf("Project creation complete\n")
-	return nil
+	c.Reporter.Complete("Project creation", "Workflow completed successfully")
+	return summary, nil
 }
 
 // createRepository creates a GitHub repository
@@ -295,40 +368,37 @@ func (c *Creator) createRepository(opts CreateOptions) (string, error) {
 func (c *Creator) applyGitHubConfigurations(opts CreateOptions) error {
 	teamDir := filepath.Join(opts.ConfigDir, "teams", opts.Team)
 
-	output.VerboseMessage(fmt.Sprintf("applyGitHubConfigurations: teamDir=%s, ApplyEnvs=%v, ApplyRulesets=%v, ApplySecrets=%v, RepoSecrets set=%v", teamDir, opts.ApplyEnvs, opts.ApplyRulesets, opts.ApplySecrets, opts.RepoSecrets != ""))
+	// Skip all GitHub configurations if SkipRepo is true
+	if opts.SkipRepo {
+		return nil
+	}
 
 	// 1. Apply environments if requested
 	if opts.ApplyEnvs {
-		output.VerboseMessage("Applying team environments...")
 		c.applyTeamEnvs(opts.RepoOwner, opts.RepoName, teamDir)
 	} else {
-		output.VerboseMessage("Creating default 'staging' environment (team envs not applied)...")
 		// Create default staging environment if not applying team envs
 		err := c.GitHubClient.CreateEnvironment(opts.RepoOwner, opts.RepoName, "staging")
 		if err != nil {
 			if !strings.Contains(err.Error(), "already exists") {
-				fmt.Printf("\nFailed to create environment: %v\n", err)
+				return fmt.Errorf("failed to create environment: %w", err)
 			}
 		}
 	}
 
 	// 2. Apply rulesets if requested
 	if opts.ApplyRulesets {
-		output.VerboseMessage("Applying team rulesets...")
 		c.applyTeamRulesets(opts.RepoOwner, opts.RepoName, teamDir)
 	}
 
 	// 3. Apply secrets if requested
 	if opts.ApplySecrets {
-		output.VerboseMessage("Applying team secrets...")
 		c.applyTeamSecrets(opts.RepoOwner, opts.RepoName, teamDir)
 	}
 
 	// 4. Apply repository-specific secrets if provided
 	if opts.RepoSecrets != "" {
-		output.VerboseMessage("Applying repository-specific secrets...")
 		if err := c.applyRepoSpecificSecrets(opts.RepoOwner, opts.RepoName, opts.RepoSecrets); err != nil {
-			output.VerboseMessage(fmt.Sprintf("Failed to apply repository-specific secrets: %v", err))
 			return fmt.Errorf("failed to apply repository-specific secrets: %w", err)
 		}
 	}
@@ -336,39 +406,26 @@ func (c *Creator) applyGitHubConfigurations(opts CreateOptions) error {
 	return nil
 }
 
-// scaffoldProject scaffolds a project locally
-func (c *Creator) scaffoldProject(opts CreateOptions) error {
-	outputDir := opts.OutputDir
-	if outputDir == "" {
-		currentDir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get current directory: %w", err)
-		}
-		outputDir = filepath.Join(currentDir, opts.RepoName)
-	}
-
-	templateSource := opts.TemplateSource
-	if templateSource == "" {
-		return fmt.Errorf("template source not specified and could not be determined from config")
-	}
-
-	templateVars := createOptionsToTemplateVariables(opts)
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars); err != nil {
-		return fmt.Errorf("failed to scaffold project: %w", err)
-	}
-
-	return nil
-}
-
 // scaffoldProjectWithVariables scaffolds a project locally with pre-populated template variables
 func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars *template.Variables) error {
+	// Determine output directory
 	outputDir := opts.OutputDir
 	if outputDir == "" {
+		// If no output directory is specified, use current directory
 		currentDir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("failed to get current directory: %w", err)
 		}
+		// Create a subdirectory with the project/repo name
 		outputDir = filepath.Join(currentDir, opts.RepoName)
+	} else {
+		// If output directory is specified, create a subdirectory with the project/repo name
+		outputDir = filepath.Join(outputDir, opts.RepoName)
+	}
+
+	// Ensure the output directory exists
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	templateSource := opts.TemplateSource
@@ -381,11 +438,7 @@ func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars 
 		templateSource = template.Source
 	}
 
-	output.VerboseMessage(fmt.Sprintf("Scaffolding project with template source: %s", templateSource))
-	output.VerboseMessage(fmt.Sprintf("Template variables: ProjectName=%s, Language=%s, Type=%s, CreatedBy=%s",
-		templateVars.ProjectName, templateVars.Language, templateVars.ProjectType, templateVars.CreatedBy))
-
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars); err != nil {
+	if err := c.Scaffolder.ScaffoldProject(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks, opts.NoCache); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 
@@ -638,24 +691,6 @@ func (c *Creator) applyRepoSpecificSecrets(owner, repo, secretsJSON string) erro
 	return nil
 }
 
-// pushToRepository initialises a Git repository in the local directory and pushes it to the remote GitHub repository
-func (c *Creator) pushToRepository(localDir, remoteURL string) error {
-	// TODO: Implement Git operations to push the local repository to GitHub
-	// For now, just display a message about manual pushing
-	output.InfoMessage(fmt.Sprintf("Repository created at: %s", localDir))
-	output.InfoMessage("To manually push to GitHub, run the following commands:")
-
-	// Use indentation for better readability of the commands
-	fmt.Printf("  cd %s\n", localDir)
-	fmt.Printf("  git init\n")
-	fmt.Printf("  git add .\n")
-	fmt.Printf("  git commit -m \"Initial commit\"\n")
-	fmt.Printf("  git remote add origin %s\n", remoteURL)
-	fmt.Printf("  git push -u origin main\n")
-
-	return nil
-}
-
 // Secret represents a secret or variable definition for use in team/repo configs
 // This matches the structure used in secretsConfig.Secrets
 // (duplicated here to avoid import cycles and for helper use)
@@ -666,6 +701,16 @@ type Secret struct {
 	Type      string
 	Reference string
 }
+
+// Source type constants
+const (
+	// SourceTypeConfig represents a configuration source type
+	SourceTypeConfig = "config"
+	// SourceTypeKeyring represents a keyring source type
+	SourceTypeKeyring = "keyring"
+	// SourceTypeEnv represents an environment variable source type
+	SourceTypeEnv = "env"
+)
 
 // Helper functions
 
@@ -714,23 +759,28 @@ func sanitizeSecretName(name string) string {
 	sanitized := strings.ReplaceAll(name, "-", "_")
 
 	// Ensure the name starts with a letter or underscore
-	if len(sanitized) > 0 && !((sanitized[0] >= 'a' && sanitized[0] <= 'z') ||
-		(sanitized[0] >= 'A' && sanitized[0] <= 'Z') ||
-		sanitized[0] == '_') {
+	if len(sanitized) > 0 && (!isAlpha(sanitized[0]) && sanitized[0] != '_') {
 		sanitized = "_" + sanitized
 	}
 
 	// Replace any other invalid characters with underscores
 	for i, char := range sanitized {
-		if !((char >= 'a' && char <= 'z') ||
-			(char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') ||
-			char == '_') {
+		if !isAlphaNumeric(char) && char != '_' {
 			sanitized = sanitized[:i] + "_" + sanitized[i+1:]
 		}
 	}
 
 	return sanitized
+}
+
+// isAlpha checks if a byte is an alphabetic character (a-z, A-Z)
+func isAlpha(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+// isAlphaNumeric checks if a rune is an alphanumeric character (a-z, A-Z, 0-9)
+func isAlphaNumeric(c rune) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
 // resolveSecretValue resolves a secret value from various sources (config, keyring, env vars)

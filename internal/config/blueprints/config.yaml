@@ -44,21 +44,29 @@ default_private: true
 # - Tarball URL: "url@https://example.com/template.tar.gz"
 templates:
   # Go templates
-  "go":
-    "cli": "git@github.com/nentgroup/go-cli-template.git"
-    "lambda": "git@github.com/nentgroup/go-lambda-template.git"
-    "package": "git@github.com/nentgroup/go-package-template.git"
-    "service": "git@github.com/nentgroup/go-service-template.git"
+  go:
+    cli:
+      source: "git@github.com:nentgroup/go-cli-template.git"
+    lambda:
+      source: "git@github.com:nentgroup/go-lambda-template.git"
+    package:
+      source: "git@github.com:nentgroup/go-package-template.git"
+    service:
+      source: "git@github.com:nentgroup/go-service-template.git"
+      hooks:
+        post:
+          install:
+            cmd:
+              - "echo 'Go service template installed successfully'"
 
   # Rust templates
-  "rust":
-    "service": "git@github.com/nentgroup/rust-http-service-template-2.git"
+  rust:
+    service: "git@github.com:nentgroup/rust-http-service-template-2.git"
 
   # TypeScript templates
-  "typescript":
-    "service": "git@github.com/nentgroup/ts-service-template.git"
-    "lambda": "git@github.com/nentgroup/ts-lambda-template.git"
-
+  typescript:
+    service: "git@github.com:nentgroup/ts-service-template.git"
+    lambda: "git@github.com:nentgroup/ts-lambda-template.git"
   # Add more language templates as needed
 
 # -----------------------------------------------

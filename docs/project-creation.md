@@ -16,6 +16,7 @@ viaplay-cli can scaffold new projects from templates and automate the creation o
   - Scaffolds a new project from a template (with your chosen language and type)
   - Creates a new GitHub repository
   - Applies team/org settings (environments, rulesets, secrets)
+  - Executes post-installation hooks (if defined and not skipped)
   - Optionally clones the project locally and sets up initial config files
 
 - **Repository Creation:**

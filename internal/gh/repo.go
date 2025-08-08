@@ -1,6 +1,7 @@
 package gh
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/google/go-github/v74/github"
@@ -34,4 +35,44 @@ func (ghc *GitHubClient) CreateRepo(repoName, org string, private bool, descript
 // TODO: Implement this using github.ProtectionRequest if needed, or remove if not used
 func (ghc *GitHubClient) SetBranchProtection(owner, repo, branch string, rules map[string]interface{}) error {
 	return fmt.Errorf("setBranchProtection not implemented with go-github; use ruleset.go for advanced protection")
+}
+
+// RepositoryExists checks if a repository with the given name already exists
+func (g *GitHubClient) RepositoryExists(owner, repo string) (bool, error) {
+	// Use the GitHub API to check if the repository exists
+	_, resp, err := g.client.Repositories.Get(g.ctx, owner, repo)
+
+	// If we got a 404, the repository doesn't exist
+	if resp != nil && resp.StatusCode == 404 {
+		return false, nil
+	}
+
+	// If we got a different error, something went wrong with the API call
+	if err != nil && resp == nil {
+		return false, fmt.Errorf("failed to check if repository exists: %w", err)
+	}
+
+	// If we get here with a non-nil error but it's not a 404, treat it as a special case
+	if err != nil {
+		// Check if it's a rate limit error or other specific GitHub API error
+		var rateLimitError *github.RateLimitError
+		if errors.As(err, &rateLimitError) {
+			return false, fmt.Errorf("GitHub API rate limit exceeded: %w", err)
+		}
+
+		// For authentication errors, check the status code
+		if resp != nil && resp.StatusCode == 401 {
+			return false, fmt.Errorf("not authorized to access this repository: %w", err)
+		}
+
+		// Fall back to checking the status code from the response
+		if resp != nil && resp.StatusCode != 404 {
+			return true, nil // Repository likely exists but we have limited access
+		}
+
+		return false, fmt.Errorf("error checking repository: %w", err)
+	}
+
+	// If we got no error, the repository exists
+	return true, nil
 }

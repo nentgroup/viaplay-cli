@@ -3,12 +3,14 @@ package scaffolding
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/nentgroup/viaplay-cli/internal/cache"
+	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/git"
 	templ "github.com/nentgroup/viaplay-cli/internal/template"
 )
@@ -22,12 +24,14 @@ const (
 // ProjectScaffolder handles applying templates to create project structures
 type ProjectScaffolder struct {
 	CacheManager *cache.Manager
+	Config       *config.Configuration
 }
 
 // NewProjectScaffolder creates a new project scaffolder
-func NewProjectScaffolder(cacheManager *cache.Manager) *ProjectScaffolder {
+func NewProjectScaffolder(cacheManager *cache.Manager, cfg *config.Configuration) *ProjectScaffolder {
 	return &ProjectScaffolder{
 		CacheManager: cacheManager,
+		Config:       cfg,
 	}
 }
 
@@ -38,41 +42,13 @@ func NewProjectScaffolder(cacheManager *cache.Manager) *ProjectScaffolder {
 // - projectType: The type of project (service, lambda, cli, etc.)
 // - templateSource: The source of the template
 // - variables: Map of template variables to replace in the project
-func (ps *ProjectScaffolder) ScaffoldProject(destPath, language, projectType, templateSource string, variables map[string]string) error {
+// - forceUpdate: If true, forces update of the template cache
+func (ps *ProjectScaffolder) ScaffoldProject(destPath, language, projectType, templateSource string, opts interface{}, skipHooks, forceUpdate bool) error {
 	// Ensure the template is available in the cache
-	templatePath, err := ps.CacheManager.EnsureTemplate(language, projectType, templateSource)
-	if err != nil {
-		return fmt.Errorf("failed to ensure template is available: %w", err)
-	}
+	var templatePath string
+	var err error
 
-	// Create the destination directory if it doesn't exist
-	if err := os.MkdirAll(destPath, 0o755); err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
-	}
-
-	// Convert simple variables map to structured template variables
-	templateVars := templ.NewTemplateVariables().FromMap(variables)
-
-	// Create a renderer
-	renderer := templ.NewRenderer(templateVars)
-
-	// Copy the template files to the destination with variable substitution
-	if err := ps.copyTemplateFiles(templatePath, destPath, renderer); err != nil {
-		return fmt.Errorf("failed to copy template files: %w", err)
-	}
-
-	// Run any post-scaffolding commands
-	if err := ps.runPostScaffoldCommands(destPath, language, projectType); err != nil {
-		return fmt.Errorf("failed to run post-scaffold commands: %w", err)
-	}
-
-	return nil
-}
-
-// ScaffoldProjectWithOptions creates a project structure from a template using a strongly-typed options struct
-func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(destPath, language, projectType, templateSource string, opts interface{}) error {
-	// Ensure the template is available in the cache
-	templatePath, err := ps.CacheManager.EnsureTemplate(language, projectType, templateSource)
+	templatePath, err = ps.CacheManager.EnsureTemplate(language, projectType, templateSource, forceUpdate)
 	if err != nil {
 		return fmt.Errorf("failed to ensure template is available: %w", err)
 	}
@@ -93,11 +69,6 @@ func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(destPath, language, proj
 	// Copy the template files to the destination with variable substitution
 	if err := ps.copyTemplateFiles(templatePath, destPath, renderer); err != nil {
 		return fmt.Errorf("failed to copy template files: %w", err)
-	}
-
-	// Run any post-scaffolding commands
-	if err := ps.runPostScaffoldCommands(destPath, language, projectType); err != nil {
-		return fmt.Errorf("failed to run post-scaffold commands: %w", err)
 	}
 
 	return nil
@@ -186,39 +157,81 @@ func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, re
 }
 
 // runPostScaffoldCommands runs any post-scaffold commands for the template
-func (ps *ProjectScaffolder) runPostScaffoldCommands(projectPath, language, projectType string) error {
-	// Check for post-scaffold script
-	scriptPath := filepath.Join(projectPath, ".post-scaffold.sh")
-	if _, err := os.Stat(scriptPath); err == nil {
-		// Make the script executable
-		if err := os.Chmod(scriptPath, 0o755); err != nil {
-			return fmt.Errorf("failed to make post-scaffold script executable: %w", err)
-		}
+func (ps *ProjectScaffolder) runPostScaffoldCommands(projectPath, language, projectType string, templateVars *templ.Variables) error {
+	// Get renderer for template variables
+	renderer := templ.NewRenderer(templateVars)
 
-		// Run the script
-		cmd := exec.Command(scriptPath)
-		cmd.Dir = projectPath
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to run post-scaffold script: %w", err)
-		}
-
-		// Remove the script after running
-		if err := os.Remove(scriptPath); err != nil {
-			fmt.Printf("Warning: Failed to remove post-scaffold script: %v\n", err)
+	// Execute hooks from configuration
+	if ps.Config != nil {
+		if err := ps.runConfiguredHooks(projectPath, language, projectType, renderer); err != nil {
+			return fmt.Errorf("failed to run configured hooks: %w", err)
 		}
 	}
 
-	// Language-specific initialization
-	switch language {
-	case "go":
-		if err := ps.initGoProject(projectPath); err != nil {
-			return err
+	return nil
+}
+
+// runConfiguredHooks executes hooks defined in the configuration
+func (ps *ProjectScaffolder) runConfiguredHooks(projectPath, language, projectType string, renderer *templ.Renderer) error {
+	// Check if we have hooks for this language and project type
+	hooks := ps.Config.GetPostInstallHooks(language, projectType)
+	if len(hooks) == 0 {
+		// No hooks configured
+		return nil
+	}
+
+	// Execute hooks in order (general -> language-specific -> project-type-specific)
+	for _, hook := range hooks {
+		// Process commands
+		for _, cmd := range hook.GetAllCommands() {
+			// Render template variables in the command
+			renderedCmd, err := renderer.RenderString(cmd)
+			if err != nil {
+				return fmt.Errorf("failed to render run command template: %w", err)
+			}
+
+			// Create a command that will run in the project directory
+			execCmd := exec.Command("sh", "-c", renderedCmd)
+			execCmd.Dir = projectPath
+			execCmd.Stdout = os.Stdout
+			execCmd.Stderr = os.Stderr
+
+			// Run the command
+			if err := execCmd.Run(); err != nil {
+				return fmt.Errorf("hook command failed: %w", err)
+			}
 		}
-	case "typescript", "javascript":
-		if err := ps.initNodeProject(projectPath); err != nil {
-			return err
+
+		// Process scripts
+		for _, scriptPath := range hook.GetAllScripts() {
+			// Render template variables in the script path
+			renderedScriptPath, err := renderer.RenderString(scriptPath)
+			if err != nil {
+				return fmt.Errorf("failed to render script path template: %w", err)
+			}
+
+			// Check if this is a relative path or absolute
+			fullScriptPath := renderedScriptPath
+			if !filepath.IsAbs(renderedScriptPath) {
+				// If it's relative, look in the hooks directory
+				fullScriptPath = filepath.Join(ps.Config.GetHooksDir(), renderedScriptPath)
+			}
+
+			// Check if script exists
+			if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
+				return fmt.Errorf("hook script not found: %s", fullScriptPath)
+			}
+
+			// Create a command to run the script
+			execCmd := exec.Command(fullScriptPath)
+			execCmd.Dir = projectPath
+			execCmd.Stdout = os.Stdout
+			execCmd.Stderr = os.Stderr
+
+			// Run the script
+			if err := execCmd.Run(); err != nil {
+				return fmt.Errorf("hook script failed: %w", err)
+			}
 		}
 	}
 
@@ -289,4 +302,95 @@ func (ps *ProjectScaffolder) CloneToRepo(projectPath, repoURL string) error {
 	}
 
 	return nil
+}
+
+// RunPostInstallHooks runs the post-installation hooks for a project
+// This is separated from ScaffoldProject to allow running hooks after repository creation
+func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectType string, templateVars *templ.Variables) error {
+	// Create a function that will run the hooks and write output to provided writers
+	runHookFn := func(stdout, stderr io.Writer) error {
+		// Create command executors that use the provided writers
+		cmdExecutor := func(cmd *exec.Cmd) error {
+			cmd.Stdout = stdout
+			cmd.Stderr = stderr
+			return cmd.Run()
+		}
+
+		// Get renderer for template variables
+		renderer := templ.NewRenderer(templateVars)
+
+		// Check if we have hooks for this language and project type
+		hooks := ps.Config.GetPostInstallHooks(language, projectType)
+		if len(hooks) == 0 {
+			fmt.Fprintf(stdout, "No hooks configured for %s/%s\n", language, projectType)
+			return nil
+		}
+
+		// Execute hooks in order (general -> language-specific -> project-type-specific)
+		fmt.Println("----------------------------------------")
+		for _, hook := range hooks {
+			// Process commands
+			for _, cmd := range hook.GetAllCommands() {
+				// Render template variables in the command
+				renderedCmd, err := renderer.RenderString(cmd)
+				if err != nil {
+					return fmt.Errorf("failed to render run command template: %w", err)
+				}
+
+				// Create a command that will run in the project directory
+				execCmd := exec.Command("sh", "-c", renderedCmd)
+				execCmd.Dir = projectPath
+
+				// Run the command using our executor
+				if err := cmdExecutor(execCmd); err != nil {
+					return fmt.Errorf("hook command failed: %w", err)
+				}
+			}
+
+			// Process scripts
+			for _, scriptPath := range hook.GetAllScripts() {
+				// Render template variables in the script path
+				renderedScriptPath, err := renderer.RenderString(scriptPath)
+				if err != nil {
+					return fmt.Errorf("failed to render script path template: %w", err)
+				}
+
+				// Check if this is a relative path or absolute
+				fullScriptPath := renderedScriptPath
+				if !filepath.IsAbs(renderedScriptPath) {
+					// If it's relative, look in the hooks directory
+					fullScriptPath = filepath.Join(ps.Config.GetHooksDir(), renderedScriptPath)
+				}
+				// Check if script exists
+				if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
+					return fmt.Errorf("hook script not found: %s", fullScriptPath)
+				}
+
+				// Create a command to run the script
+				execCmd := exec.Command(fullScriptPath)
+				execCmd.Dir = projectPath
+
+				// Run the script using our executor
+				if err := cmdExecutor(execCmd); err != nil {
+					return fmt.Errorf("hook script failed: %w", err)
+				}
+			}
+		}
+		fmt.Println("----------------------------------------")
+		return nil
+	}
+
+	// Create a title for the TUI
+	title := fmt.Sprintf("Post-Installation Hooks for %s/%s", language, projectType)
+
+	// Display the hook output using our simplified UI
+	err := DisplayHookOutput(title, runHookFn)
+	// Display a simple message based on the result
+	if err != nil {
+		fmt.Printf("Hooks failed: %v\n", err)
+	} else {
+		fmt.Printf("Post-installation hooks completed successfully\n")
+	}
+
+	return err
 }

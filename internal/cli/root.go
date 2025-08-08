@@ -31,7 +31,15 @@ team or organization standards such as rulesets, secrets, and environments.
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	printBanner()
+	// Set a pre-run hook for the root command to display the banner
+	// This will only show the banner for 'vip' or 'vip help' commands
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		// Only show the banner if it's the root command or help command
+		if cmd.Name() == rootCmd.Name() || cmd.Name() == "help" {
+			printBanner()
+		}
+	}
+
 	err := rootCmd.Execute()
 	if err != nil {
 		output.VerboseMessage("Root command execution failed")
@@ -44,12 +52,12 @@ func init() {
 
 	// Register all commands in one central place
 	rootCmd.AddCommand(
-		authCmd,    // Authentication
-		secretsCmd, // Secrets management
-		cacheCmd,   // Cache management
-		configCmd,  // Configuration
-		versionCmd, // Version information
-		createCmd,  // Project and repository creation
+		authCmd,            // Authentication
+		secretsCmd,         // Secrets management
+		cacheCmd,           // Cache management
+		configCmd,          // Configuration
+		versionCmd,         // Version information
+		NewCreateCommand(), // Project and repository creation - properly initialised
 	)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/viaplay/config.yaml)")

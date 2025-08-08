@@ -63,19 +63,40 @@ func Clone(opts CloneOptions) error {
 	// Add URL and destination
 	args = append(args, opts.URL, opts.Directory)
 
-	// Execute the git clone command
+	// Execute the git clone command - capture output instead of sending to terminal
 	cmd := exec.Command("git", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to clone repository: %w, output: %s", err, string(output))
+	}
 
-	return cmd.Run()
+	return nil
+}
+
+// validateGitBranch checks if a branch name is valid and not malicious
+func validateGitBranch(branch string) bool {
+	// Branches shouldn't contain spaces, control characters, or escape sequences
+	for _, c := range branch {
+		if c <= 32 || c == 127 { // ASCII control characters or space
+			return false
+		}
+	}
+
+	// Branches shouldn't contain certain dangerous characters
+	dangerousChars := []string{";", "&&", "||", ">", "<", "`", "$", "\\", "\"", "'"}
+	for _, char := range dangerousChars {
+		if strings.Contains(branch, char) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // Update updates a Git repository to the latest changes
 func Update(opts UpdateOptions) error {
 	// Verify the directory exists and is a git repository
-	gitDir := filepath.Join(opts.Directory, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+	if !IsGitRepository(opts.Directory) {
 		return fmt.Errorf("not a git repository: %s", opts.Directory)
 	}
 
@@ -95,38 +116,39 @@ func Update(opts UpdateOptions) error {
 		return fmt.Errorf("failed to change to repository directory: %w", err)
 	}
 
-	// Fetch updates
-	fetchCmd := exec.Command("git", "fetch", "--all")
-	fetchCmd.Stdout = os.Stdout
-	fetchCmd.Stderr = os.Stderr
-	if err := fetchCmd.Run(); err != nil {
-		return fmt.Errorf("failed to fetch updates: %w", err)
+	// Fetch latest updates - capture output instead of sending to terminal
+	fetchCmd := exec.Command("git", "fetch")
+	fetchOutput, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to fetch updates: %w, output: %s", err, string(fetchOutput))
 	}
 
 	// If a branch is specified, check it out
 	if opts.Branch != "" {
-		// Checkout the branch
-		checkoutCmd := exec.Command("git", "checkout", opts.Branch)
-		checkoutCmd.Stdout = os.Stdout
-		checkoutCmd.Stderr = os.Stderr
-		if err := checkoutCmd.Run(); err != nil {
-			return fmt.Errorf("failed to checkout branch '%s': %w", opts.Branch, err)
+		// Validate the branch name for security
+		if !validateGitBranch(opts.Branch) {
+			return fmt.Errorf("invalid branch name: %s", opts.Branch)
 		}
 
-		// Pull the latest changes
+		// Checkout the branch - capture output instead of sending to terminal
+		checkoutCmd := exec.Command("git", "checkout", opts.Branch)
+		checkoutOutput, err := checkoutCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to checkout branch '%s': %w, output: %s", opts.Branch, err, string(checkoutOutput))
+		}
+
+		// Pull the latest changes - capture output instead of sending to terminal
 		pullCmd := exec.Command("git", "pull", "origin", opts.Branch)
-		pullCmd.Stdout = os.Stdout
-		pullCmd.Stderr = os.Stderr
-		if err := pullCmd.Run(); err != nil {
-			return fmt.Errorf("failed to pull updates from '%s': %w", opts.Branch, err)
+		pullOutput, err := pullCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to pull updates from '%s': %w, output: %s", opts.Branch, err, string(pullOutput))
 		}
 	} else {
-		// Pull the latest changes from the current branch
+		// Pull the latest changes from the current branch - capture output instead of sending to terminal
 		pullCmd := exec.Command("git", "pull")
-		pullCmd.Stdout = os.Stdout
-		pullCmd.Stderr = os.Stderr
-		if err := pullCmd.Run(); err != nil {
-			return fmt.Errorf("failed to pull updates: %w", err)
+		pullOutput, err := pullCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to pull updates: %w, output: %s", err, string(pullOutput))
 		}
 	}
 
@@ -343,6 +365,67 @@ func Push(directory, remote, branch string) error {
 	}
 
 	return nil
+}
+
+// IsBehindRemote checks if the local repository is behind the remote branch.
+// Returns true if the local repo is behind the remote, false otherwise, and any error encountered.
+func IsBehindRemote(repoPath, remoteName, branch string) (bool, error) {
+	// Validate the input parameters for security
+	if !validateGitBranch(branch) {
+		return false, fmt.Errorf("invalid branch name: %s", branch)
+	}
+
+	if !validateGitRemote(remoteName) {
+		return false, fmt.Errorf("invalid remote name: %s", remoteName)
+	}
+
+	// Fetch latest from remote - capture output instead of sending to terminal
+	fetchCmd := exec.Command("git", "fetch", remoteName)
+	fetchCmd.Dir = repoPath
+	fetchOutput, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch from remote: %w, output: %s", err, string(fetchOutput))
+	}
+
+	// Get number of commits the local branch is behind remote
+	revListArg := fmt.Sprintf("HEAD..%s/%s", remoteName, branch)
+	behindCmd := exec.Command("git", "rev-list", "--count", revListArg)
+	behindCmd.Dir = repoPath
+	behindOutput, err := behindCmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to check commits behind: %w", err)
+	}
+
+	// Parse the output (should be a number)
+	behindCount := strings.TrimSpace(string(behindOutput))
+	// If the count is greater than 0, the local branch is behind remote
+	return behindCount != "0", nil
+}
+
+// validateGitRemote checks if a remote name is valid and not malicious
+func validateGitRemote(remote string) bool {
+	// Remote names should follow git naming conventions
+	// Only alphanumeric characters and some special characters are allowed
+	allowedSpecialChars := "-._"
+
+	for _, c := range remote {
+		if !((c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') ||
+			strings.ContainsRune(allowedSpecialChars, c)) {
+			return false
+		}
+	}
+
+	// Dangerous characters should be rejected
+	dangerousChars := []string{";", "&&", "||", ">", "<", "`", "$", "\\", "\"", "'", " "}
+	for _, char := range dangerousChars {
+		if strings.Contains(remote, char) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // ConvertToSSHURL converts an HTTPS GitHub URL to SSH format

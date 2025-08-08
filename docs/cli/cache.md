@@ -65,3 +65,18 @@ vip cache info
 ---
 
 Caching improves performance and allows offline use of previously downloaded templates.
+
+---
+
+## Related Flags in Other Commands
+
+### Project Creation
+
+When creating a project with `vip create project`, you can use the `--no-cache` flag to force an update of the template before scaffolding:
+
+```bash
+vip create project --name myproject --language go --type service --no-cache
+```
+
+This ensures you're using the latest version of a template, bypassing any cached version, but makes the scaffolding 
+process slower.
