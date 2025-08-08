@@ -31,11 +31,21 @@ team or organization standards such as rulesets, secrets, and environments.
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	// Define help template function for showing banner
+	cobra.AddTemplateFunc("ShowBanner", func() string {
+		printBanner()
+		return ""
+	})
+
+	// Modify help template to show banner before help content
+	helpTemplate := rootCmd.HelpTemplate()
+	rootCmd.SetHelpTemplate(`{{ShowBanner}}` + helpTemplate)
+
 	// Set a pre-run hook for the root command to display the banner
-	// This will only show the banner for 'vip' or 'vip help' commands
+	// when running just 'vip' with no subcommands
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// Only show the banner if it's the root command or help command
-		if cmd.Name() == rootCmd.Name() || cmd.Name() == "help" {
+		// Only show the banner if it's the root command with no args
+		if cmd.Name() == rootCmd.Name() && len(args) == 0 && !cmd.Flags().Changed("help") {
 			printBanner()
 		}
 	}
@@ -111,7 +121,7 @@ func printBanner() {
 
 	// Add the version as the last line of the banner
 	versionLine := fmt.Sprintf("                                                                v%s", Version)
-	bannerLines = append(bannerLines, versionLine)
+	bannerLines = append(bannerLines, versionLine, "\n")
 
 	p := termenv.ColorProfile()
 	colors := []string{"#e6007a", "#ff4e50"}
