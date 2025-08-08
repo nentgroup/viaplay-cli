@@ -56,7 +56,7 @@ templates:
       hooks:
         post:
           install:
-            run:
+            cmd:
               - "echo 'Go service template installed successfully'"
 
   # Rust templates

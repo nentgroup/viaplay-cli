@@ -132,7 +132,7 @@ templates:
       hooks:
         post:
           install:
-            run:
+            cmd:
               - "go mod tidy"
               - "go generate ./..."
             scripts:
@@ -143,7 +143,7 @@ templates:
       hooks:
         post:
           install:
-            run:
+            cmd:
               - "npm install"
               - "npm run build"
             scripts:
@@ -154,7 +154,7 @@ templates:
 
 Hooks can be defined as:
 
-- **Commands (`run`)**: Shell commands executed in the project directory
+- **Commands (`cmd`)**: Shell commands executed in the project directory
 - **Scripts (`scripts`)**: Executable script files that are run in the project context
 
 ### Template Variables in Hooks

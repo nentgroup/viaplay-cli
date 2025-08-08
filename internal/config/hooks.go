@@ -10,7 +10,7 @@ import (
 
 // PostInstallHook represents a hook to run after project scaffolding
 type PostInstallHook struct {
-	Run     []string `mapstructure:"run" yaml:"run"`
+	Cmd     []string `mapstructure:"cmd" yaml:"cmd"`
 	Scripts []string `mapstructure:"scripts" yaml:"scripts"`
 }
 
@@ -39,7 +39,7 @@ func (h *PostInstallHook) GetAllCommands() []string {
 	if h == nil {
 		return nil
 	}
-	return h.Run
+	return h.Cmd
 }
 
 // GetAllScripts returns all script paths to run as a slice
@@ -58,13 +58,17 @@ func (c *Configuration) GetPostInstallHooks(language, projectType string) []*Pos
 	// Check for template-specific hooks
 	// This is the approach where hooks are defined directly in the template configuration
 	templateKey := fmt.Sprintf("templates.%s.%s", language, projectType)
-	templateHooksRun := viper.GetStringSlice(templateKey + ".hooks.post.install.run")
+
+	// Get commands using 'cmd' key
+	templateHooksCmd := viper.GetStringSlice(templateKey + ".hooks.post.install.cmd")
+
+	// Get scripts (unchanged)
 	templateHooksScripts := viper.GetStringSlice(templateKey + ".hooks.post.install.scripts")
 
 	// If we found template-specific hooks, use them
-	if len(templateHooksRun) > 0 || len(templateHooksScripts) > 0 {
+	if len(templateHooksCmd) > 0 || len(templateHooksScripts) > 0 {
 		hooks = append(hooks, &PostInstallHook{
-			Run:     templateHooksRun,
+			Cmd:     templateHooksCmd,
 			Scripts: templateHooksScripts,
 		})
 		return hooks
