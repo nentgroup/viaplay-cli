@@ -13,33 +13,34 @@ import (
 
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/output"
+	"github.com/nentgroup/viaplay-cli/internal/progress"
 	"github.com/nentgroup/viaplay-cli/internal/project"
 )
 
-// Common flag variables shared between project and repo subcommands
-var (
-	// Repository flags
-	repoNameFlag    string
-	descriptionFlag string
-	publicFlag      bool   = false // Default to private repositories
-	repoSecretsFlag string         // JSON string for repo-specific secrets
-	secretsFileFlag string         // Path to secrets file
-	noRepoFlag      bool   = false // Skip GitHub repository creation
+// CreateCommandOptions contains all the options for create commands
+type CreateCommandOptions struct {
+	// Repository options
+	RepoName    string
+	Description string
+	Public      bool // false = private repo (default)
+	RepoSecrets string
+	SecretsFile string
+	NoRepo      bool
 
-	// Team flags
-	teamFlag          string
-	applyEnvsFlag     bool
-	applyRulesetsFlag bool
-	applySecretsFlag  bool
+	// Team options
+	Team          string
+	ApplyEnvs     bool
+	ApplyRulesets bool
+	ApplySecrets  bool
 
-	// Project-specific flags
-	languageFlag       string         // Programming language for the project
-	projectTypeFlag    string         // Type of project (service, cli, etc.)
-	templateSourceFlag string         // Custom template source
-	outputDirFlag      string         // Directory to create the project in (defaults to current dir + repo name)
-	binaryNameFlag     string         // Name of the compiled binary (for compiled languages like Go and Rust)
-	skipHooksFlag      bool   = false // Skip running post-installation hooks
-)
+	// Project-specific options
+	Language       string
+	ProjectType    string
+	TemplateSource string
+	OutputDir      string
+	BinaryName     string
+	SkipHooks      bool
+}
 
 // createCmd is the parent command for all creation operations
 var createCmd = &cobra.Command{
@@ -60,11 +61,29 @@ rulesets, and secrets from team configurations.`,
 	},
 }
 
-// projectCmd handles the 'create project' subcommand for full project creation
-var projectCmd = &cobra.Command{
-	Use:   "project",
-	Short: "Create a new project with scaffolding and GitHub repository",
-	Long: `Create a new project with code scaffolding and GitHub repository.
+// NewCreateCommand returns a new create command
+func NewCreateCommand() *cobra.Command {
+	// Create project command
+	projectCmd := newProjectCommand()
+
+	// Create repo command
+	repoCmd := newRepoCommand()
+
+	// Add subcommands to the create command
+	createCmd.AddCommand(projectCmd)
+	createCmd.AddCommand(repoCmd)
+
+	return createCmd
+}
+
+// newProjectCommand creates a new project command
+func newProjectCommand() *cobra.Command {
+	opts := &CreateCommandOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "project",
+		Short: "Create a new project with scaffolding and GitHub repository",
+		Long: `Create a new project with code scaffolding and GitHub repository.
 
 This command:
 1. Creates a GitHub repository
@@ -73,16 +92,34 @@ This command:
 4. Optionally clones the project locally
 
 Use this for a complete project setup experience.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return createProjectOrRepo(true)
-	},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return createProjectOrRepo(opts, true)
+		},
+	}
+
+	// Add common flags
+	addCommonFlags(cmd, opts)
+
+	// Add project-specific flags
+	cmd.Flags().StringVar(&opts.Language, "language", "", "Programming language (go, typescript, etc.)")
+	cmd.Flags().StringVar(&opts.ProjectType, "type", "", "Project type (service, cli, lambda, etc.)")
+	cmd.Flags().StringVar(&opts.TemplateSource, "template-source", "", "Custom template source")
+	cmd.Flags().StringVar(&opts.OutputDir, "output-dir", "", "Directory to create the project in (defaults to current dir + repo name)")
+	cmd.Flags().StringVar(&opts.BinaryName, "binary-name", "", "Name of the compiled binary (for compiled languages like Go and Rust)")
+	cmd.Flags().BoolVar(&opts.NoRepo, "no-repo", false, "Skip GitHub repository creation (local project only)")
+	cmd.Flags().BoolVar(&opts.SkipHooks, "skip-hooks", false, "Skip running post-installation hooks")
+
+	return cmd
 }
 
-// repoCmd handles the 'create repo' subcommand for repository-only creation
-var repoCmd = &cobra.Command{
-	Use:   "repo",
-	Short: "Create a GitHub repository without code scaffolding",
-	Long: `Create a GitHub repository without code scaffolding.
+// newRepoCommand creates a new repo command
+func newRepoCommand() *cobra.Command {
+	opts := &CreateCommandOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "repo",
+		Short: "Create a GitHub repository without code scaffolding",
+		Long: `Create a GitHub repository without code scaffolding.
 
 This command:
 1. Creates a GitHub repository
@@ -90,14 +127,43 @@ This command:
 
 Use this when you need to create a repository structure but will add code 
 manually or migrate existing code to a new repository.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return createProjectOrRepo(false)
-	},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return createProjectOrRepo(opts, false)
+		},
+	}
+
+	// Add common flags
+	addCommonFlags(cmd, opts)
+
+	return cmd
+}
+
+// addCommonFlags adds common flags to a command
+func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
+	// Repository flags
+	cmd.Flags().StringVar(&opts.RepoName, "name", "", "Repository name (required)")
+	cmd.Flags().StringVar(&opts.Description, "description", "", "Repository description")
+	cmd.Flags().BoolVar(&opts.Public, "public", false, "Create a public repository (default is private)")
+
+	// Team flags
+	cmd.Flags().StringVar(&opts.Team, "team", "", "Team name to use for configs (overrides default)")
+	cmd.Flags().BoolVar(&opts.ApplyEnvs, "apply-envs", false, "Apply environment configs from team settings")
+	cmd.Flags().BoolVar(&opts.ApplyRulesets, "apply-rulesets", false, "Apply ruleset configs from team settings")
+	cmd.Flags().BoolVar(&opts.ApplySecrets, "apply-secrets", false, "Apply secret configs from team settings")
+
+	// Secret flags
+	cmd.Flags().StringVar(&opts.RepoSecrets, "secrets", "", "JSON string with repository-specific secrets")
+	cmd.Flags().StringVar(&opts.SecretsFile, "secrets-file", "", "Path to JSON file with repository-specific secrets")
+
+	// Mark required flags
+	if err := cmd.MarkFlagRequired("name"); err != nil {
+		fmt.Printf("Failed to mark 'name' flag as required: %v\n", err)
+	}
 }
 
 // createProjectOrRepo is a shared function that handles both project and repo creation
 // The withScaffolding parameter determines whether to include scaffolding
-func createProjectOrRepo(withScaffolding bool) error {
+func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error {
 	// Start timing the operation
 	startTime := time.Now()
 
@@ -108,30 +174,36 @@ func createProjectOrRepo(withScaffolding bool) error {
 	}
 
 	// Validate and prepare repository parameters
-	repoParams, err := validateRepoParameters(withScaffolding)
+	repoParams, err := validateRepoParameters(opts, withScaffolding)
 	if err != nil {
 		return err
 	}
 
 	// Handle secrets data
-	secretsData, err := getSecretsData()
+	secretsData, err := getSecretsData(opts)
 	if err != nil {
 		return err
 	}
 
-	//// Validate project directory
-	//projectDir, err := validateProjectDirectory(repoParams.name, withScaffolding)
-	//if err != nil {
-	//	return err
-	//}
+	// Validate project directory if we're scaffolding
+	if withScaffolding {
+		projectDir, err := validateProjectDirectory(opts, repoParams.name, withScaffolding)
+		if err != nil {
+			return err
+		}
+		// Make sure OutputDir is set for the project creation
+		if opts.OutputDir == "" {
+			opts.OutputDir = filepath.Dir(projectDir)
+		}
+	}
 
 	// Check if repository exists (if we're creating one)
-	if !noRepoFlag && !validateRepositoryDoesNotExist(ghClient, repoParams.owner, repoParams.name) {
+	if !opts.NoRepo && !validateRepositoryDoesNotExist(ghClient, repoParams.owner, repoParams.name) {
 		return fmt.Errorf("repository already exists: %s/%s", repoParams.owner, repoParams.name)
 	}
 
 	// Create the project using the Creator
-	summary, err := executeProjectCreation(ghClient, configDir, repoParams, secretsData, withScaffolding)
+	summary, err := executeProjectCreation(ghClient, configDir, repoParams, opts, secretsData, withScaffolding)
 	if err != nil {
 		return err
 	}
@@ -156,7 +228,7 @@ func setupGitHubClient() (*gh.GitHubClient, string, error) {
 	}
 	output.VerboseMessage("GitHub authentication successful!")
 
-	// Initialize GitHub client
+	// Initialise GitHub client
 	ghClient := gh.NewGitHubClient(token)
 
 	// Get config directory
@@ -174,7 +246,7 @@ type repoParameters struct {
 }
 
 // validateRepoParameters validates and collects repository parameters from flags and config
-func validateRepoParameters(withScaffolding bool) (repoParameters, error) {
+func validateRepoParameters(opts *CreateCommandOptions, withScaffolding bool) (repoParameters, error) {
 	var params repoParameters
 
 	// Get repo owner from config
@@ -184,26 +256,26 @@ func validateRepoParameters(withScaffolding bool) (repoParameters, error) {
 	}
 
 	// Get repo name from flag
-	params.name = repoNameFlag
+	params.name = opts.RepoName
 	if params.name == "" {
 		return params, fmt.Errorf("repository name is required (use --name flag)")
 	}
 
 	// Get or set description
-	params.description = descriptionFlag
+	params.description = opts.Description
 	if params.description == "" {
 		params.description = fmt.Sprintf("Repository for %s", params.name)
 	}
 
 	// Get team name
-	params.team = teamFlag
+	params.team = opts.Team
 	if params.team == "" {
 		params.team = viper.GetString("default_team")
 	}
 
 	// For project creation, ensure language and project type are set
 	if withScaffolding {
-		if err := setupScaffoldingOptions(); err != nil {
+		if err := setupScaffoldingOptions(opts); err != nil {
 			return params, err
 		}
 	}
@@ -212,10 +284,10 @@ func validateRepoParameters(withScaffolding bool) (repoParameters, error) {
 }
 
 // getSecretsData handles secrets data from flag or file
-func getSecretsData() (string, error) {
-	secretsData := repoSecretsFlag
-	if secretsFileFlag != "" {
-		data, err := os.ReadFile(secretsFileFlag)
+func getSecretsData(opts *CreateCommandOptions) (string, error) {
+	secretsData := opts.RepoSecrets
+	if opts.SecretsFile != "" {
+		data, err := os.ReadFile(opts.SecretsFile)
 		if err != nil {
 			return "", fmt.Errorf("failed to read secrets file: %w", err)
 		}
@@ -225,8 +297,8 @@ func getSecretsData() (string, error) {
 }
 
 // validateProjectDirectory checks if the project directory is valid
-func validateProjectDirectory(repoName string, withScaffolding bool) (string, error) {
-	projectDir := outputDirFlag
+func validateProjectDirectory(opts *CreateCommandOptions, repoName string, withScaffolding bool) (string, error) {
+	projectDir := opts.OutputDir
 	if projectDir == "" {
 		currentDir, err := os.Getwd()
 		if err != nil {
@@ -258,42 +330,46 @@ func validateRepositoryDoesNotExist(ghClient *gh.GitHubClient, owner, repoName s
 }
 
 // executeProjectCreation executes the project creation workflow
-func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params repoParameters, secretsData string, withScaffolding bool) (*project.Summary, error) {
-	// Create project creator
-	creator := project.NewCreator(ghClient, configDir)
+func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params repoParameters, opts *CreateCommandOptions, secretsData string, withScaffolding bool) (*project.Summary, error) { // Create project creator with reporter
+	creator := project.NewCreatorWithReporter(
+		ghClient,
+		configDir,
+		progress.NewCallbackReporter(progress.DefaultCB, viper.GetBool("verbose")),
+	)
 
 	// Set up options
-	opts := project.CreateOptions{
+	projectOpts := project.CreateOptions{
 		// Repository options
 		RepoName:        params.name,
 		RepoDescription: params.description,
 		RepoOwner:       params.owner,
-		IsPrivate:       !publicFlag, // Convert public flag to private flag
+		IsPrivate:       !opts.Public, // Convert public flag to private flag
 		IsOrg:           viper.GetBool("is_org"),
-		SkipRepo:        noRepoFlag, // Skip GitHub repository creation if --no-repo is set
+		SkipRepo:        opts.NoRepo, // Skip GitHub repository creation if --no-repo is set
 
 		// Project options
-		Language:    languageFlag,
-		ProjectType: projectTypeFlag,
+		Language:    opts.Language,
+		ProjectType: opts.ProjectType,
 		Team:        params.team,
-		BinaryName:  binaryNameFlag, // Set the binary name from flag
-		SkipHooks:   skipHooksFlag,  // Skip running post-installation hooks if flag is set
+		BinaryName:  opts.BinaryName, // Set the binary name from flag
+		SkipHooks:   opts.SkipHooks,  // Skip running post-installation hooks if flag is set
 
 		// Configuration options
-		ConfigDir:     configDir,
-		ApplyEnvs:     applyEnvsFlag,
-		ApplyRulesets: applyRulesetsFlag,
-		ApplySecrets:  applySecretsFlag,
+		ConfigDir: configDir,
+		// If no-repo is set, we should skip applying environments, rulesets and secrets as they only make sense with a repo
+		ApplyEnvs:     opts.ApplyEnvs && !opts.NoRepo,
+		ApplyRulesets: opts.ApplyRulesets && !opts.NoRepo,
+		ApplySecrets:  opts.ApplySecrets && !opts.NoRepo,
 		RepoSecrets:   secretsData,
 
 		// Template options (only used if withScaffolding is true)
-		TemplateSource: templateSourceFlag,
+		TemplateSource: opts.TemplateSource,
 		Scaffold:       withScaffolding, // Always true for project, false for repo
-		OutputDir:      outputDirFlag,
+		OutputDir:      opts.OutputDir,
 	}
 
 	// Execute the project creation workflow
-	return creator.Create(opts)
+	return creator.Create(projectOpts)
 }
 
 // formatDuration formats a duration to be more human-readable
@@ -375,63 +451,25 @@ func printProjectSummary(summary *project.Summary, executionTime time.Duration) 
 }
 
 // Helper to set up project scaffolding options
-func setupScaffoldingOptions() error {
-	if languageFlag == "" {
-		languageFlag = viper.GetString("default_language")
-		if languageFlag == "" {
-			languageFlag = "go"
+func setupScaffoldingOptions(opts *CreateCommandOptions) error {
+	if opts.Language == "" {
+		opts.Language = viper.GetString("default_language")
+		if opts.Language == "" {
+			opts.Language = "go"
 		}
 	}
-	if projectTypeFlag == "" {
-		projectTypeFlag = viper.GetString("default_type")
-		if projectTypeFlag == "" {
-			projectTypeFlag = "service"
+	if opts.ProjectType == "" {
+		opts.ProjectType = viper.GetString("default_type")
+		if opts.ProjectType == "" {
+			opts.ProjectType = "service"
 		}
 	}
-	if templateSourceFlag == "" {
-		templateKey := fmt.Sprintf("templates.%s.%s.source", languageFlag, projectTypeFlag)
-		templateSourceFlag = viper.GetString(templateKey)
-		if templateSourceFlag == "" {
-			return fmt.Errorf("no template found for %s/%s, please specify with --template-source", languageFlag, projectTypeFlag)
+	if opts.TemplateSource == "" {
+		templateKey := fmt.Sprintf("templates.%s.%s.source", opts.Language, opts.ProjectType)
+		opts.TemplateSource = viper.GetString(templateKey)
+		if opts.TemplateSource == "" {
+			return fmt.Errorf("no template found for %s/%s, please specify with --template-source", opts.Language, opts.ProjectType)
 		}
 	}
 	return nil
-}
-
-func init() {
-	// Add the two subcommands to the create command
-	createCmd.AddCommand(projectCmd)
-	createCmd.AddCommand(repoCmd)
-
-	// Define flags for both commands
-	for _, cmd := range []*cobra.Command{projectCmd, repoCmd} {
-		// Repository flags
-		cmd.Flags().StringVar(&repoNameFlag, "name", "", "Repository name (required)")
-		cmd.Flags().StringVar(&descriptionFlag, "description", "", "Repository description")
-		cmd.Flags().BoolVar(&publicFlag, "public", false, "Create a public repository (default is private)")
-
-		// Team flags
-		cmd.Flags().StringVar(&teamFlag, "team", "", "Team name to use for configs (overrides default)")
-		cmd.Flags().BoolVar(&applyEnvsFlag, "apply-envs", false, "Apply environment configs from team settings")
-		cmd.Flags().BoolVar(&applyRulesetsFlag, "apply-rulesets", false, "Apply ruleset configs from team settings")
-		cmd.Flags().BoolVar(&applySecretsFlag, "apply-secrets", false, "Apply secret configs from team settings")
-
-		// Secret flags
-		cmd.Flags().StringVar(&repoSecretsFlag, "secrets", "", "JSON string with repository-specific secrets")
-		cmd.Flags().StringVar(&secretsFileFlag, "secrets-file", "", "Path to JSON file with repository-specific secrets")
-
-		// Mark required flags
-		if err := cmd.MarkFlagRequired("name"); err != nil {
-			fmt.Printf("Failed to mark 'name' flag as required: %v\n", err)
-		}
-	}
-
-	// Add project-specific flags to the project command only
-	projectCmd.Flags().StringVar(&languageFlag, "language", "", "Programming language (go, typescript, etc.)")
-	projectCmd.Flags().StringVar(&projectTypeFlag, "type", "", "Project type (service, cli, lambda, etc.)")
-	projectCmd.Flags().StringVar(&templateSourceFlag, "template-source", "", "Custom template source")
-	projectCmd.Flags().StringVar(&outputDirFlag, "output-dir", "", "Directory to create the project in (defaults to current dir + repo name)")
-	projectCmd.Flags().StringVar(&binaryNameFlag, "binary-name", "", "Name of the compiled binary (for compiled languages like Go and Rust)")
-	projectCmd.Flags().BoolVar(&noRepoFlag, "no-repo", false, "Skip GitHub repository creation (local project only)")
-	projectCmd.Flags().BoolVar(&skipHooksFlag, "skip-hooks", false, "Skip running post-installation hooks")
 }

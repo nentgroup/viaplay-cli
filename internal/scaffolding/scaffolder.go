@@ -186,29 +186,6 @@ func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, re
 
 // runPostScaffoldCommands runs any post-scaffold commands for the template
 func (ps *ProjectScaffolder) runPostScaffoldCommands(projectPath, language, projectType string, templateVars *templ.Variables) error {
-	// Check for legacy post-scaffold script (for backward compatibility)
-	//scriptPath := filepath.Join(projectPath, ".post-scaffold.sh")
-	//if _, err := os.Stat(scriptPath); err == nil {
-	//	// Make the script executable
-	//	if err := os.Chmod(scriptPath, 0o755); err != nil {
-	//		return fmt.Errorf("failed to make post-scaffold script executable: %w", err)
-	//	}
-	//
-	//	// Run the script
-	//	cmd := exec.Command(scriptPath)
-	//	cmd.Dir = projectPath
-	//	cmd.Stdout = os.Stdout
-	//	cmd.Stderr = os.Stderr
-	//	if err := cmd.Run(); err != nil {
-	//		return fmt.Errorf("failed to run post-scaffold script: %w", err)
-	//	}
-	//
-	//	// Remove the script after running
-	//	if err := os.Remove(scriptPath); err != nil {
-	//		fmt.Printf("Warning: Failed to remove post-scaffold script: %v\n", err)
-	//	}
-	//}
-
 	// Get renderer for template variables
 	renderer := templ.NewRenderer(templateVars)
 
@@ -218,18 +195,6 @@ func (ps *ProjectScaffolder) runPostScaffoldCommands(projectPath, language, proj
 			return fmt.Errorf("failed to run configured hooks: %w", err)
 		}
 	}
-
-	// Language-specific initialization (fallback for older templates)
-	//switch language {
-	//case "go":
-	//	if err := ps.initGoProject(projectPath); err != nil {
-	//		return err
-	//	}
-	//case "typescript", "javascript":
-	//	if err := ps.initNodeProject(projectPath); err != nil {
-	//		return err
-	//	}
-	//}
 
 	return nil
 }
@@ -378,18 +343,19 @@ func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectT
 			cmd.Stderr = stderr
 			return cmd.Run()
 		}
-		// Get renderer for template variables
+
 		// Get renderer for template variables
 		renderer := templ.NewRenderer(templateVars)
-		// Check if we have hooks for this language and project type
+
 		// Check if we have hooks for this language and project type
 		hooks := ps.Config.GetPostInstallHooks(language, projectType)
 		if len(hooks) == 0 {
 			fmt.Fprintf(stdout, "No hooks configured for %s/%s\n", language, projectType)
 			return nil
 		}
+
 		// Execute hooks in order (general -> language-specific -> project-type-specific)
-		// Execute hooks in order (general -> language-specific -> project-type-specific)
+		fmt.Println("----------------------------------------")
 		for _, hook := range hooks {
 			// Process commands
 			for _, cmd := range hook.GetAllCommands() {
@@ -398,19 +364,17 @@ func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectT
 				if err != nil {
 					return fmt.Errorf("failed to render run command template: %w", err)
 				}
-				// fmt.Printf("▶️  Running command: %s\n", renderedCmd)
-				// fmt.Fprintf(stdout, "Running command: %s\n", renderedCmd)
-				// Create a command that will run in the project directory
+
 				// Create a command that will run in the project directory
 				execCmd := exec.Command("sh", "-c", renderedCmd)
 				execCmd.Dir = projectPath
-				// Run the command
+
 				// Run the command using our executor
 				if err := cmdExecutor(execCmd); err != nil {
 					return fmt.Errorf("hook command failed: %w", err)
 				}
 			}
-			// Process scripts
+
 			// Process scripts
 			for _, scriptPath := range hook.GetAllScripts() {
 				// Render template variables in the script path
@@ -418,7 +382,7 @@ func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectT
 				if err != nil {
 					return fmt.Errorf("failed to render script path template: %w", err)
 				}
-				// Check if this is a relative path or absolute
+
 				// Check if this is a relative path or absolute
 				fullScriptPath := renderedScriptPath
 				if !filepath.IsAbs(renderedScriptPath) {
@@ -426,17 +390,14 @@ func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectT
 					fullScriptPath = filepath.Join(ps.Config.GetHooksDir(), renderedScriptPath)
 				}
 				// Check if script exists
-				// Check if script exists
 				if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
 					return fmt.Errorf("hook script not found: %s", fullScriptPath)
 				}
-				// fmt.Printf("▶️  Running script: %s\n", fullScriptPath)
-				// fmt.Fprintf(stdout, "Running script: %s\n", fullScriptPath)
-				// Create a command to run the script
+
 				// Create a command to run the script
 				execCmd := exec.Command(fullScriptPath)
 				execCmd.Dir = projectPath
-				// Run the script
+
 				// Run the script using our executor
 				if err := cmdExecutor(execCmd); err != nil {
 					return fmt.Errorf("hook script failed: %w", err)
@@ -454,10 +415,10 @@ func (ps *ProjectScaffolder) RunPostInstallHooks(projectPath, language, projectT
 	err := DisplayHookOutput(title, runHookFn)
 	// Display a simple message based on the result
 	if err != nil {
-		fmt.Println("Post-installation hooks failed")
-		return err
+		fmt.Printf("Hooks failed: %v\n", err)
+	} else {
+		fmt.Printf("Post-installation hooks completed successfully\n")
 	}
 
-	fmt.Println("Post-installation hooks completed successfully")
-	return nil
+	return err
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/output"
+	"github.com/nentgroup/viaplay-cli/internal/progress"
 	"github.com/nentgroup/viaplay-cli/internal/registry"
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
 	"github.com/nentgroup/viaplay-cli/internal/template"
@@ -52,6 +53,9 @@ type Creator struct {
 
 	// Project scaffolder for applying templates
 	Scaffolder *scaffolding.ProjectScaffolder
+
+	// Progress reporter for tracking operation progress
+	Reporter progress.Reporter
 }
 
 // CreateOptions contains all options for creating a new project
@@ -116,7 +120,24 @@ func NewCreator(ghClient *gh.GitHubClient, configDir string) *Creator {
 		TemplateRegistry: templateRegistry,
 		CacheManager:     cacheManager,
 		Scaffolder:       scaffolder,
+		Reporter:         progress.NewNoopReporter(), // Default to noop reporter
 	}
+}
+
+// NewCreatorWithReporter creates a new project creator with a custom progress reporter
+func NewCreatorWithReporter(ghClient *gh.GitHubClient, configDir string, reporter progress.Reporter) *Creator {
+	creator := NewCreator(ghClient, configDir)
+	creator.Reporter = reporter
+	return creator
+}
+
+// SetReporter sets a custom reporter for the creator
+func (c *Creator) SetReporter(reporter progress.Reporter) {
+	if reporter == nil {
+		c.Reporter = progress.NewNoopReporter()
+		return
+	}
+	c.Reporter = reporter
 }
 
 // Helper to convert CreateOptions to *template.Variables
@@ -215,7 +236,8 @@ func (c *Creator) CreateProject(opts CreateOptions) error {
 
 // Create handles the full project creation workflow
 func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
-	output.VerboseMessage(fmt.Sprintf("Starting project creation with options: %+v", opts))
+	// Debug info when available
+	c.Reporter.Debug(fmt.Sprintf("Starting project creation with options: %+v", opts))
 
 	// Initialise project summary
 	summary := &Summary{
@@ -230,10 +252,13 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 	}
 
 	// Get authenticated user for CreatedBy field
+	c.Reporter.Start("Getting authenticated user", "")
 	username, err := c.GitHubClient.GetAuthenticatedUser()
 	if err != nil {
-		output.VerboseMessage(fmt.Sprintf("Failed to get authenticated username: %v", err))
+		c.Reporter.Failed("Getting authenticated user", err, "")
 		summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to get authenticated username: %v", err))
+	} else {
+		c.Reporter.Complete("Getting authenticated user", "")
 	}
 
 	// Convert options to template variables with additional info
@@ -242,7 +267,7 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 	// Set authenticated username if available
 	if username != "" {
 		templateVars.CreatedBy = username
-		output.VerboseMessage(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", username))
+		c.Reporter.Debug(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", username))
 	}
 
 	// Determine the project path
@@ -258,57 +283,50 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 	}
 	summary.ProjectPath = projectPath
 
+	// Scaffold the project if requested
 	if opts.Scaffold {
-		output.VerboseMessage("Scaffolding project locally...")
-		fmt.Printf("Scaffolding project...")
+		c.Reporter.Start("Scaffolding project", "")
 		if err := c.scaffoldProjectWithVariables(opts, templateVars); err != nil {
-			output.VerboseMessage(fmt.Sprintf("Project scaffolding failed: %v", err))
-			fmt.Println(" failed")
 			return nil, fmt.Errorf("failed to scaffold project: %w", err)
 		}
-		output.VerboseMessage("Project scaffolding complete.")
-		fmt.Println(" done")
+		c.Reporter.Complete("Scaffolding project", "complete!")
 	}
 
+	// Create GitHub repository if not skipped
 	if opts.SkipRepo {
-		output.VerboseMessage("Skipping GitHub repository creation as per options.")
+		c.Reporter.Skip("Creating GitHub repository", "Skipped as per user request")
 	} else {
-		output.VerboseMessage("Creating repository on GitHub...")
-		fmt.Printf("Creating repository...")
+		c.Reporter.Start("Creating GitHub repository", "")
 		_, err = c.createRepository(opts)
 		if err != nil {
-			output.VerboseMessage(fmt.Sprintf("Repository creation error: %v", err))
-			if !strings.Contains(err.Error(), "name already exists on this account") {
-				fmt.Println(" failed")
+			if strings.Contains(err.Error(), "name already exists on this account") {
+				c.Reporter.Skip("Creating GitHub repository", "Repository already exists")
+			} else {
+				c.Reporter.Failed("Creating GitHub repository", err, "")
 				return nil, fmt.Errorf("failed to create repository: %w", err)
 			}
-			fmt.Println(" already exists, proceeding")
 		} else {
-			output.VerboseMessage("Repository created successfully.")
-			fmt.Println(" done")
+			c.Reporter.Complete("Creating GitHub repository", "")
 		}
 
 		// Set the repository URL in the summary
 		summary.RepoURL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
 	}
 
-	output.VerboseMessage("Applying GitHub configurations (envs, rulesets, secrets)...")
-	fmt.Printf("Applying GitHub configurations...")
+	// Apply GitHub configurations
+	c.Reporter.Start("Applying GitHub configurations", "")
 	if err := c.applyGitHubConfigurations(opts); err != nil {
-		output.VerboseMessage(fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
-		fmt.Println(" failed")
 		summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
+	} else {
+		c.Reporter.Complete("Applying GitHub configurations", "")
 	}
-	output.VerboseMessage("GitHub configurations applied.")
-	fmt.Println(" done")
 
-	// Run post-installation hooks only if they're not skipped and we've scaffolded locally
+	// Run post-installation hooks if scaffolding was done and hooks aren't skipped
 	if opts.Scaffold && !opts.SkipHooks {
 		outputDir := opts.OutputDir
 		if outputDir == "" {
 			currentDir, err := os.Getwd()
 			if err != nil {
-				output.VerboseMessage(fmt.Sprintf("Failed to get current directory: %v", err))
 				return nil, fmt.Errorf("failed to get current directory: %w", err)
 			}
 			outputDir = filepath.Join(currentDir, opts.RepoName)
@@ -316,26 +334,22 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 			outputDir = filepath.Join(outputDir, opts.RepoName)
 		}
 
-		output.VerboseMessage("Running post-installation hooks...")
-		fmt.Printf("Running post-installation hooks...")
+		c.Reporter.Start("Running post-installation hooks \n", "")
 		if err := c.Scaffolder.RunPostInstallHooks(
 			outputDir,
 			opts.Language,
 			opts.ProjectType,
 			templateVars,
 		); err != nil {
-			output.VerboseMessage(fmt.Sprintf("Failed to run post-installation hooks: %v", err))
-			fmt.Println(" failed")
 			summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to run post-installation hooks: %v", err))
+		} else {
+			c.Reporter.Complete("Running post-installation hooks", "complete!")
 		}
-		output.VerboseMessage("Post-installation hooks completed successfully.")
 	} else if opts.SkipHooks {
-		output.VerboseMessage("Skipping post-installation hooks as requested.")
-		fmt.Printf("Skipping post-installation hooks...")
-		fmt.Println(" done")
+		c.Reporter.Skip("Running post-installation hooks", "Skipped as per user request")
 	}
 
-	output.VerboseMessage("Project creation workflow complete.")
+	c.Reporter.Complete("Project creation", "Workflow completed successfully")
 	return summary, nil
 }
 
@@ -353,40 +367,37 @@ func (c *Creator) createRepository(opts CreateOptions) (string, error) {
 func (c *Creator) applyGitHubConfigurations(opts CreateOptions) error {
 	teamDir := filepath.Join(opts.ConfigDir, "teams", opts.Team)
 
-	output.VerboseMessage(fmt.Sprintf("applyGitHubConfigurations: teamDir=%s, ApplyEnvs=%v, ApplyRulesets=%v, ApplySecrets=%v, RepoSecrets set=%v", teamDir, opts.ApplyEnvs, opts.ApplyRulesets, opts.ApplySecrets, opts.RepoSecrets != ""))
+	// Skip all GitHub configurations if SkipRepo is true
+	if opts.SkipRepo {
+		return nil
+	}
 
 	// 1. Apply environments if requested
 	if opts.ApplyEnvs {
-		output.VerboseMessage("Applying team environments...")
 		c.applyTeamEnvs(opts.RepoOwner, opts.RepoName, teamDir)
 	} else {
-		output.VerboseMessage("Creating default 'staging' environment (team envs not applied)...")
 		// Create default staging environment if not applying team envs
 		err := c.GitHubClient.CreateEnvironment(opts.RepoOwner, opts.RepoName, "staging")
 		if err != nil {
 			if !strings.Contains(err.Error(), "already exists") {
-				fmt.Printf("\nFailed to create environment: %v\n", err)
+				return fmt.Errorf("failed to create environment: %w", err)
 			}
 		}
 	}
 
 	// 2. Apply rulesets if requested
 	if opts.ApplyRulesets {
-		output.VerboseMessage("Applying team rulesets...")
 		c.applyTeamRulesets(opts.RepoOwner, opts.RepoName, teamDir)
 	}
 
 	// 3. Apply secrets if requested
 	if opts.ApplySecrets {
-		output.VerboseMessage("Applying team secrets...")
 		c.applyTeamSecrets(opts.RepoOwner, opts.RepoName, teamDir)
 	}
 
 	// 4. Apply repository-specific secrets if provided
 	if opts.RepoSecrets != "" {
-		output.VerboseMessage("Applying repository-specific secrets...")
 		if err := c.applyRepoSpecificSecrets(opts.RepoOwner, opts.RepoName, opts.RepoSecrets); err != nil {
-			output.VerboseMessage(fmt.Sprintf("Failed to apply repository-specific secrets: %v", err))
 			return fmt.Errorf("failed to apply repository-specific secrets: %w", err)
 		}
 	}
@@ -425,10 +436,6 @@ func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars 
 		}
 		templateSource = template.Source
 	}
-
-	output.VerboseMessage(fmt.Sprintf("Scaffolding project with template source: %s", templateSource))
-	output.VerboseMessage(fmt.Sprintf("Template variables: ProjectName=%s, Language=%s, Type=%s, CreatedBy=%s",
-		templateVars.ProjectName, templateVars.Language, templateVars.ProjectType, templateVars.CreatedBy))
 
 	if err := c.Scaffolder.ScaffoldProjectWithOptions(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
@@ -751,13 +758,13 @@ func sanitizeSecretName(name string) string {
 	sanitized := strings.ReplaceAll(name, "-", "_")
 
 	// Ensure the name starts with a letter or underscore
-	if len(sanitized) > 0 && !(isAlpha(sanitized[0]) || sanitized[0] == '_') {
+	if len(sanitized) > 0 && (!isAlpha(sanitized[0]) && sanitized[0] != '_') {
 		sanitized = "_" + sanitized
 	}
 
 	// Replace any other invalid characters with underscores
 	for i, char := range sanitized {
-		if !(isAlphaNumeric(char) || char == '_') {
+		if !isAlphaNumeric(char) && char != '_' {
 			sanitized = sanitized[:i] + "_" + sanitized[i+1:]
 		}
 	}

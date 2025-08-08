@@ -63,12 +63,14 @@ func Clone(opts CloneOptions) error {
 	// Add URL and destination
 	args = append(args, opts.URL, opts.Directory)
 
-	// Execute the git clone command
+	// Execute the git clone command - capture output instead of sending to terminal
 	cmd := exec.Command("git", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to clone repository: %w, output: %s", err, string(output))
+	}
 
-	return cmd.Run()
+	return nil
 }
 
 // validateGitBranch checks if a branch name is valid and not malicious
@@ -114,12 +116,11 @@ func Update(opts UpdateOptions) error {
 		return fmt.Errorf("failed to change to repository directory: %w", err)
 	}
 
-	// Fetch latest updates
+	// Fetch latest updates - capture output instead of sending to terminal
 	fetchCmd := exec.Command("git", "fetch")
-	fetchCmd.Stdout = os.Stdout
-	fetchCmd.Stderr = os.Stderr
-	if err := fetchCmd.Run(); err != nil {
-		return fmt.Errorf("failed to fetch updates: %w", err)
+	fetchOutput, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to fetch updates: %w, output: %s", err, string(fetchOutput))
 	}
 
 	// If a branch is specified, check it out
@@ -129,28 +130,25 @@ func Update(opts UpdateOptions) error {
 			return fmt.Errorf("invalid branch name: %s", opts.Branch)
 		}
 
-		// Checkout the branch
+		// Checkout the branch - capture output instead of sending to terminal
 		checkoutCmd := exec.Command("git", "checkout", opts.Branch)
-		checkoutCmd.Stdout = os.Stdout
-		checkoutCmd.Stderr = os.Stderr
-		if err := checkoutCmd.Run(); err != nil {
-			return fmt.Errorf("failed to checkout branch '%s': %w", opts.Branch, err)
+		checkoutOutput, err := checkoutCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to checkout branch '%s': %w, output: %s", opts.Branch, err, string(checkoutOutput))
 		}
 
-		// Pull the latest changes
+		// Pull the latest changes - capture output instead of sending to terminal
 		pullCmd := exec.Command("git", "pull", "origin", opts.Branch)
-		pullCmd.Stdout = os.Stdout
-		pullCmd.Stderr = os.Stderr
-		if err := pullCmd.Run(); err != nil {
-			return fmt.Errorf("failed to pull updates from '%s': %w", opts.Branch, err)
+		pullOutput, err := pullCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to pull updates from '%s': %w, output: %s", opts.Branch, err, string(pullOutput))
 		}
 	} else {
-		// Pull the latest changes from the current branch
+		// Pull the latest changes from the current branch - capture output instead of sending to terminal
 		pullCmd := exec.Command("git", "pull")
-		pullCmd.Stdout = os.Stdout
-		pullCmd.Stderr = os.Stderr
-		if err := pullCmd.Run(); err != nil {
-			return fmt.Errorf("failed to pull updates: %w", err)
+		pullOutput, err := pullCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to pull updates: %w, output: %s", err, string(pullOutput))
 		}
 	}
 
@@ -381,11 +379,12 @@ func IsBehindRemote(repoPath, remoteName, branch string) (bool, error) {
 		return false, fmt.Errorf("invalid remote name: %s", remoteName)
 	}
 
-	// Fetch latest from remote
+	// Fetch latest from remote - capture output instead of sending to terminal
 	fetchCmd := exec.Command("git", "fetch", remoteName)
 	fetchCmd.Dir = repoPath
-	if err := fetchCmd.Run(); err != nil {
-		return false, fmt.Errorf("failed to fetch from remote: %w", err)
+	fetchOutput, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch from remote: %w, output: %s", err, string(fetchOutput))
 	}
 
 	// Get number of commits the local branch is behind remote

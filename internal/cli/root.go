@@ -52,12 +52,12 @@ func init() {
 
 	// Register all commands in one central place
 	rootCmd.AddCommand(
-		authCmd,    // Authentication
-		secretsCmd, // Secrets management
-		cacheCmd,   // Cache management
-		configCmd,  // Configuration
-		versionCmd, // Version information
-		createCmd,  // Project and repository creation
+		authCmd,            // Authentication
+		secretsCmd,         // Secrets management
+		cacheCmd,           // Cache management
+		configCmd,          // Configuration
+		versionCmd,         // Version information
+		NewCreateCommand(), // Project and repository creation - properly initialised
 	)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/viaplay/config.yaml)")
