@@ -5,30 +5,11 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
-)
-
-// Icon constants for consistent visual indicators
-const (
-	IconSuccess   = "✅"
-	IconError     = "❌"
-	IconWarning   = "⚠️"
-	IconInfo      = "💡"
-	IconProcess   = "🔄"
-	IconQuestion  = "❓"
-	IconKey       = "🔑"
-	IconGitHub    = "🚀"
-	IconTemplate  = "📄"
-	IconBrain     = "🧠"
-	IconConfig    = "⚙️"
-	IconCache     = "📦"
-	IconClock     = "⏱️"
-	IconCheckmark = "✓"
-	IconCross     = "✗"
-	IconBullet    = "•"
 )
 
 // Colour printers for consistent colours
@@ -62,7 +43,6 @@ var (
 	Secondaryf = color.New(color.FgMagenta).SprintfFunc()
 	Faintf     = color.New(color.FgHiBlack).SprintfFunc()
 
-	DebugIcon  = "🐞"
 	DebugColor = color.New(color.FgHiMagenta).SprintFunc()
 )
 
@@ -73,53 +53,53 @@ func EnableColors(enabled bool) {
 
 // SuccessMessage prints a formatted success message
 func SuccessMessage(message string) {
-	fmt.Printf("\n%s %s\n", IconSuccess, SuccessBold(message))
+	fmt.Printf("\n%s %s\n", ActiveIcons.Success, SuccessBold(message))
 }
 
 // ErrorMessage prints a formatted error message
 func ErrorMessage(message string) {
-	fmt.Printf("\n%s %s\n", IconError, ErrorBold(message))
+	fmt.Printf("\n%s %s\n", ActiveIcons.Error, ErrorBold(message))
 }
 
 // WarningMessage prints a formatted warning message
 func WarningMessage(message string) {
-	fmt.Printf("\n%s %s\n", IconWarning, WarningBold(message))
+	fmt.Printf("\n%s %s\n", ActiveIcons.Warning, WarningBold(message))
 }
 
 // InfoMessage prints a formatted info message
 func InfoMessage(message string) {
 	// Always add a space after the emoji for better terminal spacing
-	fmt.Printf("\n%s %s\n", IconInfo, InfoBold(message))
+	fmt.Printf("\n%s %s\n", ActiveIcons.Info, InfoBold(message))
 }
 
 // ProcessingMessage prints a message indicating an operation is in progress
 func ProcessingMessage(message string) {
-	fmt.Printf("\n%s %s\n", IconProcess, message)
+	fmt.Printf("\n%s %s\n", ActiveIcons.Process, message)
 }
 
 // AuthMessage prints an authentication-related message
 func AuthMessage(message string) {
-	fmt.Printf("\n%s %s\n", IconKey, PrimaryBold(message))
+	fmt.Printf("\n%s %s\n", ActiveIcons.Key, PrimaryBold(message))
 }
 
 // GitHubMessage prints a GitHub-related message
 func GitHubMessage(message string) {
-	fmt.Printf("\n%s %s\n", IconGitHub, PrimaryBold(message))
+	fmt.Printf("\n%s %s\n", ActiveIcons.GitHub, PrimaryBold(message))
 }
 
 // ConfigMessage prints a configuration-related message
 func ConfigMessage(message string) {
-	fmt.Printf("\n%s %s\n", IconConfig, InfoBold(message))
+	fmt.Printf("\n%s %s\n", ActiveIcons.Config, InfoBold(message))
 }
 
 // CacheMessage prints a cache-related message
 func CacheMessage(message string) {
-	fmt.Printf("\n%s %s\n", IconCache, InfoBold(message))
+	fmt.Printf("\n%s %s\n", ActiveIcons.Cache, InfoBold(message))
 }
 
 // Section prints a section header
 func Section(title string) {
-	fmt.Printf("\n%s %s\n%s\n", IconBrain, Bold(title), strings.Repeat("─", len(title)+2))
+	fmt.Printf("\n%s %s\n%s\n", ActiveIcons.Brain, Bold(title), strings.Repeat("─", len(title)+2))
 }
 
 // Table formats data as a table with aligned columns
@@ -128,16 +108,21 @@ func Table(headers []string, rows [][]string, indent int) string {
 		return ""
 	}
 
-	// Calculate column widths
+	// Calculate column widths based on visible content
 	colWidths := make([]int, len(headers))
 	for i, header := range headers {
 		colWidths[i] = len(header)
 	}
 
+	// Calculate maximum visible width for each column
 	for _, row := range rows {
 		for i, cell := range row {
-			if i < len(colWidths) && len(cell) > colWidths[i] {
-				colWidths[i] = len(cell)
+			if i < len(colWidths) {
+				// Get the visual width by stripping ANSI color codes
+				visualWidth := stripANSI(cell)
+				if len(visualWidth) > colWidths[i] {
+					colWidths[i] = len(visualWidth)
+				}
 			}
 		}
 	}
@@ -166,14 +151,29 @@ func Table(headers []string, rows [][]string, indent int) string {
 		sb.WriteString(indentStr)
 		for i, cell := range row {
 			if i < len(colWidths) {
-				format := fmt.Sprintf("%%-%ds", colWidths[i]+2)
-				sb.WriteString(fmt.Sprintf(format, cell))
+				// Calculate padding based on visible text length
+				visibleLen := len(stripANSI(cell))
+				padding := colWidths[i] - visibleLen + 2
+
+				// Write the cell with its ANSI colors intact
+				sb.WriteString(cell)
+
+				// Add appropriate padding after the cell
+				sb.WriteString(strings.Repeat(" ", padding))
 			}
 		}
 		sb.WriteString("\n")
 	}
 
 	return sb.String()
+}
+
+// stripANSI removes ANSI color sequences from a string to get its visual length
+func stripANSI(str string) string {
+	// ANSI escape sequence regex pattern
+	ansiPattern := "\033\\[[0-9;]*m"
+	re := regexp.MustCompile(ansiPattern)
+	return re.ReplaceAllString(str, "")
 }
 
 // List creates a formatted list with bullets or numbers
@@ -189,7 +189,7 @@ func List(items []string, numbered bool, indent int) string {
 		if numbered {
 			sb.WriteString(fmt.Sprintf("%s%d. %s\n", indentStr, i+1, item))
 		} else {
-			sb.WriteString(fmt.Sprintf("%s%s %s\n", indentStr, IconBullet, item))
+			sb.WriteString(fmt.Sprintf("%s%s %s\n", indentStr, ActiveIcons.Bullet, item))
 		}
 	}
 
@@ -329,6 +329,11 @@ func VerboseMessage(message interface{}) {
 				formatted = fmt.Sprintf("%+v", v)
 			}
 		}
-		fmt.Printf("\n%s %s %s\n", DebugIcon, DebugColor("[DEBUG]"), formatted)
+		fmt.Printf("\n%s %s %s\n", ActiveIcons.Debug, DebugColor("[DEBUG]"), formatted)
 	}
+}
+
+// IsVerboseEnabled returns whether verbose mode is enabled
+func IsVerboseEnabled() bool {
+	return verboseEnabled
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/cache"
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
-	"github.com/nentgroup/viaplay-cli/internal/output"
 	"github.com/nentgroup/viaplay-cli/internal/progress"
 	"github.com/nentgroup/viaplay-cli/internal/registry"
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
@@ -388,12 +387,16 @@ func (c *Creator) applyGitHubConfigurations(opts CreateOptions) error {
 
 	// 2. Apply rulesets if requested
 	if opts.ApplyRulesets {
-		c.applyTeamRulesets(opts.RepoOwner, opts.RepoName, teamDir)
+		if err := c.applyTeamRulesets(opts.RepoOwner, opts.RepoName, teamDir); err != nil {
+			return fmt.Errorf("failed to apply team rulesets: %w", err)
+		}
 	}
 
 	// 3. Apply secrets if requested
 	if opts.ApplySecrets {
-		c.applyTeamSecrets(opts.RepoOwner, opts.RepoName, teamDir)
+		if err := c.applyTeamSecrets(opts.RepoOwner, opts.RepoName, teamDir); err != nil {
+			return fmt.Errorf("failed to apply team secrets: %w", err)
+		}
 	}
 
 	// 4. Apply repository-specific secrets if provided
@@ -448,24 +451,45 @@ func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars 
 // The following methods are delegated to the appropriate handlers
 // and should be implemented similarly to the functions in create.go
 
-func (c *Creator) applyTeamEnvs(owner, repo, teamDir string) {
+func (c *Creator) applyTeamEnvs(owner, repo, teamDir string) error {
+	mainOperation := "Applying team environments"
+
+	// Start the overall operation
+	c.Reporter.Start(mainOperation, "")
+
 	// Expand tilde in path if it exists
 	if strings.HasPrefix(teamDir, "~") {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			output.ErrorMessage(fmt.Sprintf("Failed to get user home directory: %v", err))
-			return
+			c.Reporter.Failed(mainOperation, err, "Failed to get user home directory")
+			return fmt.Errorf("failed to get user home directory: %w", err)
 		}
 		teamDir = filepath.Join(home, teamDir[1:])
 	}
 
 	envsDir := filepath.Join(teamDir, "envs")
+	c.Reporter.Debug(fmt.Sprintf("Looking for environment configs in %s", envsDir))
+
+	// Check if the directory exists first
+	if _, err := os.Stat(envsDir); os.IsNotExist(err) {
+		errMsg := fmt.Sprintf("Environments directory does not exist: %s", envsDir)
+		c.Reporter.Skip(mainOperation, errMsg)
+		return fmt.Errorf(errMsg)
+	}
 
 	entries, err := os.ReadDir(envsDir)
 	if err != nil {
-		output.ErrorMessage(fmt.Sprintf("Failed to read envs directory %s: %v", envsDir, err))
-		return
+		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to read envs directory: %s", envsDir))
+		return fmt.Errorf("failed to read environments directory: %w", err)
 	}
+
+	if len(entries) == 0 {
+		c.Reporter.Skip(mainOperation, "No environment configurations found")
+		return nil
+	}
+
+	appliedCount := 0
+	failedEnvs := []string{}
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -478,9 +502,13 @@ func (c *Creator) applyTeamEnvs(owner, repo, teamDir string) {
 		}
 
 		filePath := filepath.Join(envsDir, entry.Name())
+		c.Reporter.Debug(fmt.Sprintf("Processing environment file: %s", filePath))
+
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			output.ErrorMessage(fmt.Sprintf("Failed to read env file %s: %v", filePath, err))
+			errMsg := fmt.Sprintf("Failed to read env file %s: %v", entry.Name(), err)
+			c.Reporter.Warning("Environment processing", errMsg)
+			failedEnvs = append(failedEnvs, errMsg)
 			continue
 		}
 
@@ -490,35 +518,91 @@ func (c *Creator) applyTeamEnvs(owner, repo, teamDir string) {
 
 		// Parse JSON
 		if err := json.Unmarshal(data, &envConfig); err != nil {
-			output.ErrorMessage(fmt.Sprintf("Failed to parse JSON in %s: %v", filePath, err))
+			errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", entry.Name(), err)
+			c.Reporter.Warning("Environment processing", errMsg)
+			failedEnvs = append(failedEnvs, errMsg)
 			continue
 		}
 
 		if envConfig.Name == "" {
-			output.InfoMessage(fmt.Sprintf("Missing 'name' in %s, skipping", filePath))
+			c.Reporter.Skip("Environment processing", fmt.Sprintf("Environment in %s is missing a name", entry.Name()))
 			continue
 		}
 
-		output.ProcessingMessage(fmt.Sprintf("Creating environment: %s", envConfig.Name))
+		// Update the main operation with current environment being processed
+		c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Creating environment: %s", envConfig.Name))
+
+		// Create the environment
 		if err := c.GitHubClient.CreateEnvironment(owner, repo, envConfig.Name); err != nil {
 			if strings.Contains(err.Error(), "already exists") {
-				output.InfoMessage(fmt.Sprintf("Environment %s already exists, skipping", envConfig.Name))
+				c.Reporter.Debug(fmt.Sprintf("Environment %s already exists", envConfig.Name))
 			} else {
-				output.ErrorMessage(fmt.Sprintf("Failed to apply env config %s: %v", filePath, err))
+				errMsg := fmt.Sprintf("Failed to create environment %s: %v", envConfig.Name, err)
+				c.Reporter.Warning("Environment creation", errMsg)
+				failedEnvs = append(failedEnvs, errMsg)
 			}
 		} else {
-			output.SuccessMessage(fmt.Sprintf("Environment created: %s", envConfig.Name))
+			c.Reporter.Debug(fmt.Sprintf("Successfully created environment: %s", envConfig.Name))
+			appliedCount++
 		}
 	}
+
+	// Return a summary error if any environments failed
+	if len(failedEnvs) > 0 {
+		summaryMessage := fmt.Sprintf("Applied %d environments, %d failed", appliedCount, len(failedEnvs))
+		c.Reporter.Complete(mainOperation, summaryMessage)
+		return fmt.Errorf("some environments could not be applied: %s", strings.Join(failedEnvs[:1], ", "))
+	}
+
+	// Finalize the overall operation
+	if appliedCount > 0 {
+		c.Reporter.Complete(mainOperation, fmt.Sprintf("Successfully applied %d environments", appliedCount))
+	} else {
+		c.Reporter.Skip(mainOperation, "No new environments were applied")
+	}
+
+	return nil
 }
 
-func (c *Creator) applyTeamRulesets(owner, repo, teamDir string) {
+func (c *Creator) applyTeamRulesets(owner, repo, teamDir string) error {
+	mainOperation := "Applying team rulesets"
+	// Start the overall operation
+	c.Reporter.Start(mainOperation, "")
+
+	// Expand tilde in path if it exists
+	if strings.HasPrefix(teamDir, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			c.Reporter.Failed(mainOperation, err, "Failed to get user home directory")
+			return fmt.Errorf("failed to get user home directory: %w", err)
+		}
+		teamDir = filepath.Join(home, teamDir[1:])
+	}
+
 	rulesetsDir := filepath.Join(teamDir, "rulesets")
+	c.Reporter.Debug(fmt.Sprintf("Looking for ruleset configs in %s", rulesetsDir))
+
+	// Check if the directory exists first
+	if _, err := os.Stat(rulesetsDir); os.IsNotExist(err) {
+		errMsg := fmt.Sprintf("Rulesets directory does not exist: %s", rulesetsDir)
+		c.Reporter.Skip(mainOperation, errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
 	files, err := os.ReadDir(rulesetsDir)
 	if err != nil {
-		output.ErrorMessage(fmt.Sprintf("No rulesets directory found at %s: %v", rulesetsDir, err))
-		return
+		c.Reporter.Failed(mainOperation, err, "Failed to read rulesets directory")
+		return fmt.Errorf("failed to read rulesets directory: %w", err)
 	}
+
+	if len(files) == 0 {
+		c.Reporter.Skip(mainOperation, "No ruleset files found")
+		return nil
+	}
+
+	// Track applied and failed rulesets
+	appliedCount := 0
+	failedRulesets := []string{}
 
 	for _, f := range files {
 		if f.IsDir() {
@@ -531,55 +615,75 @@ func (c *Creator) applyTeamRulesets(owner, repo, teamDir string) {
 		}
 
 		filePath := filepath.Join(rulesetsDir, f.Name())
-		output.ProcessingMessage(fmt.Sprintf("Processing ruleset file: %s", filePath))
+		c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Processing ruleset file: %s", filePath))
 
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			output.ErrorMessage(fmt.Sprintf("Failed to read ruleset file %s: %v", f.Name(), err))
+			errMsg := fmt.Sprintf("Failed to read ruleset file %s: %v", f.Name(), err)
+			c.Reporter.Warning("Ruleset processing", errMsg)
+			failedRulesets = append(failedRulesets, errMsg)
 			continue
 		}
 
 		// Unmarshal JSON directly into the GitHub API struct
 		var ruleset github.RepositoryRuleset
 		if err := json.Unmarshal(data, &ruleset); err != nil {
-			output.ErrorMessage(fmt.Sprintf("Failed to parse JSON in %s: %v", f.Name(), err))
+			errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", f.Name(), err)
+			c.Reporter.Warning("Ruleset processing", errMsg)
+			failedRulesets = append(failedRulesets, errMsg)
 			continue
 		}
 
 		// Basic validation
 		if ruleset.Name == "" {
-			output.InfoMessage(fmt.Sprintf("Ruleset in %s is missing a name, skipping", f.Name()))
+			c.Reporter.Skip("Ruleset processing", fmt.Sprintf("Ruleset in %s is missing a name", f.Name()))
 			continue
 		}
 
 		if ruleset.Target == nil {
-			output.InfoMessage(fmt.Sprintf("Ruleset in %s is missing a target, skipping", f.Name()))
+			c.Reporter.Skip("Ruleset processing", fmt.Sprintf("Ruleset in %s is missing a target", f.Name()))
 			continue
 		}
 
 		// Debug output
-		output.ProcessingMessage(fmt.Sprintf("Applying ruleset: %s (target: %s)", ruleset.Name, *ruleset.Target))
+		c.Reporter.Debug(fmt.Sprintf("Applying ruleset: %s (target: %s)", ruleset.Name, *ruleset.Target))
 
 		// Apply the ruleset
 		if err := c.GitHubClient.CreateRuleset(owner, repo, ruleset); err != nil {
-			output.ErrorMessage(fmt.Sprintf("Failed to apply ruleset %s: %v", f.Name(), err))
+			errMsg := fmt.Sprintf("Failed to apply ruleset %s: %v", f.Name(), err)
+			c.Reporter.Warning("Ruleset application", errMsg)
+			failedRulesets = append(failedRulesets, errMsg)
 		} else {
-			output.SuccessMessage(fmt.Sprintf("Applied ruleset: %s", ruleset.Name))
+			c.Reporter.Progress("Ruleset application", 100, fmt.Sprintf("Applied ruleset: %s", ruleset.Name))
+			appliedCount++
 		}
 	}
+
+	// Return a summary error if any rulesets failed
+	if len(failedRulesets) > 0 {
+		summaryMessage := fmt.Sprintf("Applied %d rulesets, %d failed", appliedCount, len(failedRulesets))
+		c.Reporter.Complete(mainOperation, summaryMessage)
+		return fmt.Errorf("some rulesets could not be applied: %s", strings.Join(failedRulesets[:1], ", "))
+	}
+
+	c.Reporter.Complete(mainOperation, fmt.Sprintf("Successfully applied %d rulesets", appliedCount))
+	return nil
 }
 
-func (c *Creator) applyTeamSecrets(owner, repo, teamDir string) {
+func (c *Creator) applyTeamSecrets(owner, repo, teamDir string) error {
+	mainOperation := "Applying team secrets"
+	c.Reporter.Start(mainOperation, "")
+
 	secretsPath := filepath.Join(teamDir, "secrets.json")
 	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
-		output.InfoMessage("No secrets.json file found")
-		return
+		c.Reporter.Skip(mainOperation, "No secrets.json file found")
+		return nil
 	}
 
 	data, err := os.ReadFile(secretsPath)
 	if err != nil {
-		output.ErrorMessage(fmt.Sprintf("Failed to read secrets file: %v", err))
-		return
+		c.Reporter.Failed(mainOperation, err, "Failed to read secrets file")
+		return fmt.Errorf("failed to read secrets file: %w", err)
 	}
 
 	var secretsConfig struct {
@@ -594,8 +698,8 @@ func (c *Creator) applyTeamSecrets(owner, repo, teamDir string) {
 
 	// Parse JSON
 	if err := json.Unmarshal(data, &secretsConfig); err != nil {
-		output.ErrorMessage(fmt.Sprintf("Failed to parse JSON in %s: %v", secretsPath, err))
-		return
+		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to parse JSON in %s", secretsPath))
+		return fmt.Errorf("failed to parse secrets JSON: %w", err)
 	}
 
 	// First pass to collect all secret values
@@ -603,13 +707,13 @@ func (c *Creator) applyTeamSecrets(owner, repo, teamDir string) {
 	for _, s := range secretsConfig.Secrets {
 		// Skip if name is empty
 		if s.Name == "" {
-			output.InfoMessage("Skipping secret with missing name")
+			c.Reporter.Skip("Secret processing", "Skipping secret with missing name")
 			continue
 		}
 
 		secretValue, sourceType, sourceKey, err := resolveSecretValue(s.Value, s.Name)
 		if err != nil {
-			output.ErrorMessage(fmt.Sprintf("Error resolving secret value for '%s': %v", s.Name, err))
+			c.Reporter.Warning("Secret resolution", fmt.Sprintf("Error resolving secret value for '%s': %v", s.Name, err))
 			continue
 		}
 
@@ -618,11 +722,12 @@ func (c *Creator) applyTeamSecrets(owner, repo, teamDir string) {
 
 		// Debug info about resolution
 		if sourceType != "config" {
-			output.InfoMessage(fmt.Sprintf("Resolved '%s' from %s: '%s'", s.Name, sourceType, sourceKey))
+			c.Reporter.Debug(fmt.Sprintf("Resolved '%s' from %s: '%s'", s.Name, sourceType, sourceKey))
 		}
 	}
 
 	// Second pass to apply secrets, including those with references
+	appliedCount := 0
 	for _, s := range secretsConfig.Secrets {
 		if s.Name == "" {
 			continue // Skip again
@@ -640,22 +745,40 @@ func (c *Creator) applyTeamSecrets(owner, repo, teamDir string) {
 		secretValue, valueSource, ok := getSecretValueAndSource(secret, secretValues)
 		if !ok {
 			if s.Reference != "" {
-				output.ErrorMessage(fmt.Sprintf("Referenced secret '%s' not found for '%s'", s.Reference, s.Name))
+				c.Reporter.Warning("Secret reference", fmt.Sprintf("Referenced secret '%s' not found for '%s'", s.Reference, s.Name))
 			}
 			continue
 		}
 
 		if secretValue == "" {
-			output.InfoMessage(fmt.Sprintf("Skipping secret '%s' with empty value", s.Name))
+			c.Reporter.Skip("Secret processing", fmt.Sprintf("Skipping secret '%s' with empty value", s.Name))
 			continue
 		}
 
 		isVariable := s.Type == "variable"
-		c.applySecretOrVariable(isVariable, owner, repo, s.Name, secretValue, s.Env, valueSource)
+		if err := c.applySecretOrVariable(isVariable, owner, repo, s.Name, secretValue, s.Env, valueSource); err != nil {
+			c.Reporter.Warning("Secret application", fmt.Sprintf("Failed to apply %s '%s': %v",
+				secret.Type, secret.Name, err))
+		} else {
+			c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Applied %s: %s (env: %s, source: %s)",
+				valueOrEmpty(s.Type, "secret"), s.Name, valueOrEmpty(s.Env, "repo"), valueSource))
+			appliedCount++
+		}
 	}
+
+	if appliedCount > 0 {
+		c.Reporter.Complete(mainOperation, fmt.Sprintf("Applied %d secrets/variables", appliedCount))
+	} else {
+		c.Reporter.Skip(mainOperation, "No secrets were applied")
+	}
+
+	return nil
 }
 
 func (c *Creator) applyRepoSpecificSecrets(owner, repo, secretsJSON string) error {
+	mainOperation := "Applying repository-specific secrets"
+	c.Reporter.Start(mainOperation, "")
+
 	var repoSecretsConfig struct {
 		Secrets []struct {
 			Name      string `json:"name"`
@@ -668,26 +791,56 @@ func (c *Creator) applyRepoSpecificSecrets(owner, repo, secretsJSON string) erro
 
 	// Parse the JSON string
 	if err := json.Unmarshal([]byte(secretsJSON), &repoSecretsConfig); err != nil {
+		c.Reporter.Failed(mainOperation, err, "Failed to parse repository secrets JSON")
 		return fmt.Errorf("failed to parse repository secrets JSON: %w", err)
 	}
 
+	if len(repoSecretsConfig.Secrets) == 0 {
+		c.Reporter.Skip(mainOperation, "No repository-specific secrets found")
+		return nil
+	}
+
 	// Apply the secrets
+	appliedCount := 0
+	failedSecrets := []string{}
+
 	for _, s := range repoSecretsConfig.Secrets {
 		prefixedName := sanitizeSecretName(fmt.Sprintf("%s_%s", repo, s.Name))
 		envScope := s.Env
+
 		secretValue, _, _, err := resolveSecretValue(s.Value, s.Name)
 		if err != nil {
-			output.ErrorMessage(fmt.Sprintf("Error resolving secret value for '%s': %v", s.Name, err))
+			errMsg := fmt.Sprintf("Error resolving secret value for '%s': %v", s.Name, err)
+			c.Reporter.Warning("Secret resolution", errMsg)
+			failedSecrets = append(failedSecrets, errMsg)
 			continue
 		}
+
 		if secretValue == "" {
-			output.InfoMessage(fmt.Sprintf("Skipping secret '%s' with empty value", s.Name))
+			c.Reporter.Skip("Secret processing", fmt.Sprintf("Skipping secret '%s' with empty value", s.Name))
 			continue
 		}
+
 		isVariable := s.Type == "variable"
-		c.applySecretOrVariable(isVariable, owner, repo, prefixedName, secretValue, envScope, "repo-secrets")
+		c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Setting %s: %s", valueOrEmpty(s.Type, "secret"), prefixedName))
+
+		if err := c.applySecretOrVariable(isVariable, owner, repo, prefixedName, secretValue, envScope, "repo-secrets"); err != nil {
+			errMsg := fmt.Sprintf("Failed to apply %s '%s': %v", valueOrEmpty(s.Type, "secret"), prefixedName, err)
+			c.Reporter.Warning("Secret application", errMsg)
+			failedSecrets = append(failedSecrets, errMsg)
+		} else {
+			appliedCount++
+		}
 	}
 
+	// Return a summary error if any secrets failed
+	if len(failedSecrets) > 0 {
+		summaryMessage := fmt.Sprintf("Applied %d repository-specific secrets, %d failed", appliedCount, len(failedSecrets))
+		c.Reporter.Complete(mainOperation, summaryMessage)
+		return fmt.Errorf("some repository-specific secrets could not be applied: %s", strings.Join(failedSecrets[:1], ", "))
+	}
+
+	c.Reporter.Complete(mainOperation, fmt.Sprintf("Successfully applied %d repository-specific secrets", appliedCount))
 	return nil
 }
 
@@ -853,22 +1006,29 @@ func getSecretValueAndSource(s Secret, secretValues map[string]string) (string, 
 }
 
 // Helper to apply a secret or variable
-func (c *Creator) applySecretOrVariable(isVariable bool, owner, repo, name, value, env, valueSource string) {
-	if isVariable {
-		output.ProcessingMessage(fmt.Sprintf("Setting variable: %s", name))
-		err := c.GitHubClient.SetVariable(owner, repo, name, value, env)
-		if err != nil {
-			output.ErrorMessage(fmt.Sprintf("Failed to set variable '%s': %v", name, err))
-			return
-		}
-		output.SuccessMessage(fmt.Sprintf("Applied variable: %s (env: %s, source: %s)", name, valueOrEmpty(env, "repo"), valueSource))
-	} else {
-		output.ProcessingMessage(fmt.Sprintf("Setting secret: %s", name))
-		err := c.GitHubClient.ApplySecret(owner, repo, name, value, env)
-		if err != nil {
-			output.ErrorMessage(fmt.Sprintf("Failed to set secret '%s': %v", name, err))
-			return
-		}
-		output.SuccessMessage(fmt.Sprintf("Applied secret: %s (env: %s, source: %s)", name, valueOrEmpty(env, "repo"), valueSource))
+func (c *Creator) applySecretOrVariable(isVariable bool, owner, repo, name, value, env, valueSource string) error {
+	operation := "Setting variable"
+	resourceType := "variable"
+	if !isVariable {
+		operation = "Setting secret"
+		resourceType = "secret"
 	}
+
+	c.Reporter.Progress(operation, 0, name)
+
+	var err error
+	if isVariable {
+		err = c.GitHubClient.SetVariable(owner, repo, name, value, env)
+	} else {
+		err = c.GitHubClient.ApplySecret(owner, repo, name, value, env)
+	}
+
+	if err != nil {
+		c.Reporter.Warning(operation, fmt.Sprintf("Failed to set %s '%s': %v", resourceType, name, err))
+		return err
+	}
+
+	c.Reporter.Debug(fmt.Sprintf("Applied %s: %s (env: %s, source: %s)",
+		resourceType, name, valueOrEmpty(env, "repo"), valueSource))
+	return nil
 }

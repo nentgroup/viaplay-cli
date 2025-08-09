@@ -12,16 +12,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Unicode icons that resemble Font Awesome icons
-const (
-	// More sophisticated Unicode symbols resembling Font Awesome
-	IconFASuccess = "✔" // CHECK MARK (U+2714)
-	IconFAError   = "✖" // HEAVY MULTIPLICATION X (U+2716)
-	IconFAWarning = "⚠" // WARNING SIGN (U+26A0)
-	IconFAInfo    = "ℹ" // INFORMATION SOURCE (U+2139)
-	IconFAProcess = "↻" // ANTICLOCKWISE OPEN CIRCLE ARROW (U+21BB)
-)
-
 // Spinner represents a CLI spinner for showing progress
 type Spinner struct {
 	spinner      *spinner.Spinner
@@ -33,6 +23,7 @@ type Spinner struct {
 	successStyle lipgloss.Style
 	errorStyle   lipgloss.Style
 	skipStyle    lipgloss.Style
+	warningStyle lipgloss.Style
 }
 
 // NewSpinner creates a new spinner
@@ -46,7 +37,8 @@ func NewSpinner() *Spinner {
 		output:       os.Stdout,
 		successStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("76")),  // Green
 		errorStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("161")), // Red
-		skipStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("214")), // Yellow
+		skipStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("240")), // Gray
+		warningStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("214")), // Yellow
 	}
 }
 
@@ -97,17 +89,23 @@ func (s *Spinner) Stop() {
 // Success stops the spinner and displays a success message
 func (s *Spinner) Success(message string) {
 	s.Stop()
-	fmt.Fprintf(s.output, "%s %s\n", IconFASuccess, s.successStyle.Render(message))
+	fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Success, s.successStyle.Render(message))
 }
 
 // Fail stops the spinner and displays an error message
 func (s *Spinner) Fail(message string) {
 	s.Stop()
-	fmt.Fprintf(s.output, "%s %s\n", IconFAError, s.errorStyle.Render(message))
+	fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Error, s.errorStyle.Render(message))
 }
 
 // Skip stops the spinner and displays a skipped message
 func (s *Spinner) Skip(message string) {
 	s.Stop()
-	fmt.Fprintf(s.output, "%s %s\n", IconFAWarning, s.skipStyle.Render(message))
+	fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Skip, s.skipStyle.Render(message))
+}
+
+// Warn stops the spinner and displays a warning message
+func (s *Spinner) Warn(message string) {
+	s.Stop()
+	fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Warning, s.warningStyle.Render(message))
 }

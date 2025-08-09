@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -409,48 +410,48 @@ func pluralS(count int) string {
 
 // printProjectSummary prints the project creation summary in a nice format
 func printProjectSummary(summary *project.Summary, executionTime time.Duration) {
-	fmt.Println("\n📋 Project Summary:")
-	fmt.Println("-------------------")
+	fmt.Printf("\n%s %s\n", output.ActiveIcons.Summary, output.Bold("Project Summary:"))
+	fmt.Println(output.Faint(strings.Repeat("─", 20)))
 
-	fmt.Printf("📁 Project location: %s\n", summary.ProjectPath)
+	fmt.Printf("%s Project location: %s\n", output.ActiveIcons.Template, summary.ProjectPath)
 
 	if summary.RepoURL != "" {
-		fmt.Printf("🔗 Repository URL: %s\n", summary.RepoURL)
+		fmt.Printf("%s Repository URL: %s\n", output.ActiveIcons.GitHub, summary.RepoURL)
 	}
 
-	fmt.Printf("⚙️  Project type: %s/%s\n", summary.Language, summary.ProjectType)
+	fmt.Printf("%s Project type: %s/%s\n", output.ActiveIcons.Config, summary.Language, summary.ProjectType)
 
 	if summary.Team != "" {
-		fmt.Printf("👥 Team: %s\n", summary.Team)
+		fmt.Printf("%s Team: %s\n", output.ActiveIcons.People, summary.Team)
 	}
 
 	if summary.AppliedEnvs {
-		fmt.Printf("🌍 Environments: Applied from team configuration\n")
+		fmt.Printf("%s Environments: %s\n", output.ActiveIcons.Globe, output.Success("Applied from team configuration"))
 	} else {
-		fmt.Printf("🌍 Environments: Default staging environment\n")
+		fmt.Printf("%s Environments: %s\n", output.ActiveIcons.Globe, "Default staging environment")
 	}
 
 	if summary.AppliedRulesets {
-		fmt.Printf("🔒 Rulesets: Applied from team configuration\n")
+		fmt.Printf("%s Rulesets: %s\n", output.ActiveIcons.Lock, output.Success("Applied from team configuration"))
 	}
 
 	if summary.AppliedSecrets {
-		fmt.Printf("🔑 Secrets: Applied from team configuration\n")
+		fmt.Printf("%s Secrets: %s\n", output.ActiveIcons.Key, output.Success("Applied from team configuration"))
 	}
 
 	if summary.CustomSecrets {
-		fmt.Printf("🔑 Custom secrets: Applied\n")
+		fmt.Printf("%s Custom secrets: %s\n", output.ActiveIcons.Key, output.Success("Applied"))
 	}
 
 	// Print any non-fatal errors that occurred
 	if len(summary.Errors) > 0 {
-		fmt.Println("\n⚠️ Warnings:")
+		fmt.Printf("\n%s %s\n", output.ActiveIcons.Warning, output.WarningBold("Warnings:"))
 		for _, err := range summary.Errors {
-			fmt.Printf("   - %s\n", err)
+			fmt.Printf("   %s %s\n", output.ActiveIcons.Bullet, err)
 		}
 	}
 
-	fmt.Printf("\nProject creation complete in %s\n", formatDuration(executionTime))
+	fmt.Printf("\n%s Project creation complete in %s\n", output.ActiveIcons.Clock, formatDuration(executionTime))
 }
 
 // Helper to set up project scaffolding options

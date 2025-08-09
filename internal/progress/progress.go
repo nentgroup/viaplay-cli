@@ -19,6 +19,9 @@ const (
 	StatusFailed     Status = "failed"
 	StatusSkipped    Status = "skipped"
 	StatusWarning    Status = "warning"
+	StatusDebug      Status = "debug" // For debug messages
+	StatusInfo       Status = "info"  // For info messages
+	StatusError      Status = "error" // For error messages
 )
 
 // Reporter defines an interface for reporting operation progress
@@ -99,18 +102,18 @@ func (r *CallbackReporter) Warning(operation, message string) {
 
 // Info implements Reporter.Info
 func (r *CallbackReporter) Info(message string) {
-	r.callback("info", StatusInProgress, message, nil)
+	r.callback("info", StatusInfo, message, nil)
 }
 
 // Debug implements Reporter.Debug
 func (r *CallbackReporter) Debug(message string) {
 	if r.debug {
-		r.callback("debug", StatusInProgress, message, nil)
+		r.callback("debug", StatusDebug, message, nil)
 	}
 }
 
 func (r *CallbackReporter) Error(message string) {
-	r.callback("error", StatusFailed, message, fmt.Errorf("error: %s", message))
+	r.callback("error", StatusError, message, fmt.Errorf("error: %s", message))
 }
 
 // NoopReporter is a Reporter implementation that does nothing
@@ -161,6 +164,15 @@ func DefaultCB(operation string, status Status, details string, err error) {
 	}
 
 	switch status {
+	case StatusDebug:
+		output.VerboseMessage(details)
+		return
+	case StatusInfo:
+		output.InfoMessage(details)
+		return
+	case StatusError:
+		output.ErrorMessage(details)
+		return
 	case StatusStarted:
 		spinnerInstance.Start(operation)
 	case StatusInProgress:
@@ -187,6 +199,19 @@ func DefaultCB(operation string, status Status, details string, err error) {
 		spinnerInstance.Skip(skipMsg)
 	case StatusWarning:
 		// Handle warnings as spinner updates but don't change spinner state
-		output.WarningMessage(fmt.Sprintf("%s: %s", operation, details))
+		//output.WarningMessage(fmt.Sprintf("%s: %s", operation, details))
+		skipMsg := fmt.Sprintf("%s skipped", operation)
+		if details != "" {
+			skipMsg = fmt.Sprintf("%s: %s", skipMsg, details)
+		}
+		spinnerInstance.Warn(skipMsg)
 	}
+}
+
+// NewDefaultReporter creates a new reporter with the default callback
+// and automatically sets debug mode based on the output package's verbose setting
+func NewDefaultReporter() Reporter {
+	// Get verbose status from output package
+	isVerbose := output.IsVerboseEnabled()
+	return NewCallbackReporter(DefaultCB, isVerbose)
 }
