@@ -42,6 +42,9 @@ type CreateCommandOptions struct {
 	BinaryName     string
 	SkipHooks      bool
 	NoCache        bool // Force template cache update
+
+	// Error handling options
+	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur
 }
 
 // createCmd is the parent command for all creation operations
@@ -158,6 +161,9 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 	cmd.Flags().StringVar(&opts.RepoSecrets, "secrets", "", "JSON string with repository-specific secrets")
 	cmd.Flags().StringVar(&opts.SecretsFile, "secrets-file", "", "Path to JSON file with repository-specific secrets")
 
+	// Error handling flags
+	cmd.Flags().BoolVar(&opts.CleanupOnError, "cleanup-on-error", false, "Clean up resources (delete project folder and repo) if errors occur during creation")
+
 	// Mark required flags
 	if err := cmd.MarkFlagRequired("name"); err != nil {
 		fmt.Printf("Failed to mark 'name' flag as required: %v\n", err)
@@ -179,7 +185,8 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 	// Validate and prepare repository parameters
 	repoParams, err := validateRepoParameters(opts, withScaffolding)
 	if err != nil {
-		return err
+		output.FatalError(fmt.Sprintf("Repo parameters validation failed: %v", err))
+		return nil
 	}
 
 	// Handle secrets data
@@ -192,7 +199,8 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 	if withScaffolding {
 		projectDir, err := validateProjectDirectory(opts, repoParams.name, withScaffolding)
 		if err != nil {
-			return err
+			output.FatalError(fmt.Sprintf("Project directory validation failed: %v", err))
+			return nil
 		}
 		// Make sure OutputDir is set for the project creation
 		if opts.OutputDir == "" {
@@ -202,20 +210,33 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 
 	// Check if repository exists (if we're creating one)
 	if !opts.NoRepo && !validateRepositoryDoesNotExist(ghClient, repoParams.owner, repoParams.name) {
-		return fmt.Errorf("repository already exists: %s/%s", repoParams.owner, repoParams.name)
+		output.FatalError(fmt.Sprintf("Repository already exists: %s/%s", repoParams.owner, repoParams.name))
+		return nil
 	}
 
 	// Create the project using the Creator
-	summary, err := executeProjectCreation(ghClient, configDir, repoParams, opts, secretsData, withScaffolding)
-	if err != nil {
-		return err
-	}
+	summary, createErr := executeProjectCreation(ghClient, configDir, repoParams, opts, secretsData, withScaffolding)
 
 	// Calculate total execution time
 	executionTime := time.Since(startTime)
 
-	// Print the project summary with execution time
-	printProjectSummary(summary, executionTime)
+	// Always print the summary if we have one, even if there was an error
+	if summary != nil {
+		// Print the summary
+		printProjectSummary(summary, executionTime)
+
+		// If resources were cleaned up due to an error, and cleanup was successful,
+		// we should consider this a successful operation (exit code 0)
+		if summary.CleanedUp && opts.CleanupOnError {
+			// Return nil to indicate success (resources were cleaned up properly)
+			return nil
+		}
+	}
+
+	// Return any error that occurred during creation
+	if createErr != nil {
+		return createErr
+	}
 
 	return nil
 }
@@ -370,6 +391,9 @@ func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params 
 		Scaffold:       withScaffolding, // Always true for project, false for repo
 		OutputDir:      opts.OutputDir,
 		NoCache:        opts.NoCache, // Force update of template cache if flag is set
+
+		// Error handling options
+		CleanupOnError: opts.CleanupOnError, // Pass the cleanup flag to the creator
 	}
 
 	// Execute the project creation workflow
@@ -413,6 +437,28 @@ func printProjectSummary(summary *project.Summary, executionTime time.Duration) 
 	fmt.Printf("\n%s %s\n", output.ActiveIcons.Summary, output.Bold("Project Summary:"))
 	fmt.Println(output.Faint(strings.Repeat("─", 20)))
 
+	// If resources were cleaned up due to an error, show that first and prominently
+	if summary.CleanedUp {
+		fmt.Printf("%s %s\n", output.ActiveIcons.Warning, output.WarningBold("Project creation failed and resources were cleaned up:"))
+		for _, detail := range summary.CleanupDetails {
+			fmt.Printf("   %s %s\n", output.ActiveIcons.Bullet, detail)
+		}
+		fmt.Println(output.Faint(strings.Repeat("─", 20)))
+
+		// If we have any errors that triggered the cleanup, show them
+		if len(summary.Errors) > 0 {
+			fmt.Printf("%s %s\n", output.ActiveIcons.Error, output.ErrorBold("Errors that caused cleanup:"))
+			for _, err := range summary.Errors {
+				fmt.Printf("   %s %s\n", output.ActiveIcons.Bullet, err)
+			}
+			fmt.Println(output.Faint(strings.Repeat("─", 20)))
+		}
+
+		fmt.Printf("\nProject creation failed but all resources were cleaned up in %s\n", formatDuration(executionTime))
+		return
+	}
+
+	// Only show these if we didn't clean up (i.e., project creation was successful)
 	fmt.Printf("%s Project location: %s\n", output.ActiveIcons.Template, summary.ProjectPath)
 
 	if summary.RepoURL != "" {
@@ -426,24 +472,24 @@ func printProjectSummary(summary *project.Summary, executionTime time.Duration) 
 	}
 
 	if summary.AppliedEnvs {
-		fmt.Printf("%s Environments: %s\n", output.ActiveIcons.Globe, output.Success("Applied from team configuration"))
+		fmt.Printf("%s Environments: Applied from team configuration\n", output.ActiveIcons.Globe)
 	} else {
-		fmt.Printf("%s Environments: %s\n", output.ActiveIcons.Globe, "Default staging environment")
+		fmt.Printf("%s Environments: Default staging environment\n", output.ActiveIcons.Globe)
 	}
 
 	if summary.AppliedRulesets {
-		fmt.Printf("%s Rulesets: %s\n", output.ActiveIcons.Lock, output.Success("Applied from team configuration"))
+		fmt.Printf("%s Rulesets: Applied from team configuration\n", output.ActiveIcons.Lock)
 	}
 
 	if summary.AppliedSecrets {
-		fmt.Printf("%s Secrets: %s\n", output.ActiveIcons.Key, output.Success("Applied from team configuration"))
+		fmt.Printf("%s Secrets: Applied from team configuration\n", output.ActiveIcons.Key)
 	}
 
 	if summary.CustomSecrets {
-		fmt.Printf("%s Custom secrets: %s\n", output.ActiveIcons.Key, output.Success("Applied"))
+		fmt.Printf("%s Custom secrets: Applied\n", output.ActiveIcons.Key)
 	}
 
-	// Print any non-fatal errors that occurred
+	// Print any non-fatal errors that occurred during successful creation
 	if len(summary.Errors) > 0 {
 		fmt.Printf("\n%s %s\n", output.ActiveIcons.Warning, output.WarningBold("Warnings:"))
 		for _, err := range summary.Errors {
@@ -451,7 +497,7 @@ func printProjectSummary(summary *project.Summary, executionTime time.Duration) 
 		}
 	}
 
-	fmt.Printf("\n%s Project creation complete in %s\n", output.ActiveIcons.Clock, formatDuration(executionTime))
+	fmt.Printf("\nProject creation complete in %s\n", formatDuration(executionTime))
 }
 
 // Helper to set up project scaffolding options

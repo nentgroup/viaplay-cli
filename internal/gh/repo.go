@@ -38,9 +38,9 @@ func (ghc *GitHubClient) SetBranchProtection(owner, repo, branch string, rules m
 }
 
 // RepositoryExists checks if a repository with the given name already exists
-func (g *GitHubClient) RepositoryExists(owner, repo string) (bool, error) {
+func (ghc *GitHubClient) RepositoryExists(owner, repo string) (bool, error) {
 	// Use the GitHub API to check if the repository exists
-	_, resp, err := g.client.Repositories.Get(g.ctx, owner, repo)
+	_, resp, err := ghc.client.Repositories.Get(ghc.ctx, owner, repo)
 
 	// If we got a 404, the repository doesn't exist
 	if resp != nil && resp.StatusCode == 404 {
@@ -75,4 +75,17 @@ func (g *GitHubClient) RepositoryExists(owner, repo string) (bool, error) {
 
 	// If we got no error, the repository exists
 	return true, nil
+}
+
+// DeleteRepo deletes a GitHub repository
+func (ghc *GitHubClient) DeleteRepo(owner, repo string) error {
+	resp, err := ghc.client.Repositories.Delete(ghc.ctx, owner, repo)
+	if err != nil {
+		if resp != nil && resp.StatusCode == 404 {
+			// Repository doesn't exist, which is fine for our deletion purpose
+			return nil
+		}
+		return fmt.Errorf("failed to delete repository: %w", err)
+	}
+	return nil
 }

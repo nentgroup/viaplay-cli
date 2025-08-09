@@ -7,6 +7,21 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// GitHub API scope constants
+const (
+	// ScopeRepo grants read/write access to code, commit statuses, etc.
+	ScopeRepo = "repo"
+
+	// ScopeDeleteRepo allows deletion of repositories
+	ScopeDeleteRepo = "delete_repo"
+
+	// ScopeReadOrg grants read-only access to organization data
+	ScopeReadOrg = "read:org"
+
+	// DefaultScopes combines the default scopes needed for viaplay-cli
+	DefaultScopes = ScopeRepo + " " + ScopeDeleteRepo + " " + ScopeReadOrg
+)
+
 type GitHubClient struct {
 	ctx    context.Context
 	client *github.Client
@@ -24,8 +39,8 @@ func NewGitHubClient(token string) *GitHubClient {
 }
 
 // GetAuthenticatedUser returns the username of the authenticated GitHub user
-func (c *GitHubClient) GetAuthenticatedUser() (string, error) {
-	user, _, err := c.client.Users.Get(c.ctx, "")
+func (ghc *GitHubClient) GetAuthenticatedUser() (string, error) {
+	user, _, err := ghc.client.Users.Get(ghc.ctx, "")
 	if err != nil {
 		return "", err
 	}

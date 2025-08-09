@@ -34,6 +34,8 @@ type Summary struct {
 	AppliedSecrets  bool     // Whether secrets were applied
 	CustomSecrets   bool     // Whether custom secrets were applied
 	Errors          []string // Any non-fatal errors that occurred
+	CleanedUp       bool     // Whether resources were cleaned up due to an error
+	CleanupDetails  []string // Details about what was cleaned up
 }
 
 // Creator manages the project creation workflow
@@ -86,6 +88,9 @@ type CreateOptions struct {
 	Scaffold       bool   // Wether to scaffold the project, always true for project creation
 	OutputDir      string // Local directory for the project (if Scaffold is true)
 	NoCache        bool   // Force update of template cache before using it
+
+	// Error handling options
+	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur
 }
 
 // NewCreator creates a new project creator with the given GitHub client and config directory
@@ -251,6 +256,46 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 		Errors:          []string{},
 	}
 
+	// Track resources for potential cleanup
+	var createdProjectDir string
+	var createdRepo bool
+
+	// Define cleanup function
+	cleanup := func() {
+		if !opts.CleanupOnError {
+			return
+		}
+
+		summary.CleanedUp = true
+		c.Reporter.Start("Cleaning up resources due to error", "")
+
+		// 1. Delete project directory if it was created
+		if createdProjectDir != "" && opts.Scaffold {
+			c.Reporter.Progress("Cleanup", 0, fmt.Sprintf("Deleting project directory: %s", createdProjectDir))
+			if err := os.RemoveAll(createdProjectDir); err != nil {
+				c.Reporter.Warning("Cleanup", fmt.Sprintf("Failed to delete project directory: %v", err))
+				summary.CleanupDetails = append(summary.CleanupDetails, fmt.Sprintf("Failed to delete project directory: %v", err))
+			} else {
+				c.Reporter.Progress("Cleanup", 50, "Project directory deleted")
+				summary.CleanupDetails = append(summary.CleanupDetails, fmt.Sprintf("Project directory deleted: %s", createdProjectDir))
+			}
+		}
+
+		// 2. Delete GitHub repository if it was created
+		if createdRepo && !opts.SkipRepo {
+			c.Reporter.Progress("Cleanup", 50, fmt.Sprintf("Deleting GitHub repository: %s/%s", opts.RepoOwner, opts.RepoName))
+			if err := c.GitHubClient.DeleteRepo(opts.RepoOwner, opts.RepoName); err != nil {
+				c.Reporter.Warning("Cleanup", fmt.Sprintf("Failed to delete GitHub repository: %v", err))
+				summary.CleanupDetails = append(summary.CleanupDetails, fmt.Sprintf("Failed to delete GitHub repository: %v", err))
+			} else {
+				c.Reporter.Progress("Cleanup", 100, "GitHub repository deleted")
+				summary.CleanupDetails = append(summary.CleanupDetails, fmt.Sprintf("GitHub repository deleted: %s/%s", opts.RepoOwner, opts.RepoName))
+			}
+		}
+
+		c.Reporter.Complete("Cleanup", "Resources cleaned up")
+	}
+
 	// Get authenticated user for CreatedBy field
 	c.Reporter.Start("Getting authenticated user", "")
 	username, err := c.GitHubClient.GetAuthenticatedUser()
@@ -287,8 +332,14 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 	if opts.Scaffold {
 		c.Reporter.Start("Scaffolding project", "")
 		if err := c.scaffoldProjectWithVariables(opts, templateVars); err != nil {
+			if opts.CleanupOnError {
+				cleanup()
+				summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to scaffold project: %v", err))
+				return summary, fmt.Errorf("failed to scaffold project: %w", err)
+			}
 			return nil, fmt.Errorf("failed to scaffold project: %w", err)
 		}
+		createdProjectDir = projectPath // Track created directory for potential cleanup
 		c.Reporter.Complete("Scaffolding project", "complete!")
 	}
 
@@ -303,9 +354,15 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 				c.Reporter.Skip("Creating GitHub repository", "Repository already exists")
 			} else {
 				c.Reporter.Failed("Creating GitHub repository", err, "")
+				if opts.CleanupOnError {
+					cleanup()
+					summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to create repository: %v", err))
+					return summary, fmt.Errorf("failed to create repository: %w", err)
+				}
 				return nil, fmt.Errorf("failed to create repository: %w", err)
 			}
 		} else {
+			createdRepo = true // Track created repo for potential cleanup
 			c.Reporter.Complete("Creating GitHub repository", "")
 		}
 
@@ -316,6 +373,11 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 	// Apply GitHub configurations
 	c.Reporter.Start("Applying GitHub configurations", "")
 	if err := c.applyGitHubConfigurations(opts); err != nil {
+		if opts.CleanupOnError {
+			cleanup()
+			summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
+			return summary, fmt.Errorf("failed to apply GitHub configurations: %w", err)
+		}
 		summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
 	} else {
 		c.Reporter.Complete("Applying GitHub configurations", "")
@@ -327,6 +389,11 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 		if outputDir == "" {
 			currentDir, err := os.Getwd()
 			if err != nil {
+				if opts.CleanupOnError {
+					cleanup()
+					summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to get current directory: %v", err))
+					return summary, fmt.Errorf("failed to get current directory: %w", err)
+				}
 				return nil, fmt.Errorf("failed to get current directory: %w", err)
 			}
 			outputDir = filepath.Join(currentDir, opts.RepoName)

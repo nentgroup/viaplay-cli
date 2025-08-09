@@ -5,6 +5,7 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -100,6 +101,12 @@ func CacheMessage(message string) {
 // Section prints a section header
 func Section(title string) {
 	fmt.Printf("\n%s %s\n%s\n", ActiveIcons.Brain, Bold(title), strings.Repeat("─", len(title)+2))
+}
+
+// FatalError prints an error message and exits the program
+func FatalError(msg string) {
+	ErrorMessage(msg)
+	os.Exit(1)
 }
 
 // Table formats data as a table with aligned columns
