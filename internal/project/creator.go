@@ -541,7 +541,7 @@ func (c *Creator) applyTeamEnvs(owner, repo, teamDir string) error {
 	if _, err := os.Stat(envsDir); os.IsNotExist(err) {
 		errMsg := fmt.Sprintf("Environments directory does not exist: %s", envsDir)
 		c.Reporter.Skip(mainOperation, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("environments directory does not exist: %s", envsDir)
 	}
 
 	entries, err := os.ReadDir(envsDir)
@@ -621,7 +621,7 @@ func (c *Creator) applyTeamEnvs(owner, repo, teamDir string) error {
 		return fmt.Errorf("some environments could not be applied: %s", strings.Join(failedEnvs[:1], ", "))
 	}
 
-	// Finalize the overall operation
+	// Finalise the overall operation
 	if appliedCount > 0 {
 		c.Reporter.Complete(mainOperation, fmt.Sprintf("Successfully applied %d environments", appliedCount))
 	} else {
@@ -653,7 +653,7 @@ func (c *Creator) applyTeamRulesets(owner, repo, teamDir string) error {
 	if _, err := os.Stat(rulesetsDir); os.IsNotExist(err) {
 		errMsg := fmt.Sprintf("Rulesets directory does not exist: %s", rulesetsDir)
 		c.Reporter.Skip(mainOperation, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("rulesets directory does not exist: %s", rulesetsDir)
 	}
 
 	files, err := os.ReadDir(rulesetsDir)

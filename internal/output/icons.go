@@ -18,10 +18,8 @@ const (
 	IconTypeNerdFont
 )
 
-var (
-	// currentIconType stores the detected or configured icon type
-	currentIconType = IconTypeUnicode
-)
+// currentIconType stores the detected or configured icon type
+var currentIconType = IconTypeUnicode
 
 // Icons holds all icon definitions with fallbacks
 type Icons struct {
@@ -139,7 +137,7 @@ var NerdFontIcons = Icons{
 	LangGeneric: "\uf121", // nf-fa-code (f121)
 }
 
-// ColoredIcons defines color emoji icons (mostly for compatibility)
+// ColoredIcons defines colour emoji icons (mostly for compatibility)
 var ColoredIcons = Icons{
 	// Status icons
 	Success:  "✅",
@@ -240,7 +238,7 @@ func ShouldUseNerdFonts() bool {
 	return false
 }
 
-// InitIcons initializes the icons based on terminal capabilities
+// InitIcons initialises the icons based on terminal capabilities
 func InitIcons() {
 	// Check if the VIAPLAY_CLI_ICON_TYPE environment variable is set
 	iconTypeEnv := os.Getenv("VIAPLAY_CLI_ICON_TYPE")
@@ -384,6 +382,6 @@ func GetLanguageIcon(language string) string {
 }
 
 func init() {
-	// Initialize icons when the package is imported
+	// Initialise icons when the package is imported
 	InitIcons()
 }

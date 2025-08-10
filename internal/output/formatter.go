@@ -125,7 +125,7 @@ func Table(headers []string, rows [][]string, indent int) string {
 	for _, row := range rows {
 		for i, cell := range row {
 			if i < len(colWidths) {
-				// Get the visual width by stripping ANSI color codes
+				// Get the visual width by stripping ANSI colour codes
 				visualWidth := stripANSI(cell)
 				if len(visualWidth) > colWidths[i] {
 					colWidths[i] = len(visualWidth)
@@ -162,7 +162,7 @@ func Table(headers []string, rows [][]string, indent int) string {
 				visibleLen := len(stripANSI(cell))
 				padding := colWidths[i] - visibleLen + 2
 
-				// Write the cell with its ANSI colors intact
+				// Write the cell with its ANSI colours intact
 				sb.WriteString(cell)
 
 				// Add appropriate padding after the cell
@@ -175,7 +175,7 @@ func Table(headers []string, rows [][]string, indent int) string {
 	return sb.String()
 }
 
-// stripANSI removes ANSI color sequences from a string to get its visual length
+// stripANSI removes ANSI colour sequences from a string to get its visual length
 func stripANSI(str string) string {
 	// ANSI escape sequence regex pattern
 	ansiPattern := "\033\\[[0-9;]*m"

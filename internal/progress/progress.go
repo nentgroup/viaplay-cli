@@ -198,8 +198,6 @@ func DefaultCB(operation string, status Status, details string, err error) {
 		}
 		spinnerInstance.Skip(skipMsg)
 	case StatusWarning:
-		// Handle warnings as spinner updates but don't change spinner state
-		//output.WarningMessage(fmt.Sprintf("%s: %s", operation, details))
 		skipMsg := fmt.Sprintf("%s skipped", operation)
 		if details != "" {
 			skipMsg = fmt.Sprintf("%s: %s", skipMsg, details)

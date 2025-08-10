@@ -15,7 +15,7 @@ const (
 	// ScopeDeleteRepo allows deletion of repositories
 	ScopeDeleteRepo = "delete_repo"
 
-	// ScopeReadOrg grants read-only access to organization data
+	// ScopeReadOrg grants read-only access to organisation data
 	ScopeReadOrg = "read:org"
 
 	// DefaultScopes combines the default scopes needed for viaplay-cli
