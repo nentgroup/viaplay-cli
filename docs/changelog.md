@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/nentgroup/viaplay-cli/compare/v0.3.1...v0.4.0) (2025-08-10)
+
+
+### Features
+
+* add clean up feature ([50fddf4](https://github.com/nentgroup/viaplay-cli/commit/50fddf4dc1e2fe92ac29e0a005b96843df1a8851))
+* consolidate output data ([191f6a4](https://github.com/nentgroup/viaplay-cli/commit/191f6a4c3afd3f0ea46344dde13cece7a49cd108))
+
+
+### Bug Fixes
+
+* show always banner on help ([b37d4c3](https://github.com/nentgroup/viaplay-cli/commit/b37d4c30f8544cd76e6e8d50e9612421bd03ea96))
+
 ## [0.3.1](https://github.com/nentgroup/viaplay-cli/compare/v0.3.0...v0.3.1) (2025-08-08)
 
 
