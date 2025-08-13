@@ -1,0 +1,130 @@
+package project
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+
+	"github.com/nentgroup/viaplay-cli/internal/output"
+	"github.com/nentgroup/viaplay-cli/internal/template"
+)
+
+// InitGoProject initialises a Go project with proper module setup
+func (c *Factory) InitGoProject(projectPath string) error {
+	if _, err := os.Stat(filepath.Join(projectPath, "go.mod")); err == nil {
+		return nil
+	}
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = projectPath
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// InitNodeProject initialises a Node.js project
+func (c *Factory) InitNodeProject(projectPath string) error {
+	packageJSONPath := filepath.Join(projectPath, "package.json")
+	nodeModulesPath := filepath.Join(projectPath, "node_modules")
+	if _, err := os.Stat(packageJSONPath); err == nil {
+		if _, err := os.Stat(nodeModulesPath); os.IsNotExist(err) {
+			cmd := exec.Command("npm", "install")
+			cmd.Dir = projectPath
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			return cmd.Run()
+		}
+	}
+	return nil
+}
+
+// RunHooks runs the post-installation hooks for a project
+func (c *Factory) RunHooks(projectPath, language, projectType string, templateVars *template.Variables) error {
+	// Create a function that will run the hooks and write output to provided writers
+	runHookFn := func(stdout, stderr io.Writer) error {
+		// Create command executors that use the provided writers
+		cmdExecutor := func(cmd *exec.Cmd) error {
+			cmd.Stdout = stdout
+			cmd.Stderr = stderr
+			return cmd.Run()
+		}
+
+		// Get renderer for template variables
+		renderer := template.NewRenderer(templateVars)
+
+		// Check if we have hooks for this language and project type
+		hooks := c.Config.GetPostInstallHooks(language, projectType)
+		if len(hooks) == 0 {
+			fmt.Fprintf(stdout, "No hooks configured for %s/%s\n", language, projectType)
+			return nil
+		}
+
+		// Execute hooks in order (general -> language-specific -> project-type-specific)
+		fmt.Println("----------------------------------------")
+		for _, hook := range hooks {
+			// Process commands
+			for _, cmd := range hook.GetAllCommands() {
+				// Render template variables in the command
+				renderedCmd, err := renderer.RenderString(cmd)
+				if err != nil {
+					return fmt.Errorf("failed to render run command template: %w", err)
+				}
+
+				// Create a command that will run in the project directory
+				execCmd := exec.Command("sh", "-c", renderedCmd)
+				execCmd.Dir = projectPath
+
+				// Run the command using our executor
+				if err := cmdExecutor(execCmd); err != nil {
+					return fmt.Errorf("hook command failed: %w", err)
+				}
+			}
+
+			// Process scripts
+			for _, scriptPath := range hook.GetAllScripts() {
+				// Render template variables in the script path
+				renderedScriptPath, err := renderer.RenderString(scriptPath)
+				if err != nil {
+					return fmt.Errorf("failed to render script path template: %w", err)
+				}
+
+				// Check if this is a relative path or absolute
+				fullScriptPath := renderedScriptPath
+				if !filepath.IsAbs(renderedScriptPath) {
+					// If it's relative, look in the hooks directory
+					fullScriptPath = filepath.Join(c.Config.GetHooksDir(), renderedScriptPath)
+				}
+				// Check if script exists
+				if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
+					return fmt.Errorf("hook script not found: %s", fullScriptPath)
+				}
+
+				// Create a command to run the script
+				execCmd := exec.Command(fullScriptPath)
+				execCmd.Dir = projectPath
+
+				// Run the script using our executor
+				if err := cmdExecutor(execCmd); err != nil {
+					return fmt.Errorf("hook script failed: %w", err)
+				}
+			}
+		}
+		fmt.Println("----------------------------------------")
+		return nil
+	}
+
+	// Create a title for the TUI
+	title := fmt.Sprintf("Post-Installation Hooks for %s/%s", language, projectType)
+
+	// Display the hook output using our simplified UI
+	err := output.DisplayHookOutput(title, runHookFn)
+	// Display a simple message based on the result
+	if err != nil {
+		fmt.Printf("Hooks failed: %v\n", err)
+	} else {
+		fmt.Printf("Post-installation hooks completed successfully\n")
+	}
+
+	return err
+}

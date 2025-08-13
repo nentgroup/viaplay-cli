@@ -214,7 +214,7 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 		return nil
 	}
 
-	// Create the project using the Creator
+	// Create the project using the Factory
 	summary, createErr := executeProjectCreation(ghClient, configDir, repoParams, opts, secretsData, withScaffolding)
 
 	// Calculate total execution time
@@ -355,14 +355,10 @@ func validateRepositoryDoesNotExist(ghClient *gh.GitHubClient, owner, repoName s
 
 // executeProjectCreation executes the project creation workflow
 func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params repoParameters, opts *CreateCommandOptions, secretsData string, withScaffolding bool) (*project.Summary, error) { // Create project creator with reporter
-	creator := project.NewCreatorWithReporter(
-		ghClient,
-		configDir,
-		progress.NewCallbackReporter(progress.DefaultCB, viper.GetBool("verbose")),
-	)
+	creator := project.NewFactory(ghClient, progress.NewCallbackReporter(progress.DefaultCB, viper.GetBool("verbose")))
 
 	// Set up options
-	projectOpts := project.CreateOptions{
+	projectOpts := project.Options{
 		// Repository options
 		RepoName:        params.name,
 		RepoDescription: params.description,
