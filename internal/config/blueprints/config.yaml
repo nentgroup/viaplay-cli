@@ -61,13 +61,15 @@ templates:
 
   # Rust templates
   rust:
-    service: "git@github.com:nentgroup/rust-http-service-template-2.git"
+    service:
+        source: git@github.com:nentgroup/rust-service-template.git
 
-  # TypeScript templates
-  typescript:
-    service: "git@github.com:nentgroup/ts-service-template.git"
-    lambda: "git@github.com:nentgroup/ts-lambda-template.git"
+  # Node templates
+  node:
+    service:
+      source: git@github.com:nentgroup/node-service-template.git
   # Add more language templates as needed
+
 
 # -----------------------------------------------
 # Directory Configuration
