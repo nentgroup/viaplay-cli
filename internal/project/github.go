@@ -283,6 +283,16 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 	mainOperation := "Applying team secrets"
 	c.Reporter.Start(mainOperation, "")
 
+	// Expand tilde in path if it exists
+	if strings.HasPrefix(teamDir, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			c.Reporter.Failed(mainOperation, err, "Failed to get user home directory")
+			return fmt.Errorf("failed to get user home directory: %w", err)
+		}
+		teamDir = filepath.Join(home, teamDir[1:])
+	}
+
 	secretsPath := filepath.Join(teamDir, "secrets.json")
 	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
 		c.Reporter.Skip(mainOperation, "No secrets.json file found")
