@@ -4,7 +4,7 @@ cask "vip" do
 
   desc "CLI tool for Gecko Generators."
   homepage "https://nentgroup.github.io/viaplay-cli"
-  version "0.4.0"
+  version "1.0.0"
 
   livecheck do
     skip "Auto-generated on release."
@@ -14,27 +14,27 @@ cask "vip" do
 
   on_macos do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v0.4.0/viaplay-cli_0.4.0_darwin_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v1.0.0/viaplay-cli_1.0.0_darwin_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "8c951a6b7610a87a789ecf18a8f7ee6e7b234560d6fd4a30e4de0d21f464346a"
+      sha256 "61a51cd07d74cad5614eb5074bc7f6361f059082bad2c91299d30059a3be10b2"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v0.4.0/viaplay-cli_0.4.0_darwin_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v1.0.0/viaplay-cli_1.0.0_darwin_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "42c0c636f773bc7f4dfeefa62a5ac356caa4bc61548139d654d9ddf127d84a3f"
+      sha256 "18aa906c12add44512ed52d877ece1edfe0f43a93c895dbbefe28dff16d3a5c8"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v0.4.0/viaplay-cli_0.4.0_linux_amd64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v1.0.0/viaplay-cli_1.0.0_linux_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "12129a2254392a1de982de0b9689fb5219566a296e27fcb1530860a4ca3f74e3"
+      sha256 "77d5491adbbc940dd0713ce0d8022163d67ddf14c31907ca58f4617c6d928407"
     end
     on_arm do
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v0.4.0/viaplay-cli_0.4.0_linux_arm64.tar.gz",
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v1.0.0/viaplay-cli_1.0.0_linux_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "d9acea2dfd6cfe5ed11c81f42370540df745e6911b7ad39b4627f9317bfa1525"
+      sha256 "29dcc149122e282e848537ac114fa8c8ca4ed7e93a5b0a292620b255d2c5e67b"
     end
   end
 
