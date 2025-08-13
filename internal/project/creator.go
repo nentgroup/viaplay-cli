@@ -24,6 +24,7 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
 	"github.com/nentgroup/viaplay-cli/internal/template"
+	"github.com/nentgroup/viaplay-cli/pkg/tmpl"
 )
 
 // Summary contains details about the created project to be displayed to the user
@@ -153,16 +154,22 @@ func (c *Creator) SetReporter(reporter progress.Reporter) {
 func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 	vars := template.NewTemplateVariables()
 
+	// Keep original project name for display (could include spaces)
+	originalName := opts.RepoName
+
+	// Convert to kebab-case for repo name and other technical identifiers
+	kebabName := tmpl.ToKebabCase(originalName)
+
 	// Basic project information
-	vars.Project.Name = opts.RepoName
+	vars.Project.Name = originalName
 	vars.Project.Description = opts.RepoDescription
 
-	// Repository information
+	// Repository information (always use kebab case)
 	vars.Repo.Owner = opts.RepoOwner
-	vars.Repo.Name = opts.RepoName
+	vars.Repo.Name = kebabName
 	vars.Repo.IsPrivate = opts.IsPrivate
-	vars.Repo.URL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
-	vars.Repo.SSHURL = fmt.Sprintf("git@github.com:%s/%s.git", opts.RepoOwner, opts.RepoName)
+	vars.Repo.URL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, kebabName)
+	vars.Repo.SSHURL = fmt.Sprintf("git@github.com:%s/%s.git", opts.RepoOwner, kebabName)
 
 	// Project language and type
 	vars.Project.Language = opts.Language
@@ -174,12 +181,12 @@ func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 	vars.Meta.Year = time.Now().Year()
 
 	// Service information
-	vars.Service.Name = opts.RepoName
+	vars.Service.Name = kebabName // Use kebab case for service name
 	vars.Service.Owner = opts.Team
 	vars.Service.OwnerKey = strings.ToLower(strings.ReplaceAll(opts.Team, " ", "-"))
 
 	// Handle binary name for compiled languages (Go, Rust, etc.)
-	binaryName := opts.RepoName
+	binaryName := kebabName // Start with kebab case version
 	if opts.BinaryName != "" {
 		// Use the custom binary name if provided
 		binaryName = opts.BinaryName
@@ -200,16 +207,16 @@ func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 		vars.Go.BinaryName = binaryName
 	} else if opts.Language == "rust" {
 		vars.Rust.BinaryName = binaryName
-		vars.Rust.CargoName = strings.ReplaceAll(opts.RepoName, "-", "_") // Cargo names conventionally use underscores
+		vars.Rust.CargoName = strings.ReplaceAll(kebabName, "-", "_") // Cargo names conventionally use underscores
 	}
 
 	// Go-specific variables
 	if opts.Language == "go" {
-		vars.Go.ModulePath = fmt.Sprintf("github.com/%s/%s", opts.RepoOwner, opts.RepoName)
+		vars.Go.ModulePath = fmt.Sprintf("github.com/%s/%s", opts.RepoOwner, kebabName)
 	}
 
 	// Docker variables
-	vars.Docker.ImageName = strings.ToLower(opts.RepoName)
+	vars.Docker.ImageName = strings.ToLower(kebabName)
 	return vars
 }
 
@@ -322,16 +329,19 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 		c.Reporter.Debug(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", username))
 	}
 
-	// Determine the project path
+	// Convert project name to kebab-case for directory name
+	kebabName := tmpl.ToKebabCase(opts.RepoName)
+
+	// Determine the project path using kebab-case
 	projectPath := opts.OutputDir
 	if projectPath == "" {
 		currentDir, err := os.Getwd()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get current directory: %w", err)
 		}
-		projectPath = filepath.Join(currentDir, opts.RepoName)
+		projectPath = filepath.Join(currentDir, kebabName)
 	} else {
-		projectPath = filepath.Join(projectPath, opts.RepoName)
+		projectPath = filepath.Join(projectPath, kebabName)
 	}
 	summary.ProjectPath = projectPath
 
@@ -374,7 +384,7 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 		}
 
 		// Set the repository URL in the summary
-		summary.RepoURL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
+		summary.RepoURL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, kebabName)
 	}
 
 	// Apply GitHub configurations
@@ -392,25 +402,10 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 
 	// Run post-installation hooks if scaffolding was done and hooks aren't skipped
 	if opts.Scaffold && !opts.SkipHooks { //nolint:nestif
-		outputDir := opts.OutputDir
-		if outputDir == "" {
-			currentDir, err := os.Getwd()
-			if err != nil {
-				if opts.CleanupOnError {
-					cleanup()
-					summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to get current directory: %v", err))
-					return summary, fmt.Errorf("failed to get current directory: %w", err)
-				}
-				return nil, fmt.Errorf("failed to get current directory: %w", err)
-			}
-			outputDir = filepath.Join(currentDir, opts.RepoName)
-		} else {
-			outputDir = filepath.Join(outputDir, opts.RepoName)
-		}
-
+		// Use the kebab-case directory for post-installation hooks
 		c.Reporter.Start("Running post-installation hooks \n", "")
 		if err := c.RunPostInstallHooks(
-			outputDir,
+			projectPath, // Use the consistent kebab-case project path
 			opts.Language,
 			opts.ProjectType,
 			templateVars,
@@ -423,12 +418,12 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 		c.Reporter.Skip("Running post-installation hooks", "Skipped as per user request")
 	}
 
-	// Initialize and push to GitHub repository if both scaffolding is done and repo was created
+	// Initialise and push to GitHub repository if both scaffolding is done and repo was created
 	if opts.Scaffold && !opts.SkipRepo && createdRepo {
 		c.Reporter.Start("Initializing Git repository and pushing to GitHub", "")
 
 		// Create SSH URL from repository information
-		sshURL := fmt.Sprintf("git@github.com:%s/%s.git", opts.RepoOwner, opts.RepoName)
+		sshURL := fmt.Sprintf("git@github.com:%s/%s.git", opts.RepoOwner, kebabName)
 		c.Reporter.Debug(fmt.Sprintf("Using SSH URL for Git operations: %s", sshURL))
 
 		if err := c.CloneToRepo(projectPath, sshURL); err != nil {
@@ -686,6 +681,9 @@ func valueOrEmpty(value, defaultValue string) string {
 
 // scaffoldProjectWithVariables scaffolds a project locally with pre-populated template variables
 func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars *template.Variables) error {
+	// Convert project name to kebab-case for directory name
+	kebabName := tmpl.ToKebabCase(opts.RepoName)
+
 	// Determine output directory
 	outputDir := opts.OutputDir
 	if outputDir == "" {
@@ -694,11 +692,11 @@ func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars 
 		if err != nil {
 			return fmt.Errorf("failed to get current directory: %w", err)
 		}
-		// Create a subdirectory with the project/repo name
-		outputDir = filepath.Join(currentDir, opts.RepoName)
+		// Create a subdirectory with the kebab-case project name
+		outputDir = filepath.Join(currentDir, kebabName)
 	} else {
-		// If output directory is specified, create a subdirectory with the project/repo name
-		outputDir = filepath.Join(outputDir, opts.RepoName)
+		// If output directory is specified, create a subdirectory with the kebab-case project name
+		outputDir = filepath.Join(outputDir, kebabName)
 	}
 
 	// Ensure the output directory exists

@@ -142,11 +142,11 @@ func NewTemplateVariables() *Variables {
 			Port: "8080",
 		},
 		Go: GoInfo{
-			Version: "1.21",
+			Version: "1.24",
 		},
 		Rust: RustInfo{
-			Version: "1.75",
-			Edition: "2021",
+			Version: "1.88",
+			Edition: "2024",
 		},
 		Node: NodeInfo{
 			Version: "20",
@@ -154,8 +154,8 @@ func NewTemplateVariables() *Variables {
 		Lambda: LambdaInfo{
 			Timeout:      30,  // 30 seconds default timeout
 			MemorySize:   512, // 512 MB default memory
-			Architecture: "x86_64",
-			Runtime:      "nodejs18.x", // Default to current Node.js LTS
+			Architecture: "arm64",
+			Runtime:      "nodejs22.x", // Default to current Node.js LTS
 		},
 		Cloud: CloudInfo{
 			Provider: "aws",
