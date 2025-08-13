@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/nentgroup/viaplay-cli/compare/v1.1.0...v1.2.0) (2025-08-13)
+
+
+### Features
+
+* add new template functions ([#31](https://github.com/nentgroup/viaplay-cli/issues/31)) ([4e92f1f](https://github.com/nentgroup/viaplay-cli/commit/4e92f1f7401e5eeaff1f5f42bec1590f7f3ce7f1))
+
 ## [1.1.0](https://github.com/nentgroup/viaplay-cli/compare/v1.0.0...v1.1.0) (2025-08-13)
 
 
