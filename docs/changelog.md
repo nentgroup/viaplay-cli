@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/nentgroup/viaplay-cli/compare/v1.0.0...v1.1.0) (2025-08-13)
+
+
+### Features
+
+* add topics support and automatic push on repo creation ([#29](https://github.com/nentgroup/viaplay-cli/issues/29)) ([0c8d1e5](https://github.com/nentgroup/viaplay-cli/commit/0c8d1e5128eea5390c3d92c9f7cbcc66a6f88c4d))
+
 ## [1.0.0](https://github.com/nentgroup/viaplay-cli/compare/v0.4.0...v1.0.0) (2025-08-13)
 
 
