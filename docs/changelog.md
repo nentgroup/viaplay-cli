@@ -5,6 +5,8 @@
 
 ### ⚠ BREAKING CHANGES
 
+* Templates must now use {{ }} syntax instead of {{{ }}}.
+* Tags now use Name Space format, e.g., .Repo.Name instead of .RepoName.
 * Update all templates accordingly.
 
 ### Dependencies
