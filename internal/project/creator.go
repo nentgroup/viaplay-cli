@@ -423,18 +423,72 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 		c.Reporter.Skip("Running post-installation hooks", "Skipped as per user request")
 	}
 
+	// Initialize and push to GitHub repository if both scaffolding is done and repo was created
+	if opts.Scaffold && !opts.SkipRepo && createdRepo {
+		c.Reporter.Start("Initializing Git repository and pushing to GitHub", "")
+
+		// Create SSH URL from repository information
+		sshURL := fmt.Sprintf("git@github.com:%s/%s.git", opts.RepoOwner, opts.RepoName)
+		c.Reporter.Debug(fmt.Sprintf("Using SSH URL for Git operations: %s", sshURL))
+
+		if err := c.CloneToRepo(projectPath, sshURL); err != nil {
+			c.Reporter.Failed("Git repository initialization", err, "")
+			summary.Errors = append(summary.Errors, fmt.Sprintf("Failed to initialize and push to Git repository: %v", err))
+		} else {
+			c.Reporter.Complete("Git repository initialization", "Successfully pushed project to GitHub")
+		}
+	} else if opts.SkipRepo {
+		c.Reporter.Skip("Git repository initialization", "Skipped as no GitHub repository was created")
+	} else if !opts.Scaffold {
+		c.Reporter.Skip("Git repository initialization", "Skipped as no local project was scaffolded")
+	}
+
 	c.Reporter.Complete("Project creation", "Workflow completed successfully")
 	return summary, nil
 }
 
-// createRepository creates a GitHub repository
+// createRepository creates a GitHub repository and adds appropriate topics and labels
 func (c *Creator) createRepository(opts CreateOptions) (string, error) {
 	// Only print errors if needed, not process/info messages
 	var org string
 	if opts.IsOrg {
 		org = opts.RepoOwner
 	}
-	return c.GitHubClient.CreateRepo(opts.RepoName, org, opts.IsPrivate, opts.RepoDescription)
+	repoURL, err := c.GitHubClient.CreateRepo(opts.RepoName, org, opts.IsPrivate, opts.RepoDescription)
+	if err != nil {
+		return "", err
+	}
+
+	// Generate appropriate topics for the repository
+	topics := []string{}
+
+	// Add language topic
+	if opts.Language != "" {
+		topics = append(topics, strings.ToLower(opts.Language))
+	}
+
+	// Add project type topic
+	if opts.ProjectType != "" {
+		topics = append(topics, strings.ToLower(opts.ProjectType))
+	}
+
+	// Add team topic if provided
+	if opts.Team != "" {
+		topics = append(topics, strings.ToLower(strings.ReplaceAll(opts.Team, " ", "-")))
+	}
+
+	// Add viaplay-cli topic to identify repos created by this tool
+	topics = append(topics, "viaplay-cli")
+
+	// Add the topics to the repository
+	if err := c.GitHubClient.AddTopicsToRepo(opts.RepoOwner, opts.RepoName, topics); err != nil {
+		c.Reporter.Warning("Topic Creation", fmt.Sprintf("Failed to add topics to repository: %v", err))
+		// Don't return an error here as topic creation is not critical to the repository creation
+	} else {
+		c.Reporter.Debug(fmt.Sprintf("Added topics to repository: %v", topics))
+	}
+
+	return repoURL, nil
 }
 
 // applyGitHubConfigurations applies configurations to the GitHub repository

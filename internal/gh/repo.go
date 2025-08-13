@@ -89,3 +89,33 @@ func (ghc *GitHubClient) DeleteRepo(owner, repo string) error {
 	}
 	return nil
 }
+
+// AddLabelsToRepo adds labels to a GitHub repository
+func (ghc *GitHubClient) AddLabelsToRepo(owner, repo string, labels []string) error {
+	for _, label := range labels {
+		// Create a new label with default color (gray)
+		newLabel := &github.Label{
+			Name:  github.Ptr(label),
+			Color: github.Ptr("ededed"), // Light gray color
+		}
+
+		// Try to create the label
+		_, resp, err := ghc.client.Issues.CreateLabel(ghc.ctx, owner, repo, newLabel)
+
+		// If the label already exists (422 status code), that's fine, continue with the next one
+		if err != nil && (resp == nil || resp.StatusCode != 422) {
+			return fmt.Errorf("failed to create label '%s': %w", label, err)
+		}
+	}
+
+	return nil
+}
+
+// AddTopicsToRepo adds topics to a GitHub repository
+func (ghc *GitHubClient) AddTopicsToRepo(owner, repo string, topics []string) error {
+	_, _, err := ghc.client.Repositories.ReplaceAllTopics(ghc.ctx, owner, repo, topics)
+	if err != nil {
+		return fmt.Errorf("failed to set topics for repository: %w", err)
+	}
+	return nil
+}
