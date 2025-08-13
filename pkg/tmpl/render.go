@@ -8,7 +8,77 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"unicode"
 )
+
+// capitalize returns the string with the first rune capitalized
+func capitalize(s string) string {
+	if s == "" {
+		return ""
+	}
+	r := []rune(s)
+	r[0] = unicode.ToUpper(r[0])
+	return string(r)
+}
+
+// ToPascalCase converts a string like "hello world" or "hello-world" to "HelloWorld"
+func ToPascalCase(s string) string {
+	// Replace non-letter characters with space
+	s = strings.ReplaceAll(s, "-", " ")
+	s = strings.ReplaceAll(s, "_", " ")
+
+	words := strings.Fields(s)
+	for i, w := range words {
+		words[i] = capitalize(w) // capitalize first letter
+	}
+	return strings.Join(words, "")
+}
+
+// ToKebabCase converts a string like "HelloWorld" or "hello world" to "hello-world"
+func ToKebabCase(s string) string {
+	// Replace underscores with hyphens and spaces with hyphens
+	s = strings.ReplaceAll(s, "_", "-")
+	s = strings.ReplaceAll(s, " ", "-")
+
+	// Handle camelCase and PascalCase by inserting hyphens before capital letters
+	// and converting to lowercase
+	var result bytes.Buffer
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			// Check if previous character is already a hyphen
+			if s[i-1] != '-' {
+				result.WriteRune('-')
+			}
+			result.WriteRune(r - 'A' + 'a') // Convert to lowercase
+		} else if r >= 'A' && r <= 'Z' {
+			// First character, just convert to lowercase
+			result.WriteRune(r - 'A' + 'a')
+		} else {
+			result.WriteRune(r)
+		}
+	}
+
+	// Remove any double hyphens and trim
+	kebab := strings.TrimSpace(result.String())
+	for strings.Contains(kebab, "--") {
+		kebab = strings.ReplaceAll(kebab, "--", "-")
+	}
+
+	return kebab
+}
+
+// ToTitleCase converts a string like "hello-world" or "hello_world" to "Hello World"
+func ToTitleCase(s string) string {
+	// Replace non-letter characters with space
+	s = strings.ReplaceAll(s, "-", " ")
+	s = strings.ReplaceAll(s, "_", " ")
+
+	words := strings.Fields(s)
+	for i, w := range words {
+		words[i] = capitalize(w) // capitalize first letter
+	}
+	return strings.Join(words, " ")
+}
 
 // RenderWithLiteralUnknowns processes a Go template string so that
 // missing variables remain literally in the output, instead of causing errors.
@@ -54,8 +124,15 @@ func RenderWithLiteralUnknowns(templateString string, data interface{}) (string,
 		result = strings.ReplaceAll(result, expr, escaped)
 	}
 
-	// Parse and execute the modified template
-	tmpl, err := template.New("safe").Parse(result)
+	// Define template functions
+	funcMap := template.FuncMap{
+		"pascal": ToPascalCase, // Add the PascalCase function as "pascal"
+		"kebab":  ToKebabCase,  // Add the KebabCase function as "kebab"
+		"title":  ToTitleCase,  // Add the TitleCase function as "title"
+	}
+
+	// Parse and execute the modified template with function map
+	tmpl, err := template.New("safe").Funcs(funcMap).Parse(result)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template string: %w", err)
 	}
