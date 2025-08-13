@@ -5,20 +5,24 @@ package project
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v74/github"
-	"github.com/zalando/go-keyring"
 
 	"github.com/nentgroup/viaplay-cli/internal/cache"
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
+	"github.com/nentgroup/viaplay-cli/internal/git"
+	"github.com/nentgroup/viaplay-cli/internal/output"
 	"github.com/nentgroup/viaplay-cli/internal/progress"
 	"github.com/nentgroup/viaplay-cli/internal/registry"
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
+	"github.com/nentgroup/viaplay-cli/internal/secrets"
 	"github.com/nentgroup/viaplay-cli/internal/template"
 )
 
@@ -150,29 +154,29 @@ func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 	vars := template.NewTemplateVariables()
 
 	// Basic project information
-	vars.ProjectName = opts.RepoName
-	vars.ProjectDescription = opts.RepoDescription
+	vars.Project.Name = opts.RepoName
+	vars.Project.Description = opts.RepoDescription
 
 	// Repository information
-	vars.RepoOwner = opts.RepoOwner
-	vars.RepoName = opts.RepoName
-	vars.IsPrivate = opts.IsPrivate
-	vars.RepoURL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
-	vars.RepoSSHURL = fmt.Sprintf("git@github.com:%s/%s.git", opts.RepoOwner, opts.RepoName)
+	vars.Repo.Owner = opts.RepoOwner
+	vars.Repo.Name = opts.RepoName
+	vars.Repo.IsPrivate = opts.IsPrivate
+	vars.Repo.URL = fmt.Sprintf("https://github.com/%s/%s", opts.RepoOwner, opts.RepoName)
+	vars.Repo.SSHURL = fmt.Sprintf("git@github.com:%s/%s.git", opts.RepoOwner, opts.RepoName)
 
 	// Project language and type
-	vars.Language = opts.Language
-	vars.ProjectType = opts.ProjectType
-	vars.Team = opts.Team
+	vars.Project.Language = opts.Language
+	vars.Project.Type = opts.ProjectType
+	vars.Org.Team = opts.Team
 
 	// Additional values
-	vars.CreatedAt = time.Now()
-	vars.Year = time.Now().Year()
+	vars.Meta.CreatedAt = time.Now()
+	vars.Meta.Year = time.Now().Year()
 
 	// Service information
-	vars.ServiceName = opts.RepoName
-	vars.ServiceOwner = opts.Team
-	vars.ServiceOwnerKey = strings.ToLower(strings.ReplaceAll(opts.Team, " ", "-"))
+	vars.Service.Name = opts.RepoName
+	vars.Service.Owner = opts.Team
+	vars.Service.OwnerKey = strings.ToLower(strings.ReplaceAll(opts.Team, " ", "-"))
 
 	// Handle binary name for compiled languages (Go, Rust, etc.)
 	binaryName := opts.RepoName
@@ -191,18 +195,21 @@ func createOptionsToTemplateVariables(opts CreateOptions) *template.Variables {
 	// Convert to lowercase
 	binaryName = strings.ToLower(binaryName)
 
-	// Set binary name for compiled languages
-	if opts.Language == "go" || opts.Language == "rust" {
-		vars.BinaryName = binaryName
+	// Set binary name based on language
+	if opts.Language == "go" {
+		vars.Go.BinaryName = binaryName
+	} else if opts.Language == "rust" {
+		vars.Rust.BinaryName = binaryName
+		vars.Rust.CargoName = strings.ReplaceAll(opts.RepoName, "-", "_") // Cargo names conventionally use underscores
 	}
 
 	// Go-specific variables
 	if opts.Language == "go" {
-		vars.ModulePath = fmt.Sprintf("github.com/%s/%s", opts.RepoOwner, opts.RepoName)
+		vars.Go.ModulePath = fmt.Sprintf("github.com/%s/%s", opts.RepoOwner, opts.RepoName)
 	}
 
 	// Docker variables
-	vars.DockerImageName = strings.ToLower(opts.RepoName)
+	vars.Docker.ImageName = strings.ToLower(opts.RepoName)
 	return vars
 }
 
@@ -311,7 +318,7 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 
 	// Set authenticated username if available
 	if username != "" {
-		templateVars.CreatedBy = username
+		templateVars.Meta.CreatedBy = username
 		c.Reporter.Debug(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", username))
 	}
 
@@ -384,7 +391,7 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 	}
 
 	// Run post-installation hooks if scaffolding was done and hooks aren't skipped
-	if opts.Scaffold && !opts.SkipHooks {
+	if opts.Scaffold && !opts.SkipHooks { //nolint:nestif
 		outputDir := opts.OutputDir
 		if outputDir == "" {
 			currentDir, err := os.Getwd()
@@ -402,7 +409,7 @@ func (c *Creator) Create(opts CreateOptions) (*Summary, error) {
 		}
 
 		c.Reporter.Start("Running post-installation hooks \n", "")
-		if err := c.Scaffolder.RunPostInstallHooks(
+		if err := c.RunPostInstallHooks(
 			outputDir,
 			opts.Language,
 			opts.ProjectType,
@@ -476,6 +483,153 @@ func (c *Creator) applyGitHubConfigurations(opts CreateOptions) error {
 	return nil
 }
 
+// CloneToRepo initialises a git repository in the project directory and pushes it to the remote
+func (c *Creator) CloneToRepo(projectPath, repoURL string) error {
+	if err := git.InitRepository(projectPath); err != nil {
+		return fmt.Errorf("failed to initialize git repository: %w", err)
+	}
+	if err := git.CommitAll(projectPath, "chore: initial commit"); err != nil {
+		return fmt.Errorf("failed to commit files: %w", err)
+	}
+	if err := git.AddRemote(projectPath, "origin", repoURL); err != nil {
+		return fmt.Errorf("failed to add remote: %w", err)
+	}
+	branch := "main"
+	if err := git.Push(projectPath, "origin", branch); err != nil {
+		fmt.Println("Push to 'main' failed, trying 'master' branch...")
+		if err := git.Push(projectPath, "origin", "master"); err != nil {
+			return fmt.Errorf("failed to push to remote: %w", err)
+		}
+	}
+	return nil
+}
+
+// InitGoProject initialises a Go project with proper module setup
+func (c *Creator) InitGoProject(projectPath string) error {
+	if _, err := os.Stat(filepath.Join(projectPath, "go.mod")); err == nil {
+		return nil
+	}
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = projectPath
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// InitNodeProject initialises a Node.js project
+func (c *Creator) InitNodeProject(projectPath string) error {
+	packageJSONPath := filepath.Join(projectPath, "package.json")
+	nodeModulesPath := filepath.Join(projectPath, "node_modules")
+	if _, err := os.Stat(packageJSONPath); err == nil {
+		if _, err := os.Stat(nodeModulesPath); os.IsNotExist(err) {
+			cmd := exec.Command("npm", "install")
+			cmd.Dir = projectPath
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			return cmd.Run()
+		}
+	}
+	return nil
+}
+
+// RunPostInstallHooks runs the post-installation hooks for a project
+func (c *Creator) RunPostInstallHooks(projectPath, language, projectType string, templateVars *template.Variables) error {
+	// Create a function that will run the hooks and write output to provided writers
+	runHookFn := func(stdout, stderr io.Writer) error {
+		// Create command executors that use the provided writers
+		cmdExecutor := func(cmd *exec.Cmd) error {
+			cmd.Stdout = stdout
+			cmd.Stderr = stderr
+			return cmd.Run()
+		}
+
+		// Get renderer for template variables
+		renderer := template.NewRenderer(templateVars)
+
+		// Check if we have hooks for this language and project type
+		hooks := c.Config.GetPostInstallHooks(language, projectType)
+		if len(hooks) == 0 {
+			fmt.Fprintf(stdout, "No hooks configured for %s/%s\n", language, projectType)
+			return nil
+		}
+
+		// Execute hooks in order (general -> language-specific -> project-type-specific)
+		fmt.Println("----------------------------------------")
+		for _, hook := range hooks {
+			// Process commands
+			for _, cmd := range hook.GetAllCommands() {
+				// Render template variables in the command
+				renderedCmd, err := renderer.RenderString(cmd)
+				if err != nil {
+					return fmt.Errorf("failed to render run command template: %w", err)
+				}
+
+				// Create a command that will run in the project directory
+				execCmd := exec.Command("sh", "-c", renderedCmd)
+				execCmd.Dir = projectPath
+
+				// Run the command using our executor
+				if err := cmdExecutor(execCmd); err != nil {
+					return fmt.Errorf("hook command failed: %w", err)
+				}
+			}
+
+			// Process scripts
+			for _, scriptPath := range hook.GetAllScripts() {
+				// Render template variables in the script path
+				renderedScriptPath, err := renderer.RenderString(scriptPath)
+				if err != nil {
+					return fmt.Errorf("failed to render script path template: %w", err)
+				}
+
+				// Check if this is a relative path or absolute
+				fullScriptPath := renderedScriptPath
+				if !filepath.IsAbs(renderedScriptPath) {
+					// If it's relative, look in the hooks directory
+					fullScriptPath = filepath.Join(c.Config.GetHooksDir(), renderedScriptPath)
+				}
+				// Check if script exists
+				if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
+					return fmt.Errorf("hook script not found: %s", fullScriptPath)
+				}
+
+				// Create a command to run the script
+				execCmd := exec.Command(fullScriptPath)
+				execCmd.Dir = projectPath
+
+				// Run the script using our executor
+				if err := cmdExecutor(execCmd); err != nil {
+					return fmt.Errorf("hook script failed: %w", err)
+				}
+			}
+		}
+		fmt.Println("----------------------------------------")
+		return nil
+	}
+
+	// Create a title for the TUI
+	title := fmt.Sprintf("Post-Installation Hooks for %s/%s", language, projectType)
+
+	// Display the hook output using our simplified UI
+	err := output.DisplayHookOutput(title, runHookFn)
+	// Display a simple message based on the result
+	if err != nil {
+		fmt.Printf("Hooks failed: %v\n", err)
+	} else {
+		fmt.Printf("Post-installation hooks completed successfully\n")
+	}
+
+	return err
+}
+
+// valueOrEmpty returns the value or a default value if empty
+func valueOrEmpty(value, defaultValue string) string {
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
+
 // scaffoldProjectWithVariables scaffolds a project locally with pre-populated template variables
 func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars *template.Variables) error {
 	// Determine output directory
@@ -514,9 +668,6 @@ func (c *Creator) scaffoldProjectWithVariables(opts CreateOptions, templateVars 
 
 	return nil
 }
-
-// The following methods are delegated to the appropriate handlers
-// and should be implemented similarly to the functions in create.go
 
 func (c *Creator) applyTeamEnvs(owner, repo, teamDir string) error {
 	mainOperation := "Applying team environments"
@@ -778,7 +929,7 @@ func (c *Creator) applyTeamSecrets(owner, repo, teamDir string) error {
 			continue
 		}
 
-		secretValue, sourceType, sourceKey, err := resolveSecretValue(s.Value, s.Name)
+		secretValue, sourceType, sourceKey, err := secrets.ResolveSecretValue(s.Value, s.Name)
 		if err != nil {
 			c.Reporter.Warning("Secret resolution", fmt.Sprintf("Error resolving secret value for '%s': %v", s.Name, err))
 			continue
@@ -801,7 +952,7 @@ func (c *Creator) applyTeamSecrets(owner, repo, teamDir string) error {
 		}
 
 		// Convert anonymous struct to Secret type for helper compatibility
-		secret := Secret{
+		secret := secrets.Secret{
 			Name:      s.Name,
 			Value:     s.Value,
 			Env:       s.Env,
@@ -809,7 +960,7 @@ func (c *Creator) applyTeamSecrets(owner, repo, teamDir string) error {
 			Reference: s.Reference,
 		}
 
-		secretValue, valueSource, ok := getSecretValueAndSource(secret, secretValues)
+		secretValue, valueSource, ok := secrets.GetSecretValueAndSource(secret, secretValues)
 		if !ok {
 			if s.Reference != "" {
 				c.Reporter.Warning("Secret reference", fmt.Sprintf("Referenced secret '%s' not found for '%s'", s.Reference, s.Name))
@@ -872,10 +1023,10 @@ func (c *Creator) applyRepoSpecificSecrets(owner, repo, secretsJSON string) erro
 	failedSecrets := []string{}
 
 	for _, s := range repoSecretsConfig.Secrets {
-		prefixedName := sanitizeSecretName(fmt.Sprintf("%s_%s", repo, s.Name))
+		prefixedName := secrets.SanitizeSecretName(fmt.Sprintf("%s_%s", repo, s.Name))
 		envScope := s.Env
 
-		secretValue, _, _, err := resolveSecretValue(s.Value, s.Name)
+		secretValue, _, _, err := secrets.ResolveSecretValue(s.Value, s.Name)
 		if err != nil {
 			errMsg := fmt.Sprintf("Error resolving secret value for '%s': %v", s.Name, err)
 			c.Reporter.Warning("Secret resolution", errMsg)
@@ -909,167 +1060,6 @@ func (c *Creator) applyRepoSpecificSecrets(owner, repo, secretsJSON string) erro
 
 	c.Reporter.Complete(mainOperation, fmt.Sprintf("Successfully applied %d repository-specific secrets", appliedCount))
 	return nil
-}
-
-// Secret represents a secret or variable definition for use in team/repo configs
-// This matches the structure used in secretsConfig.Secrets
-// (duplicated here to avoid import cycles and for helper use)
-type Secret struct {
-	Name      string
-	Value     string
-	Env       string
-	Type      string
-	Reference string
-}
-
-// Source type constants
-const (
-	// SourceTypeConfig represents a configuration source type
-	SourceTypeConfig = "config"
-	// SourceTypeKeyring represents a keyring source type
-	SourceTypeKeyring = "keyring"
-	// SourceTypeEnv represents an environment variable source type
-	SourceTypeEnv = "env"
-)
-
-// Helper functions
-
-// valueOrEmpty returns the value or a default value if empty
-func valueOrEmpty(value, defaultValue string) string {
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
-// extractGitHubActionsSecret extracts a secret name from GitHub Actions style syntax: ${{ secrets.SECRET_NAME }}
-// Returns the secret name or empty string if no match
-func extractGitHubActionsSecret(value string) string {
-	// Simple regex-like pattern matching: ${{ secrets.KEY_NAME }}
-	value = strings.TrimSpace(value)
-
-	// Check if it follows the pattern
-	if !strings.HasPrefix(value, "${{") || !strings.HasSuffix(value, "}}") {
-		return ""
-	}
-
-	// Extract the part between ${{ and }}
-	inner := strings.TrimSpace(value[3 : len(value)-2])
-
-	// Check if it starts with secrets.
-	if !strings.HasPrefix(inner, "secrets.") {
-		return ""
-	}
-
-	// Extract the key name (everything after secrets.)
-	keyName := strings.TrimSpace(inner[8:])
-	if keyName == "" {
-		return ""
-	}
-
-	return keyName
-}
-
-// sanitizeSecretName ensures a secret name follows GitHub's naming requirements:
-// - Can only contain alphanumeric characters or underscores
-// - Must start with a letter or underscore
-// - No spaces allowed
-func sanitizeSecretName(name string) string {
-	// Replace hyphens with underscores
-	sanitized := strings.ReplaceAll(name, "-", "_")
-
-	// Ensure the name starts with a letter or underscore
-	if len(sanitized) > 0 && (!isAlpha(sanitized[0]) && sanitized[0] != '_') {
-		sanitized = "_" + sanitized
-	}
-
-	// Replace any other invalid characters with underscores
-	for i, char := range sanitized {
-		if !isAlphaNumeric(char) && char != '_' {
-			sanitized = sanitized[:i] + "_" + sanitized[i+1:]
-		}
-	}
-
-	return sanitized
-}
-
-// isAlpha checks if a byte is an alphabetic character (a-z, A-Z)
-func isAlpha(c byte) bool {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-}
-
-// isAlphaNumeric checks if a rune is an alphanumeric character (a-z, A-Z, 0-9)
-func isAlphaNumeric(c rune) bool {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-}
-
-// resolveSecretValue resolves a secret value from various sources (config, keyring, env vars)
-// Returns the resolved value, source type, source key, and any error that occurred
-func resolveSecretValue(value, name string) (string, string, string, error) {
-	var secretValue string
-	var sourceType, sourceKey string
-
-	// Priority order for value resolution:
-	// 1. Direct value in the config (which may contain references)
-	// 2. Reference to another secret (handled separately)
-
-	if value != "" {
-		// 1a. Check if value contains GitHub Actions style reference: ${{ secrets.KEY_NAME }}
-		if keyringKey := extractGitHubActionsSecret(value); keyringKey != "" {
-			// Get from keyring/vault
-			keyringValue, err := GetSecret(keyringKey)
-			if err != nil {
-				return "", "", "", fmt.Errorf("failed to get keyring value for '%s': %w", keyringKey, err)
-			}
-			secretValue = keyringValue
-			sourceType = "keyring"
-			sourceKey = keyringKey
-		} else if strings.HasPrefix(value, "$") && len(value) > 1 {
-			// 1b. Simple $ENV_VAR syntax - get from environment variables
-			envVarName := value[1:] // Remove the $ prefix
-			envVarValue := os.Getenv(envVarName)
-			if envVarValue == "" {
-				fmt.Printf("Warning: Environment variable '%s' is empty or not set\n", envVarName)
-			}
-			secretValue = envVarValue
-			sourceType = "env"
-			sourceKey = envVarName
-		} else {
-			// 1c. Regular direct value
-			secretValue = value
-			sourceType = "config"
-		}
-	} else {
-		return "", "", "", fmt.Errorf("no value source provided for '%s'", name)
-	}
-
-	return secretValue, sourceType, sourceKey, nil
-}
-
-// GetSecret retrieves a secret from the keyring
-func GetSecret(key string) (string, error) {
-	// Use the keyring service to get the secret
-	return keyring.Get("viaplaycli", key)
-}
-
-// Helper to determine secret value and source
-func getSecretValueAndSource(s Secret, secretValues map[string]string) (string, string, bool) {
-	if s.Value != "" {
-		if keyringKey := extractGitHubActionsSecret(s.Value); keyringKey != "" {
-			return secretValues[s.Name], "keyring:" + keyringKey, true
-		} else if strings.HasPrefix(s.Value, "$") && len(s.Value) > 1 {
-			return secretValues[s.Name], "env:" + s.Value[1:], true
-		} else {
-			return s.Value, "config", true
-		}
-	} else if s.Reference != "" {
-		refValue, exists := secretValues[s.Reference]
-		if !exists {
-			return "", "reference missing", false
-		}
-		return refValue, "reference:" + s.Reference, true
-	}
-	return "", "", false
 }
 
 // Helper to apply a secret or variable

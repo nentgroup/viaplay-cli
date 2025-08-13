@@ -6,51 +6,98 @@ viaplay-cli supports a set of template variables that can be used in your projec
 
 ## How to Reference Variables
 
-Use the syntax `{{{.VarName}}}` (triple braces, leading dot) in your template files. For example:
+Use the syntax `{{ .Namespace.VarName }}` (double braces, leading dot) in your template files. For example:
 
 ```
-# {{{.ProjectName}}}
-Owner: {{{.RepoOwner}}}
-Service Port: {{{.ServicePort}}}
+# {{ .Project.Name }}
+Owner: {{ .Repo.Owner }}
+Service Port: {{ .Service.Port }}
 ```
 
 ---
 
 ## Supported Template Variables
 
-The following variables are available for use in your templates:
+The following variables are organized into namespaces for easier reference and to prevent naming collisions:
 
-- `{{{.ProjectName}}}` — Name of the project/repository
-- `{{{.ProjectDescription}}}` — Description of the project
-- `{{{.RepoOwner}}}` — GitHub username or organization name
-- `{{{.RepoName}}}` — Repository name (often same as ProjectName)
-- `{{{.RepoURL}}}` — Full GitHub repository URL
-- `{{{.IsPrivate}}}` — Whether the repository is private
+### Project Information
+- `{{ .Project.Name }}` — Name of the project/repository
+- `{{ .Project.Description }}` — Description of the project
+- `{{ .Project.Type }}` — Type of project (e.g., "api", "library", "app")
+- `{{ .Project.Language }}` — Programming language (e.g., "go", "typescript", "python")
+- `{{ .Project.License }}` — License type (e.g., "MIT", "Apache-2.0")
 
-**Service-related variables:**
-- `{{{.ServiceName}}}` — Name of the service
-- `{{{.ServiceOwner}}}` — Owner/team responsible for the service
-- `{{{.ServiceOwnerKey}}}` — Key identifier for the service owner
-- `{{{.ServicePort}}}` — Port the service listens on
-- `{{{.ServiceType}}}` — Type of service (e.g., "http", "grpc", "worker")
+### Repository Information
+- `{{ .Repo.Owner }}` — GitHub username or organization name
+- `{{ .Repo.Name }}` — Repository name
+- `{{ .Repo.URL }}` — Full GitHub repository URL
+- `{{ .Repo.SSHURL }}` — SSH URL for the repository
+- `{{ .Repo.IsPrivate }}` — Whether the repository is private
 
-**Go-specific variables:**
-- `{{{.BinaryName}}}` — Name of the compiled binary
-- `{{{.ModulePath}}}` — Go module path (e.g., "github.com/org/service")
-- `{{{.GoVersion}}}` — Go version used (e.g., "1.20")
+### Service Information
+- `{{ .Service.Name }}` — Name of the service
+- `{{ .Service.Owner }}` — Owner/team responsible for the service
+- `{{ .Service.OwnerKey }}` — Key identifier for the service owner
+- `{{ .Service.Port }}` — Port the service listens on
+- `{{ .Service.Type }}` — Type of service (e.g., "http", "grpc", "worker")
 
-**Node.js/TypeScript-specific variables:**
-- `{{{.NodeVersion}}}` — Node.js version
-- `{{{.NPMPackageName}}}` — Name in package.json
-- `{{{.TypeScriptVersion}}}` — TypeScript version
+### Go-specific Variables
+- `{{ .Go.BinaryName }}` — Name of the compiled binary
+- `{{ .Go.ModulePath }}` — Go module path (e.g., "github.com/org/service")
+- `{{ .Go.Version }}` — Go version used (e.g., "1.21")
 
-**Cloud/AWS-specific variables:**
-- `{{{.AWSRegion}}}` — AWS region
-- `{{{.AWSAccountID}}}` — AWS account ID
-- `{{{.CloudProvider}}}` — Cloud provider name (e.g., "aws", "gcp")
+### Rust-specific Variables
+- `{{ .Rust.BinaryName }}` — Name of the compiled binary
+- `{{ .Rust.CargoName }}` — Name in Cargo.toml (often uses underscores instead of dashes)
+- `{{ .Rust.Version }}` — Rust version used (e.g., "1.75")
+- `{{ .Rust.Edition }}` — Rust edition (e.g., "2021")
 
-**Docker/Kubernetes variables:**
-- `{{{.DockerImageName}}}` — Docker image name
+### AWS Lambda-specific Variables
+- `{{ .Lambda.FunctionName }}` — Name of the Lambda function
+- `{{ .Lambda.Handler }}` — Handler path (e.g., "index.handler")
+- `{{ .Lambda.Runtime }}` — Lambda runtime (e.g., "nodejs18.x", "go1.x", "python3.9")
+- `{{ .Lambda.Timeout }}` — Timeout in seconds
+- `{{ .Lambda.MemorySize }}` — Memory size in MB
+- `{{ .Lambda.Architecture }}` — Architecture (e.g., "x86_64", "arm64")
+- `{{ .Lambda.Layers }}` — Comma-separated list of layer ARNs
+- `{{ .Lambda.Environment }}` — Environment variables as JSON string
+- `{{ .Lambda.IAMRole }}` — IAM role ARN or name
+- `{{ .Lambda.Triggers }}` — Event triggers (e.g., "apigateway,s3")
+- `{{ .Lambda.DeploymentPackage }}` — Deployment package path
+
+### Node.js/TypeScript-specific Variables
+- `{{ .Node.Version }}` — Node.js version
+- `{{ .Node.PackageName }}` — Name in package.json
+- `{{ .Node.TypeScriptVersion }}` — TypeScript version
+
+### Cloud/AWS Information
+- `{{ .Cloud.Provider }}` — Cloud provider name (e.g., "aws", "gcp", "azure")
+- `{{ .Cloud.AWSRegion }}` — AWS region
+- `{{ .Cloud.AWSAccountID }}` — AWS account ID
+
+### Docker/Kubernetes Variables
+- `{{ .Docker.ImageName }}` — Docker image name
+- `{{ .Docker.ImageTag }}` — Docker image tag
+- `{{ .Docker.Registry }}` — Docker registry URL
+- `{{ .Docker.K8sNamespace }}` — Kubernetes namespace
+
+### Organization Information
+- `{{ .Org.Name }}` — Organization name
+- `{{ .Org.Team }}` — Team name
+- `{{ .Org.CIProvider }}` — CI provider (e.g., "github-actions", "jenkins")
+
+### Environment Information
+- `{{ .Env.Default }}` — Default environment (e.g., "dev", "staging")
+- `{{ .Env.Environments }}` — List of supported environments
+
+### Documentation Links
+- `{{ .Docs.URL }}` — URL to project documentation
+- `{{ .Docs.APIURL }}` — URL to API documentation
+
+### Metadata
+- `{{ .Meta.CreatedAt }}` — When the project was created
+- `{{ .Meta.CreatedBy }}` — Username of project creator
+- `{{ .Meta.Year }}` — Current year (for license, copyright notices)
 
 ---
 
@@ -59,12 +106,12 @@ The following variables are available for use in your templates:
 ### Markdown Example
 
 ```
-# {{{.ProjectName}}}
+# {{ .Project.Name }}
 
-{{{.ProjectDescription}}}
+{{ .Project.Description }}
 
-Maintained by: {{{.ServiceOwner}}}
-Service port: {{{.ServicePort}}}
+Maintained by: {{ .Service.Owner }}
+Service port: {{ .Service.Port }}
 ```
 
 ### Go Example
@@ -75,7 +122,7 @@ package main
 import "fmt"
 
 func main() {
-    fmt.Println("Service {{{.ServiceName}}} ({{{.ServiceType}}}) running on port {{{.ServicePort}}}")
+    fmt.Println("Service {{ .Service.Name }} ({{ .Service.Type }}) running on port {{ .Service.Port }}")
 }
 ```
 
@@ -83,15 +130,21 @@ func main() {
 
 ```rust
 fn main() {
-    println!("Service {{{.ServiceName}}} ({{{.ServiceType}}}) running on port {{{.ServicePort}}}");
+    println!("Service {{ .Service.Name }} ({{ .Service.Type }}) running on port {{ .Service.Port }}");
 }
 ```
 
 ### Node.js Example
 
 ```js
-console.log(`Service {{{.ServiceName}}} ({{{.ServiceType}}}) running on port {{{.ServicePort}}}`);
+console.log(`Service {{ .Service.Name }} ({{ .Service.Type }}) running on port {{ .Service.Port }}`);
 ```
+
+---
+
+## Backward Compatibility
+
+If you have existing templates that use the old flat structure (e.g., `{{ .ProjectName }}`), you may need to update them to use the new namespaced structure (e.g., `{{ .Project.Name }}`).
 
 ---
 
@@ -101,7 +154,7 @@ The viaplay-cli template engine is based on Go's `text/template` package, which 
 
 - **Conditionals:**
   ```
-  {{if .IsPrivate}}
+  {{if .Repo.IsPrivate}}
   This repository is private.
   {{else}}
   This repository is public.
@@ -116,8 +169,8 @@ The viaplay-cli template engine is based on Go's `text/template` package, which 
 - **Functions:**
   You can use built-in functions like `upper`, `lower`, `title`, and more:
   ```
-  Project: {{upper .ProjectName}}
-  Owner: {{title .RepoOwner}}
+  Project: {{upper .Project.Name}}
+  Owner: {{title .Repo.Owner}}
   ```
 - **Nested Variables:**
   If your variables are structured, you can access nested fields:

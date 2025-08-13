@@ -1,4 +1,5 @@
-package scaffolding
+// Package output provides formatting utilities for CLI output.
+package output
 
 import (
 	"fmt"
@@ -10,17 +11,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// SimpleOutputWriter is a writer that formats and prints hook output
-type SimpleOutputWriter struct {
+// HookOutputWriter is a writer that formats and prints hook output
+type HookOutputWriter struct {
 	title       string
 	mu          sync.Mutex
 	content     strings.Builder
 	borderColor lipgloss.Color
 }
 
-// NewSimpleOutputWriter creates a new writer for hook output
-func NewSimpleOutputWriter(title string) *SimpleOutputWriter {
-	return &SimpleOutputWriter{
+// NewHookOutputWriter creates a new writer for hook output
+func NewHookOutputWriter(title string) *HookOutputWriter {
+	return &HookOutputWriter{
 		title:       title,
 		content:     strings.Builder{},
 		borderColor: "#E6007A", // Viaplay pink colour
@@ -28,7 +29,7 @@ func NewSimpleOutputWriter(title string) *SimpleOutputWriter {
 }
 
 // Write implements io.Writer
-func (w *SimpleOutputWriter) Write(p []byte) (n int, err error) {
+func (w *HookOutputWriter) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -55,7 +56,7 @@ func DisplayHookOutput(title string, runHookFn func(stdout, stderr io.Writer) er
 	fmt.Println()
 
 	// Create writer for output
-	writer := NewSimpleOutputWriter(title)
+	writer := NewHookOutputWriter(title)
 
 	// Run the hook with our writer
 	err := runHookFn(writer, writer)

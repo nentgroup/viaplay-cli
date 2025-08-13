@@ -66,7 +66,7 @@ tasks:
     cmds:
       - echo "Running tests with coverage report"
       - mkdir -p coverage
-      - go test -v ./... -coverprofile=coverage/coverage.out -covermode=count
+      - go test -tags=test -v ./... -coverprofile=coverage/coverage.out -covermode=atomic -coverpkg=./... -race
       - go tool cover -html=coverage/coverage.out -o coverage/coverage.html
       - echo "✅ Coverage report generated at coverage/coverage.html"
 
