@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0](https://github.com/nentgroup/viaplay-cli/compare/v0.4.0...v1.0.0) (2025-08-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* Update all templates accordingly.
+
+### Dependencies
+
+* **deps:** update actions/checkout action to v5 ([#25](https://github.com/nentgroup/viaplay-cli/issues/25)) ([1a37fab](https://github.com/nentgroup/viaplay-cli/commit/1a37fabaddb1b0c35bf5436eb1927dbf8e46bb3b))
+* **deps:** update dependency go to 1.25 ([#27](https://github.com/nentgroup/viaplay-cli/issues/27)) ([b75c611](https://github.com/nentgroup/viaplay-cli/commit/b75c61120bbbaa891abc8cde63201a2f5904faf6))
+
+
+### Code Refactoring
+
+* change template delimiters and tag naming ([#28](https://github.com/nentgroup/viaplay-cli/issues/28)) ([8788e8e](https://github.com/nentgroup/viaplay-cli/commit/8788e8e3f0b79aa3599e950a14a5d8ab59854ffa))
+
 ## [0.4.0](https://github.com/nentgroup/viaplay-cli/compare/v0.3.1...v0.4.0) (2025-08-10)
 
 
