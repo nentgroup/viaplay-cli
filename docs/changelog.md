@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/nentgroup/viaplay-cli/compare/v1.2.0...v1.2.1) (2025-08-14)
+
+
+### Bug Fixes
+
+* fix secrets parsing ([#33](https://github.com/nentgroup/viaplay-cli/issues/33)) ([48c20d4](https://github.com/nentgroup/viaplay-cli/commit/48c20d47abb5f8a789defe557738b94a7dc7a93a))
+
 ## [1.2.0](https://github.com/nentgroup/viaplay-cli/compare/v1.1.0...v1.2.0) (2025-08-13)
 
 
