@@ -142,12 +142,6 @@ console.log(`Service {{ .Service.Name }} ({{ .Service.Type }}) running on port {
 
 ---
 
-## Backward Compatibility
-
-If you have existing templates that use the old flat structure (e.g., `{{ .ProjectName }}`), you may need to update them to use the new namespaced structure (e.g., `{{ .Project.Name }}`).
-
----
-
 ## Advanced Go Template Features
 
 The viaplay-cli template engine is based on Go's `text/template` package, which supports advanced features such as:
@@ -172,6 +166,17 @@ The viaplay-cli template engine is based on Go's `text/template` package, which 
   Project: {{upper .Project.Name}}
   Owner: {{title .Repo.Owner}}
   ```
+
+- **Custom Formatting Functions:**
+  viaplay-cli provides special formatting functions to help with naming conventions:
+  ```
+  {{pascal .Project.Name}}    → Converts to PascalCase (e.g., "my-service" → "MyService")
+  {{kebab .Project.Name}}     → Converts to kebab-case (e.g., "MyService" → "my-service")
+  {{title .Project.Name}}     → Converts to Title Case (e.g., "my-service" → "My Service")
+  ```
+  These are particularly useful for generating code, filenames, and configuration that requires
+  specific naming formats.
+
 - **Nested Variables:**
   If your variables are structured, you can access nested fields:
   ```

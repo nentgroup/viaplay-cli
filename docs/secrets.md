@@ -31,8 +31,28 @@ Secrets are sensitive values (such as API keys, tokens, or passwords) that are r
 }
 ```
 
-- `env`: Target environment (empty string for repository-level, or the name of a GitHub environment)
+- `env`: Target environment where the secret/variable will be created
+  - When empty or omitted: Secret is created at the repository level (available to all workflows)
+  - When specified (e.g., "staging", "production"): Secret is created for that specific GitHub environment only
 - `type`: Either `secret` (encrypted) or `variable` (plain variable)
+
+### Scoping Secrets to Environments
+
+The `env` parameter lets you target secrets to specific deployment environments:
+
+```json
+{
+  "secrets": [
+    { "name": "API_KEY", "value": "${{ secrets.DEV_API_KEY }}", "env": "development", "type": "secret" },
+    { "name": "API_KEY", "value": "${{ secrets.PROD_API_KEY }}", "env": "production", "type": "secret" },
+    { "name": "GLOBAL_SECRET", "value": "${{ secrets.GLOBAL_SECRET }}", "type": "secret" }
+  ]
+}
+```
+
+In this example:
+- The same secret name `API_KEY` points to different values in different environments
+- `GLOBAL_SECRET` is available to all workflows since it has no environment restriction
 
 ---
 
@@ -74,6 +94,39 @@ Example usage with the CLI flag:
 ```bash
 vip create project --name myservice --repo-secrets '{"secrets":[{"name":"API_KEY","value":"${{ secrets.GH_TOKEN }}","type":"secret"}]}'
 ```
+
+## Using Template Variables in Secrets
+
+You can reference template variables in your secret values using Go template syntax. This is particularly useful for creating dynamic values that incorporate project information:
+
+```json
+{
+  "secrets": [
+    { 
+      "name": "RESOURCE_PREFIX", 
+      "value": "{{.Project.Name}}-resources",
+      "type": "variable"
+    },
+    {
+      "name": "STACK_NAME",
+      "value": "Dev-{{.Service.Name | pascal}}",
+      "type": "variable",
+      "env": "dev"
+    },
+    {
+      "name": "SERVICE_URL",
+      "value": "https://api.example.com/{{.Repo.Name | kebab}}/v1",
+      "type": "variable",
+      "env": "production"
+    }
+  ]
+}
+```
+
+In the example above:
+- The template function `pascal` converts "my-service" to "MyService"
+- The template function `kebab` ensures consistent kebab-case formatting
+- Any template variable from the project can be referenced
 
 > **Note:**
 > - Do not use `${{ secrets.SECRET_KEY }}` in your CI/CD pipeline YAML files or in templates. It is only resolved by viaplay-cli during repository setup.
