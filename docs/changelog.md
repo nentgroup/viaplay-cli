@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/nentgroup/viaplay-cli/compare/v1.2.1...v1.2.2) (2025-08-14)
+
+
+### Documentation
+
+* update documentation and add MIT license ([#35](https://github.com/nentgroup/viaplay-cli/issues/35)) ([a1c38fb](https://github.com/nentgroup/viaplay-cli/commit/a1c38fbf1ece3546cf3bb1b18cb6ac827056e9dc))
+
 ## [1.2.1](https://github.com/nentgroup/viaplay-cli/compare/v1.2.0...v1.2.1) (2025-08-14)
 
 
