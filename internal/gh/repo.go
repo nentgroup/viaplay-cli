@@ -3,6 +3,7 @@ package gh
 import (
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/google/go-github/v74/github"
 )
@@ -61,12 +62,12 @@ func (ghc *GitHubClient) RepositoryExists(owner, repo string) (bool, error) {
 		}
 
 		// For authentication errors, check the status code
-		if resp != nil && resp.StatusCode == 401 {
+		if resp.StatusCode == http.StatusUnauthorized {
 			return false, fmt.Errorf("not authorized to access this repository: %w", err)
 		}
 
 		// Fall back to checking the status code from the response
-		if resp != nil && resp.StatusCode != 404 {
+		if resp.StatusCode != http.StatusNotFound {
 			return true, nil // Repository likely exists but we have limited access
 		}
 
@@ -93,17 +94,17 @@ func (ghc *GitHubClient) DeleteRepo(owner, repo string) error {
 // AddLabelsToRepo adds labels to a GitHub repository
 func (ghc *GitHubClient) AddLabelsToRepo(owner, repo string, labels []string) error {
 	for _, label := range labels {
-		// Create a new label with default color (gray)
+		// Create a new label with default colour (gray)
 		newLabel := &github.Label{
 			Name:  github.Ptr(label),
-			Color: github.Ptr("ededed"), // Light gray color
+			Color: github.Ptr("ededed"), //nolint:misspell    // Light gray color
 		}
 
 		// Try to create the label
 		_, resp, err := ghc.client.Issues.CreateLabel(ghc.ctx, owner, repo, newLabel)
 
 		// If the label already exists (422 status code), that's fine, continue with the next one
-		if err != nil && (resp == nil || resp.StatusCode != 422) {
+		if err != nil && (resp == nil || resp.StatusCode != http.StatusUnprocessableEntity) {
 			return fmt.Errorf("failed to create label '%s': %w", label, err)
 		}
 	}

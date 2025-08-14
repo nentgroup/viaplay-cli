@@ -126,6 +126,9 @@ func (c *Factory) Create(opts Options) (*Summary, error) {
 	// Convert options to template variables with additional info
 	templateVars := optsToTemplateVars(opts)
 
+	// Store template variables for later use with secret resolution
+	c.templateVars = templateVars
+
 	// Set authenticated username if available
 	if username != "" {
 		templateVars.Meta.CreatedBy = username
@@ -387,4 +390,10 @@ func optsToTemplateVars(opts Options) *template.Variables {
 	// Docker variables
 	vars.Docker.ImageName = strings.ToLower(kebabName)
 	return vars
+}
+
+// getTemplateRenderer creates a template renderer with the current project's template variables
+func (c *Factory) getTemplateRenderer() *template.Renderer {
+	// Create a new renderer using the template variables
+	return template.NewRenderer(c.templateVars)
 }

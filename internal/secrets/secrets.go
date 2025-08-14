@@ -47,11 +47,15 @@ import (
 // This matches the structure used in secretsConfig.Secrets
 // (duplicated here to avoid import cycles and for helper use)
 type Secret struct {
-	Name      string
-	Value     string
-	Env       string
-	Type      string
-	Reference string
+	Name      string `json:"name"`
+	Value     string `json:"value"`
+	Env       string `json:"env,omitempty"`
+	Type      string `json:"type,omitempty"`      // "secret" or "variable"
+	Reference string `json:"reference,omitempty"` // Reference to another secret by name
+}
+
+type Config struct {
+	Secrets []Secret `json:"secrets"` // List of secrets defined in the configuration
 }
 
 // Helper functions
