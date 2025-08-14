@@ -231,6 +231,9 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 		return nil
 	}
 
+	// Create a renderer with the template variables
+	renderer := c.getTemplateRenderer()
+
 	// Track applied and failed rulesets
 	appliedCount := 0
 	failedRulesets := []string{}
@@ -256,9 +259,19 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 			continue
 		}
 
+		// Render the ruleset content with template variables
+		c.Reporter.Debug(fmt.Sprintf("Rendering ruleset %s with template variables", f.Name()))
+		renderedData, err := renderer.RenderString(string(data))
+		if err != nil {
+			errMsg := fmt.Sprintf("Failed to render ruleset %s with template variables: %v", f.Name(), err)
+			c.Reporter.Warning("Ruleset rendering", errMsg)
+			failedRulesets = append(failedRulesets, errMsg)
+			continue
+		}
+
 		// Unmarshal JSON directly into the GitHub API struct
 		var ruleset github.RepositoryRuleset
-		if err := json.Unmarshal(data, &ruleset); err != nil {
+		if err := json.Unmarshal([]byte(renderedData), &ruleset); err != nil {
 			errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", f.Name(), err)
 			c.Reporter.Warning("Ruleset processing", errMsg)
 			failedRulesets = append(failedRulesets, errMsg)
