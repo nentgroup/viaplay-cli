@@ -11,8 +11,8 @@ import (
 	"unicode"
 )
 
-// capitalize returns the string with the first rune capitalized
-func capitalize(s string) string {
+// capitalise returns the string with the first rune capitalised
+func capitalise(s string) string {
 	if s == "" {
 		return ""
 	}
@@ -29,7 +29,7 @@ func ToPascalCase(s string) string {
 
 	words := strings.Fields(s)
 	for i, w := range words {
-		words[i] = capitalize(w) // capitalize first letter
+		words[i] = capitalise(w) // capitalise first letter
 	}
 	return strings.Join(words, "")
 }
@@ -75,7 +75,7 @@ func ToTitleCase(s string) string {
 
 	words := strings.Fields(s)
 	for i, w := range words {
-		words[i] = capitalize(w) // capitalize first letter
+		words[i] = capitalise(w) // capitalise first letter
 	}
 	return strings.Join(words, " ")
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v74/github"
+
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
 )
 
@@ -22,14 +23,9 @@ func (c *Factory) applyConfigurations(opts Options) error {
 
 	// 1. Apply environments if requested
 	if opts.ApplyEnvs {
-		c.applyEnvs(opts.RepoOwner, opts.RepoName, teamDir)
-	} else {
-		// Create default staging environment if not applying team envs
-		err := c.GitHubClient.CreateEnvironment(opts.RepoOwner, opts.RepoName, "staging")
+		err := c.applyEnvs(opts.RepoOwner, opts.RepoName, teamDir)
 		if err != nil {
-			if !strings.Contains(err.Error(), "already exists") {
-				return fmt.Errorf("failed to create environment: %w", err)
-			}
+			return fmt.Errorf("failed to apply team environments: %w", err)
 		}
 	}
 
@@ -119,9 +115,8 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 			continue
 		}
 
-		var envConfig struct {
-			Name string `json:"name"`
-		}
+		// Parse the environment configuration
+		var envConfig EnvConf
 
 		// Parse JSON
 		if err := json.Unmarshal(data, &envConfig); err != nil {
@@ -139,19 +134,47 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 		// Update the main operation with current environment being processed
 		c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Creating environment: %s", envConfig.Name))
 
-		// Create the environment
-		if err := c.GitHubClient.CreateEnvironment(owner, repo, envConfig.Name); err != nil {
-			if strings.Contains(err.Error(), "already exists") {
-				c.Reporter.Debug(fmt.Sprintf("Environment %s already exists", envConfig.Name))
-			} else {
+		// Create the basic environment first
+		if err := c.GitHubClient.CreateEnvironment(owner, repo, envConfig.Name, envConfig.ToGitHubEnv()); err != nil {
+			if !strings.Contains(err.Error(), "already exists") {
 				errMsg := fmt.Sprintf("Failed to create environment %s: %v", envConfig.Name, err)
 				c.Reporter.Warning("Environment creation", errMsg)
 				failedEnvs = append(failedEnvs, errMsg)
+				continue
 			}
-		} else {
-			c.Reporter.Debug(fmt.Sprintf("Successfully created environment: %s", envConfig.Name))
-			appliedCount++
 		}
+
+		// Then apply deployment branch policy separately if present
+		if envConfig.DeploymentBranchPolicy != nil {
+			c.Reporter.Progress(mainOperation, 50, fmt.Sprintf("Applying branch patterns for %s", envConfig.Name))
+
+			// In v74, we can't directly set protected vs custom branch policies
+			// Instead, we'll focus on adding the branch patterns if they're provided
+
+			// If we have branch patterns defined, add them directly to the environment
+			if len(envConfig.DeploymentBranchPolicy.BranchPatterns) > 0 {
+				for _, pattern := range envConfig.DeploymentBranchPolicy.BranchPatterns {
+					// Extract the actual pattern string from the DeploymentBranchPolicyRequest object
+					patternStr := pattern.GetName()
+
+					c.Reporter.Progress(mainOperation, 75, fmt.Sprintf("Adding branch pattern '%s' to %s", patternStr, envConfig.Name))
+
+					// Apply the branch pattern
+					if err := c.GitHubClient.CreateCustomBranchPolicy(owner, repo, envConfig.Name, pattern); err != nil {
+						errMsg := fmt.Sprintf("Failed to add branch pattern '%s' for %s: %v", patternStr, envConfig.Name, err)
+						c.Reporter.Warning("Branch pattern", errMsg)
+						// Don't fail the entire operation because of one pattern
+					} else {
+						c.Reporter.Debug(fmt.Sprintf("Added branch pattern '%s' to %s", patternStr, envConfig.Name))
+					}
+				}
+			} else {
+				c.Reporter.Debug(fmt.Sprintf("No branch patterns specified for %s", envConfig.Name))
+			}
+		}
+
+		c.Reporter.Debug(fmt.Sprintf("Successfully created environment: %s", envConfig.Name))
+		appliedCount++
 	}
 
 	// Return a summary error if any environments failed
@@ -283,6 +306,16 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 	mainOperation := "Applying team secrets"
 	c.Reporter.Start(mainOperation, "")
 
+	// Expand tilde in path if it exists
+	if strings.HasPrefix(teamDir, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			c.Reporter.Failed(mainOperation, err, "Failed to get user home directory")
+			return fmt.Errorf("failed to get user home directory: %w", err)
+		}
+		teamDir = filepath.Join(home, teamDir[1:])
+	}
+
 	secretsPath := filepath.Join(teamDir, "secrets.json")
 	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
 		c.Reporter.Skip(mainOperation, "No secrets.json file found")
@@ -295,18 +328,21 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 		return fmt.Errorf("failed to read secrets file: %w", err)
 	}
 
-	var secretsConfig struct {
-		Secrets []struct {
-			Name      string `json:"name"`
-			Value     string `json:"value"`
-			Env       string `json:"env,omitempty"`
-			Type      string `json:"type,omitempty"`      // "secret" or "variable"
-			Reference string `json:"reference,omitempty"` // Reference to another secret by name
-		} `json:"secrets"`
+	// Create a renderer with the template variables
+	renderer := c.getTemplateRenderer()
+	c.Reporter.Debug("Rendering secrets.json with template variables")
+
+	// Render the secrets.json content with template variables
+	renderedData, err := renderer.RenderString(string(data))
+	if err != nil {
+		c.Reporter.Failed(mainOperation, err, "Failed to render secrets.json with template variables")
+		return fmt.Errorf("failed to render secrets.json with template variables: %w", err)
 	}
 
-	// Parse JSON
-	if err := json.Unmarshal(data, &secretsConfig); err != nil {
+	var secretsConfig secrets.Config
+
+	// Parse the rendered JSON
+	if err := json.Unmarshal([]byte(renderedData), &secretsConfig); err != nil {
 		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to parse JSON in %s", secretsPath))
 		return fmt.Errorf("failed to parse secrets JSON: %w", err)
 	}
@@ -337,40 +373,31 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 
 	// Second pass to apply secrets, including those with references
 	appliedCount := 0
-	for _, s := range secretsConfig.Secrets {
-		if s.Name == "" {
+	for _, secret := range secretsConfig.Secrets {
+		if secret.Name == "" {
 			continue // Skip again
-		}
-
-		// Convert anonymous struct to Secret type for helper compatibility
-		secret := secrets.Secret{
-			Name:      s.Name,
-			Value:     s.Value,
-			Env:       s.Env,
-			Type:      s.Type,
-			Reference: s.Reference,
 		}
 
 		secretValue, valueSource, ok := secrets.GetSecretValueAndSource(secret, secretValues)
 		if !ok {
-			if s.Reference != "" {
-				c.Reporter.Warning("Secret reference", fmt.Sprintf("Referenced secret '%s' not found for '%s'", s.Reference, s.Name))
+			if secret.Reference != "" {
+				c.Reporter.Warning("Secret reference", fmt.Sprintf("Referenced secret '%s' not found for '%s'", secret.Reference, secret.Name))
 			}
 			continue
 		}
 
 		if secretValue == "" {
-			c.Reporter.Skip("Secret processing", fmt.Sprintf("Skipping secret '%s' with empty value", s.Name))
+			c.Reporter.Skip("Secret processing", fmt.Sprintf("Skipping secret '%s' with empty value", secret.Name))
 			continue
 		}
 
-		isVariable := s.Type == "variable"
-		if err := c.applySecretOrVariable(isVariable, owner, repo, s.Name, secretValue, s.Env, valueSource); err != nil {
+		isVariable := secret.Type == "variable"
+		if err := c.applySecretOrVariable(isVariable, owner, repo, secret.Name, secretValue, secret.Env, valueSource); err != nil {
 			c.Reporter.Warning("Secret application", fmt.Sprintf("Failed to apply %s '%s': %v",
 				secret.Type, secret.Name, err))
 		} else {
 			c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Applied %s: %s (env: %s, source: %s)",
-				valueOrEmpty(s.Type, "secret"), s.Name, valueOrEmpty(s.Env, "repo"), valueSource))
+				valueOrEmpty(secret.Type, "secret"), secret.Name, valueOrEmpty(secret.Env, "repo"), valueSource))
 			appliedCount++
 		}
 	}
@@ -389,6 +416,17 @@ func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
 	mainOperation := "Applying repository-specific secrets"
 	c.Reporter.Start(mainOperation, "")
 
+	// Create a renderer with the template variables
+	renderer := c.getTemplateRenderer()
+	c.Reporter.Debug("Rendering repository secrets JSON with template variables")
+
+	// Render the secrets JSON with template variables
+	renderedJSON, err := renderer.RenderString(secretsJSON)
+	if err != nil {
+		c.Reporter.Failed(mainOperation, err, "Failed to render repository secrets JSON with template variables")
+		return fmt.Errorf("failed to render repository secrets JSON with template variables: %w", err)
+	}
+
 	var repoSecretsConfig struct {
 		Secrets []struct {
 			Name      string `json:"name"`
@@ -399,8 +437,8 @@ func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
 		} `json:"secrets"`
 	}
 
-	// Parse the JSON string
-	if err := json.Unmarshal([]byte(secretsJSON), &repoSecretsConfig); err != nil {
+	// Parse the rendered JSON string
+	if err := json.Unmarshal([]byte(renderedJSON), &repoSecretsConfig); err != nil {
 		c.Reporter.Failed(mainOperation, err, "Failed to parse repository secrets JSON")
 		return fmt.Errorf("failed to parse repository secrets JSON: %w", err)
 	}
@@ -418,7 +456,7 @@ func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
 		prefixedName := secrets.SanitizeSecretName(fmt.Sprintf("%s_%s", repo, s.Name))
 		envScope := s.Env
 
-		secretValue, _, _, err := secrets.ResolveSecretValue(s.Value, s.Name)
+		secretValue, sourceType, sourceKey, err := secrets.ResolveSecretValue(s.Value, s.Name)
 		if err != nil {
 			errMsg := fmt.Sprintf("Error resolving secret value for '%s': %v", s.Name, err)
 			c.Reporter.Warning("Secret resolution", errMsg)
@@ -429,6 +467,11 @@ func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
 		if secretValue == "" {
 			c.Reporter.Skip("Secret processing", fmt.Sprintf("Skipping secret '%s' with empty value", s.Name))
 			continue
+		}
+
+		// Debug info about resolution
+		if sourceType != "config" {
+			c.Reporter.Debug(fmt.Sprintf("Resolved '%s' from %s: '%s'", s.Name, sourceType, sourceKey))
 		}
 
 		isVariable := s.Type == "variable"

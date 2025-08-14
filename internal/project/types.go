@@ -1,12 +1,15 @@
 package project
 
 import (
+	"github.com/google/go-github/v74/github"
+
 	"github.com/nentgroup/viaplay-cli/internal/cache"
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/progress"
 	"github.com/nentgroup/viaplay-cli/internal/registry"
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
+	"github.com/nentgroup/viaplay-cli/internal/template"
 )
 
 // Summary contains details about the created project to be displayed to the user
@@ -44,6 +47,8 @@ type Factory struct {
 
 	// Progress reporter for tracking operation progress
 	Reporter progress.Reporter
+
+	templateVars *template.Variables
 }
 
 // Options contains all options for creating a new project
@@ -78,4 +83,38 @@ type Options struct {
 
 	// Error handling options
 	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur
+}
+
+// EnvConf represents the configuration for a GitHub environment.
+// Notice that it contains Also BranchPatterns for convenience, nut shall not be confused with
+// github.CreateUpdateEnvironment which is used to create environments in GitHub.
+type EnvConf struct {
+	Name                   string                 `json:"name"`
+	WaitTimer              int                    `json:"wait_timer,omitempty"`
+	PreventSelfReview      bool                   `json:"prevent_self_review,omitempty"`
+	DeploymentBranchPolicy *CustomBranchPolicy    `json:"deployment_branch_policy,omitempty"`
+	Reviewers              []*github.EnvReviewers `json:"reviewers,omitempty"`
+}
+
+type CustomBranchPolicy struct {
+	ProtectedBranches    bool                                    `json:"protected_branches,omitempty"`
+	CustomBranchPolicies bool                                    `json:"custom_branch_policies,omitempty"`
+	BranchPatterns       []*github.DeploymentBranchPolicyRequest `json:"branch_patterns,omitempty"`
+}
+
+func (e EnvConf) ToGitHubEnv() *github.CreateUpdateEnvironment {
+	env := &github.CreateUpdateEnvironment{
+		WaitTimer:         github.Ptr(e.WaitTimer),
+		PreventSelfReview: github.Ptr(e.PreventSelfReview),
+		Reviewers:         e.Reviewers,
+	}
+
+	if e.DeploymentBranchPolicy != nil {
+		env.DeploymentBranchPolicy = &github.BranchPolicy{
+			ProtectedBranches:    github.Ptr(e.DeploymentBranchPolicy.ProtectedBranches),
+			CustomBranchPolicies: github.Ptr(e.DeploymentBranchPolicy.CustomBranchPolicies),
+		}
+	}
+
+	return env
 }

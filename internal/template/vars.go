@@ -18,7 +18,7 @@ type ProjectInfo struct {
 
 // RepoInfo contains repository-specific information
 type RepoInfo struct {
-	Owner     string // GitHub username or organization name
+	Owner     string // GitHub username or organisation name
 	Name      string // Repository name (often same as ProjectName)
 	URL       string // Full GitHub repository URL (HTTPS)
 	SSHURL    string // SSH URL for the repository
@@ -86,9 +86,9 @@ type DockerInfo struct {
 	K8sNamespace string // Kubernetes namespace
 }
 
-// OrgInfo contains organizational information
+// OrgInfo contains organisational information
 type OrgInfo struct {
-	Name       string // Organization name
+	Name       string // Organisation name
 	Team       string // Team name
 	CIProvider string // CI provider (e.g., "github-actions", "jenkins")
 }
