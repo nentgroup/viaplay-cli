@@ -375,9 +375,10 @@ func optsToTemplateVars(opts Options) *template.Variables {
 	binaryName = strings.ToLower(binaryName)
 
 	// Set binary name based on language
-	if opts.Language == "go" {
+	switch opts.Language {
+	case "go":
 		vars.Go.BinaryName = binaryName
-	} else if opts.Language == "rust" {
+	case "rust":
 		vars.Rust.BinaryName = binaryName
 		vars.Rust.CargoName = strings.ReplaceAll(kebabName, "-", "_") // Cargo names conventionally use underscores
 	}

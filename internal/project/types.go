@@ -2,6 +2,7 @@ package project
 
 import (
 	"github.com/google/go-github/v74/github"
+
 	"github.com/nentgroup/viaplay-cli/internal/cache"
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"

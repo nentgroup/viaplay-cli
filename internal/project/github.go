@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v74/github"
+
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
 )
 
@@ -153,16 +154,18 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 			// If we have branch patterns defined, add them directly to the environment
 			if len(envConfig.DeploymentBranchPolicy.BranchPatterns) > 0 {
 				for _, pattern := range envConfig.DeploymentBranchPolicy.BranchPatterns {
+					// Extract the actual pattern string from the DeploymentBranchPolicyRequest object
+					patternStr := pattern.GetName()
 
-					c.Reporter.Progress(mainOperation, 75, fmt.Sprintf("Adding branch pattern '%s' to %s", pattern, envConfig.Name))
+					c.Reporter.Progress(mainOperation, 75, fmt.Sprintf("Adding branch pattern '%s' to %s", patternStr, envConfig.Name))
 
 					// Apply the branch pattern
 					if err := c.GitHubClient.CreateCustomBranchPolicy(owner, repo, envConfig.Name, pattern); err != nil {
-						errMsg := fmt.Sprintf("Failed to add branch pattern '%s' for %s: %v", pattern, envConfig.Name, err)
+						errMsg := fmt.Sprintf("Failed to add branch pattern '%s' for %s: %v", patternStr, envConfig.Name, err)
 						c.Reporter.Warning("Branch pattern", errMsg)
 						// Don't fail the entire operation because of one pattern
 					} else {
-						c.Reporter.Debug(fmt.Sprintf("Added branch pattern '%s' to %s", pattern, envConfig.Name))
+						c.Reporter.Debug(fmt.Sprintf("Added branch pattern '%s' to %s", patternStr, envConfig.Name))
 					}
 				}
 			} else {
