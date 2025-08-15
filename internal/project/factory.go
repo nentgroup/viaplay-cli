@@ -124,7 +124,7 @@ func (c *Factory) Create(opts Options) (*Summary, error) {
 	}
 
 	// Convert options to template variables with additional info
-	templateVars := optsToTemplateVars(opts)
+	templateVars := c.optsToTemplateVars(opts)
 
 	// Store template variables for later use with secret resolution
 	c.templateVars = templateVars
@@ -319,8 +319,8 @@ func valueOrEmpty(value, defaultValue string) string {
 	return value
 }
 
-// Helper to convert Options to *template.Variables
-func optsToTemplateVars(opts Options) *template.Variables {
+// optsToTemplateVars converts project creation options to template variables
+func (c *Factory) optsToTemplateVars(opts Options) *template.Variables {
 	vars := template.NewTemplateVariables()
 
 	// Keep original input name
@@ -356,6 +356,19 @@ func optsToTemplateVars(opts Options) *template.Variables {
 	vars.Service.Name = kebabName // Use kebab case for service name
 	vars.Service.Owner = opts.Team
 	vars.Service.OwnerKey = strings.ToLower(strings.ReplaceAll(opts.Team, " ", "-"))
+
+	// If this is an organization repo and we have a team name, try to fetch the team ID
+	if opts.IsOrg && opts.Team != "" {
+		c.Reporter.Debug(fmt.Sprintf("Attempting to fetch team ID for '%s' in org '%s'", opts.Team, opts.RepoOwner))
+		teamID, err := c.GitHubClient.GetTeamID(opts.RepoOwner, opts.Team)
+		if err != nil {
+			c.Reporter.Warning("Team ID", fmt.Sprintf("Could not fetch team ID: %v", err))
+		} else {
+			vars.Org.TeamID = teamID
+			c.Reporter.Debug(fmt.Sprintf("Successfully fetched team ID %d for team '%s'", teamID, opts.Team))
+			vars.Org.Name = opts.RepoOwner // Set organization name
+		}
+	}
 
 	// Handle binary name for compiled languages (Go, Rust, etc.)
 	binaryName := kebabName // Start with kebab case version

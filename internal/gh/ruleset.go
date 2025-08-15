@@ -12,8 +12,9 @@ func SetBranchProtection(ctx context.Context, client *github.Client, owner, repo
 	return err
 }
 
-// CreateRuleset creates a ruleset for a repository or organisation.
+// CreateRuleset creates or updates a GitHub repository ruleset
 func (ghc *GitHubClient) CreateRuleset(owner, repo string, ruleset github.RepositoryRuleset) error {
+	// Create the ruleset
 	_, _, err := ghc.client.Repositories.CreateRuleset(ghc.ctx, owner, repo, ruleset)
 	return err
 }

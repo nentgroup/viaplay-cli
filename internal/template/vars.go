@@ -90,6 +90,7 @@ type DockerInfo struct {
 type OrgInfo struct {
 	Name       string // Organisation name
 	Team       string // Team name
+	TeamID     int64  // GitHub team ID (used for repository permissions)
 	CIProvider string // CI provider (e.g., "github-actions", "jenkins")
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v74/github"
+	"github.com/nentgroup/viaplay-cli/internal/gh"
 
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
 )
@@ -231,6 +232,9 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 		return nil
 	}
 
+	// Create a renderer with the template variables
+	renderer := c.getTemplateRenderer()
+
 	// Track applied and failed rulesets
 	appliedCount := 0
 	failedRulesets := []string{}
@@ -256,9 +260,19 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 			continue
 		}
 
+		// Render the ruleset content with template variables
+		c.Reporter.Debug(fmt.Sprintf("Rendering ruleset %s with template variables", f.Name()))
+		renderedData, err := renderer.RenderString(string(data))
+		if err != nil {
+			errMsg := fmt.Sprintf("Failed to render ruleset %s with template variables: %v", f.Name(), err)
+			c.Reporter.Warning("Ruleset rendering", errMsg)
+			failedRulesets = append(failedRulesets, errMsg)
+			continue
+		}
+
 		// Unmarshal JSON directly into the GitHub API struct
 		var ruleset github.RepositoryRuleset
-		if err := json.Unmarshal(data, &ruleset); err != nil {
+		if err := json.Unmarshal([]byte(renderedData), &ruleset); err != nil {
 			errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", f.Name(), err)
 			c.Reporter.Warning("Ruleset processing", errMsg)
 			failedRulesets = append(failedRulesets, errMsg)
@@ -535,6 +549,18 @@ func (c *Factory) createRepository(opts Options) (string, error) {
 	repoURL, err := c.GitHubClient.CreateRepo(opts.RepoName, org, opts.IsPrivate, opts.RepoDescription)
 	if err != nil {
 		return "", err
+	}
+
+	// If this is an organization repository and we have a team, add it as admin to the repository
+	if opts.IsOrg && opts.Team != "" {
+		c.Reporter.Progress("Repository Setup", 50, fmt.Sprintf("Adding team '%s' as admin to repository", opts.Team))
+		err := c.GitHubClient.AddTeamToRepository(org, opts.RepoName, opts.Team, gh.TeamPermissionAdmin)
+		if err != nil {
+			c.Reporter.Warning("Team Permission", fmt.Sprintf("Failed to add team '%s' as admin: %v", opts.Team, err))
+			// Don't fail the entire operation - this is a non-critical enhancement
+		} else {
+			c.Reporter.Debug(fmt.Sprintf("Successfully added team '%s' as admin to repository", opts.Team))
+		}
 	}
 
 	// Generate appropriate topics for the repository
