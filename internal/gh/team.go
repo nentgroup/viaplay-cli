@@ -8,6 +8,50 @@ import (
 	"github.com/google/go-github/v74/github"
 )
 
+// TeamPermission represents the permission level for a team in a repository
+type TeamPermission string
+
+const (
+	// TeamPermissionPull represents read-only access
+	TeamPermissionPull TeamPermission = "pull"
+	// TeamPermissionTriage represents triage access (can manage issues and PRs without write access)
+	TeamPermissionTriage TeamPermission = "triage"
+	// TeamPermissionPush represents write access
+	TeamPermissionPush TeamPermission = "push"
+	// TeamPermissionMaintain represents maintain access (can manage issues, PRs, and some repository settings)
+	TeamPermissionMaintain TeamPermission = "maintain"
+	// TeamPermissionAdmin represents admin access (full control of the repository)
+	TeamPermissionAdmin TeamPermission = "admin"
+)
+
+// AddTeamToRepository adds a team to a repository with the specified permission
+func (ghc *GitHubClient) AddTeamToRepository(org, repo, team string, permission TeamPermission) error {
+	// Parameter validation
+	if org == "" {
+		return fmt.Errorf("organization name is required")
+	}
+	if repo == "" {
+		return fmt.Errorf("repository name is required")
+	}
+	if team == "" {
+		return fmt.Errorf("team name is required")
+	}
+
+	// GitHub API uses "slug" format for team names in the URL, so we convert spaces to hyphens
+	// and make it lowercase to match GitHub's behavior
+	teamSlug := strings.ToLower(strings.ReplaceAll(team, " ", "-"))
+
+	// Add team to the repository
+	_, err := ghc.client.Teams.AddTeamRepoBySlug(ghc.ctx, org, teamSlug, org, repo, &github.TeamAddTeamRepoOptions{
+		Permission: string(permission),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add team '%s' to repository '%s/%s': %w", team, org, repo, err)
+	}
+
+	return nil
+}
+
 // GetTeamID fetches the ID for a team by its name within an organization
 func (ghc *GitHubClient) GetTeamID(org, teamName string) (int64, error) {
 	// Parameter validation

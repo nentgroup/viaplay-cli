@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v74/github"
+	"github.com/nentgroup/viaplay-cli/internal/gh"
 
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
 )
@@ -548,6 +549,18 @@ func (c *Factory) createRepository(opts Options) (string, error) {
 	repoURL, err := c.GitHubClient.CreateRepo(opts.RepoName, org, opts.IsPrivate, opts.RepoDescription)
 	if err != nil {
 		return "", err
+	}
+
+	// If this is an organization repository and we have a team, add it as admin to the repository
+	if opts.IsOrg && opts.Team != "" {
+		c.Reporter.Progress("Repository Setup", 50, fmt.Sprintf("Adding team '%s' as admin to repository", opts.Team))
+		err := c.GitHubClient.AddTeamToRepository(org, opts.RepoName, opts.Team, gh.TeamPermissionAdmin)
+		if err != nil {
+			c.Reporter.Warning("Team Permission", fmt.Sprintf("Failed to add team '%s' as admin: %v", opts.Team, err))
+			// Don't fail the entire operation - this is a non-critical enhancement
+		} else {
+			c.Reporter.Debug(fmt.Sprintf("Successfully added team '%s' as admin to repository", opts.Team))
+		}
 	}
 
 	// Generate appropriate topics for the repository
