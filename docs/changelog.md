@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/nentgroup/viaplay-cli/compare/v1.2.2...v1.3.0) (2025-08-15)
+
+
+### Features
+
+* add support for org teams ([#37](https://github.com/nentgroup/viaplay-cli/issues/37)) ([964e2c1](https://github.com/nentgroup/viaplay-cli/commit/964e2c100e0327b8e1c66a76e3c0af1a221c2407))
+
 ## [1.2.2](https://github.com/nentgroup/viaplay-cli/compare/v1.2.1...v1.2.2) (2025-08-14)
 
 
