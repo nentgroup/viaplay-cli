@@ -33,6 +33,38 @@ default_type: "service"
 default_private: true
 
 # -----------------------------------------------
+# Default Behavior Settings
+# -----------------------------------------------
+
+# Apply team environments to new repositories by default
+# When true, environments from team config will be applied without needing --apply-envs flag
+apply_envs: true
+
+# Apply team secrets to new repositories by default
+# When true, secrets from team config will be applied without needing --apply-secrets flag
+apply_secrets: true
+
+# Apply team rulesets to new repositories by default
+# When true, rulesets from team config will be applied without needing --apply-rulesets flag
+apply_rulesets: true
+
+# Clean up resources on error by default
+# When true, any created resources (repos, directories) will be deleted if an error occurs
+cleanup_on_error: true
+
+# Skip post-installation hooks by default
+# When true, post-installation scripts won't run unless explicitly enabled with --hooks
+skip_hooks: false
+
+# Skip repository creation by default
+# When true, only scaffolds local project without creating GitHub repository
+skip_repo: false
+
+# Disable caching by default
+# When true, templates won't be cached
+no_cache: false
+
+# -----------------------------------------------
 # Project Templates
 # -----------------------------------------------
 

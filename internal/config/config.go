@@ -37,6 +37,15 @@ type Configuration struct {
 	DefaultPrivate  bool
 	IsOrg           bool
 
+	// Default flags for project creation
+	ApplyEnvs      bool // Default for applying environments
+	ApplySecrets   bool // Default for applying secrets
+	ApplyRulesets  bool // Default for applying rulesets
+	CleanupOnError bool // Default for cleanup on error
+	SkipHooks      bool // Default for skipping post-installation hooks
+	SkipRepo       bool // Default for skipping repository creation
+	NoCache        bool // Default for disabling caching
+
 	// Template mappings
 	Templates map[string]map[string]string
 }
@@ -136,6 +145,15 @@ func LoadConfig() (*Configuration, error) {
 		DefaultType:     viper.GetString("default_type"),
 		DefaultPrivate:  viper.GetBool("default_private"),
 		IsOrg:           viper.GetBool("is_org"),
+
+		// Load flag default values
+		ApplyEnvs:      viper.GetBool("apply_envs"),
+		ApplySecrets:   viper.GetBool("apply_secrets"),
+		ApplyRulesets:  viper.GetBool("apply_rulesets"),
+		CleanupOnError: viper.GetBool("cleanup_on_error"),
+		SkipHooks:      viper.GetBool("skip_hooks"),
+		SkipRepo:       viper.GetBool("skip_repo"),
+		NoCache:        viper.GetBool("no_cache"),
 
 		Templates: make(map[string]map[string]string),
 	}

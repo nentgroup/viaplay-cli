@@ -114,7 +114,6 @@ Use this for a complete project setup experience.`,
 	cmd.Flags().BoolVar(&opts.NoRepo, "no-repo", false, "Skip GitHub repository creation (local project only)")
 	cmd.Flags().BoolVar(&opts.SkipHooks, "skip-hooks", false, "Skip running post-installation hooks")
 	cmd.Flags().BoolVar(&opts.NoCache, "no-cache", false, "Force update of template cache (ignore cached templates)")
-
 	return cmd
 }
 
@@ -150,23 +149,59 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 	cmd.Flags().StringVar(&opts.RepoName, "name", "", "Repository name (required)")
 	cmd.Flags().StringVar(&opts.Description, "description", "", "Repository description")
 	cmd.Flags().BoolVar(&opts.Public, "public", false, "Create a public repository (default is private)")
+	cmd.Flags().StringVar(&opts.RepoSecrets, "repo-secrets", "", "JSON string containing repository-specific secrets")
+	cmd.Flags().StringVar(&opts.SecretsFile, "secrets-file", "", "Path to a JSON file containing repository-specific secrets")
 
-	// Team flags
-	cmd.Flags().StringVar(&opts.Team, "team", "", "Team name to use for configs (overrides default)")
-	cmd.Flags().BoolVar(&opts.ApplyEnvs, "apply-envs", false, "Apply environment configs from team settings")
-	cmd.Flags().BoolVar(&opts.ApplyRulesets, "apply-rulesets", false, "Apply ruleset configs from team settings")
-	cmd.Flags().BoolVar(&opts.ApplySecrets, "apply-secrets", false, "Apply secret configs from team settings")
+	// Team/organization flags
+	cmd.Flags().StringVar(&opts.Team, "team", "", "Team name for loading configuration templates")
 
-	// Secret flags
-	cmd.Flags().StringVar(&opts.RepoSecrets, "secrets", "", "JSON string with repository-specific secrets")
-	cmd.Flags().StringVar(&opts.SecretsFile, "secrets-file", "", "Path to JSON file with repository-specific secrets")
+	// Define flags without setting Viper defaults at initialization time
+	cmd.Flags().BoolVar(&opts.ApplyEnvs, "apply-envs", false, "Apply environments from team configuration")
+	cmd.Flags().BoolVar(&opts.ApplyRulesets, "apply-rulesets", false, "Apply rulesets from team configuration")
+	cmd.Flags().BoolVar(&opts.ApplySecrets, "apply-secrets", false, "Apply secrets from team configuration")
+	cmd.Flags().BoolVar(&opts.CleanupOnError, "cleanup-on-error", false, "Clean up resources on error")
 
-	// Error handling flags
-	cmd.Flags().BoolVar(&opts.CleanupOnError, "cleanup-on-error", false, "Clean up resources (delete project folder and repo) if errors occur during creation")
+	// Add a PreRun hook to set the defaults from Viper at runtime
+	originalPreRun := cmd.PreRunE
+	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		// Only apply defaults if flag wasn't explicitly set by user
+		if !cmd.Flags().Changed("team") {
+			opts.Team = viper.GetString("default_team")
+		}
+		if !cmd.Flags().Changed("apply-envs") {
+			opts.ApplyEnvs = viper.GetBool("apply_envs")
+		}
+		if !cmd.Flags().Changed("apply-rulesets") {
+			opts.ApplyRulesets = viper.GetBool("apply_rulesets")
+		}
+		if !cmd.Flags().Changed("apply-secrets") {
+			opts.ApplySecrets = viper.GetBool("apply_secrets")
+		}
+		if !cmd.Flags().Changed("cleanup-on-error") {
+			opts.CleanupOnError = viper.GetBool("cleanup_on_error")
+		}
+
+		// Add the project-specific flag defaults from Viper
+		if !cmd.Flags().Changed("no-repo") {
+			opts.NoRepo = viper.GetBool("skip_repo")
+		}
+		if !cmd.Flags().Changed("skip-hooks") {
+			opts.SkipHooks = viper.GetBool("skip_hooks")
+		}
+		if !cmd.Flags().Changed("no-cache") {
+			opts.NoCache = viper.GetBool("no_cache")
+		}
+
+		// Run the original PreRun if it exists
+		if originalPreRun != nil {
+			return originalPreRun(cmd, args)
+		}
+		return nil
+	}
 
 	// Mark required flags
 	if err := cmd.MarkFlagRequired("name"); err != nil {
-		fmt.Printf("Failed to mark 'name' flag as required: %v\n", err)
+		fmt.Printf("Warning: failed to mark required flag 'name': %v\n", err)
 	}
 }
 
@@ -212,6 +247,15 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 	if !opts.NoRepo && !validateRepositoryDoesNotExist(ghClient, repoParams.owner, repoParams.name) {
 		output.FatalError(fmt.Sprintf("Repository already exists: %s/%s", repoParams.owner, repoParams.name))
 		return nil
+	}
+
+	// Debug info about command options when in verbose mode
+	if viper.GetBool("verbose") {
+		output.VerboseMessage(fmt.Sprintf("Command options: name=%s, language=%s, type=%s, team=%s",
+			opts.RepoName, opts.Language, opts.ProjectType, opts.Team))
+		output.VerboseMessage(fmt.Sprintf("Config settings: apply-envs=%t, apply-rulesets=%t, apply-secrets=%t, no-repo=%t",
+			opts.ApplyEnvs, opts.ApplyRulesets, opts.ApplySecrets, opts.NoRepo))
+		output.VerboseMessage(fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed()))
 	}
 
 	// Create the project using the Factory
