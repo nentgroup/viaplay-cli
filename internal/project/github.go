@@ -17,7 +17,7 @@ import (
 func (c *Factory) applyConfigurations(opts Options) error {
 	teamDir := filepath.Join(opts.ConfigDir, "teams", opts.Team)
 
-	// Skip all GitHub configurations if SkipRepo is true
+	// Skip all GitHub configurations if NoRepo is true
 	if opts.SkipRepo {
 		return nil
 	}

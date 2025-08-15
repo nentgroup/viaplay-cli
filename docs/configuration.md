@@ -75,11 +75,11 @@ cleanup_on_error: true
 
 # Skip post-installation hooks by default
 # When true, post-installation scripts won't run unless explicitly enabled with --hooks
-skip_hooks: false
+no_hooks: false
 
 # Skip repository creation by default
 # When true, only scaffolds local project without creating GitHub repository
-skip_repo: false
+no_repo: false
 
 # Disable caching by default
 # When true, templates won't be cached
@@ -235,7 +235,7 @@ Rulesets define branch protection and repository rules for GitHub repositories. 
 
 ## Post-Installation Hooks
 
-Hooks allow you to run commands or scripts after project creation. They are defined in the template configurations and run automatically unless disabled with the `--skip-hooks` flag during project creation.
+Hooks allow you to run commands or scripts after project creation. They are defined in the template configurations and run automatically unless disabled with the `--no-hooks` flag during project creation.
 
 ### Hook Configuration
 
@@ -245,7 +245,7 @@ Hooks are configured under the `templates` section in your config file, associat
 templates:
   go:
     service:
-      source: github@github.com/nentgroup/go-service-template.git
+      source: github@github.com:nentgroup/go-service-template.git
       hooks:
         post:
           install:
@@ -300,7 +300,7 @@ Hooks are automatically executed after a project is scaffolded using the `vip cr
 vip create project --name myservice --language go --type service
 
 # Create a project but skip executing hooks
-vip create project --name myservice --language go --type service --skip-hooks
+vip create project --name myservice --language go --type service --no-hooks
 ```
 
 ### Locating Hook Scripts

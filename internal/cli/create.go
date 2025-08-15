@@ -40,7 +40,7 @@ type CreateCommandOptions struct {
 	TemplateSource string
 	OutputDir      string
 	BinaryName     string
-	SkipHooks      bool
+	NoHooks        bool
 	NoCache        bool // Force template cache update
 
 	// Error handling options
@@ -112,7 +112,7 @@ Use this for a complete project setup experience.`,
 	cmd.Flags().StringVar(&opts.OutputDir, "output-dir", "", "Directory to create the project in (defaults to current dir + repo name)")
 	cmd.Flags().StringVar(&opts.BinaryName, "binary-name", "", "Name of the compiled binary (for compiled languages like Go and Rust)")
 	cmd.Flags().BoolVar(&opts.NoRepo, "no-repo", false, "Skip GitHub repository creation (local project only)")
-	cmd.Flags().BoolVar(&opts.SkipHooks, "skip-hooks", false, "Skip running post-installation hooks")
+	cmd.Flags().BoolVar(&opts.NoHooks, "no-hooks", false, "Skip running post-installation hooks")
 	cmd.Flags().BoolVar(&opts.NoCache, "no-cache", false, "Force update of template cache (ignore cached templates)")
 	return cmd
 }
@@ -148,7 +148,8 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 	// Repository flags
 	cmd.Flags().StringVar(&opts.RepoName, "name", "", "Repository name (required)")
 	cmd.Flags().StringVar(&opts.Description, "description", "", "Repository description")
-	cmd.Flags().BoolVar(&opts.Public, "public", false, "Create a public repository (default is private)")
+	cmd.Flags().BoolVar(&opts.Public, "public", false, "Create a public repository (overrides --private)")
+	cmd.Flags().BoolP("private", "p", false, "Create a private repository (overrides default visibility)")
 	cmd.Flags().StringVar(&opts.RepoSecrets, "repo-secrets", "", "JSON string containing repository-specific secrets")
 	cmd.Flags().StringVar(&opts.SecretsFile, "secrets-file", "", "Path to a JSON file containing repository-specific secrets")
 
@@ -181,12 +182,31 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 			opts.CleanupOnError = viper.GetBool("cleanup_on_error")
 		}
 
+		// Handle repository visibility with priority order:
+		// 1. --public flag (highest priority)
+		// 2. --private flag (second priority)
+		// 3. default_visibility from config (lowest priority)
+		isPrivateSet, _ := cmd.Flags().GetBool("private")
+
+		// If neither flag is explicitly set, use the default_visibility from config
+		if !cmd.Flags().Changed("public") && !cmd.Flags().Changed("private") {
+			visibility := viper.GetString("default_visibility")
+			opts.Public = visibility == "public"
+		} else if cmd.Flags().Changed("public") && opts.Public {
+			// --public is set to true, which takes precedence
+			opts.Public = true
+		} else if cmd.Flags().Changed("private") && isPrivateSet {
+			// --private is set to true, make Public = false
+			opts.Public = false
+		}
+		// In case of conflict (both flags set), --public takes precedence
+
 		// Add the project-specific flag defaults from Viper
 		if !cmd.Flags().Changed("no-repo") {
-			opts.NoRepo = viper.GetBool("skip_repo")
+			opts.NoRepo = viper.GetBool("no_repo")
 		}
-		if !cmd.Flags().Changed("skip-hooks") {
-			opts.SkipHooks = viper.GetBool("skip_hooks")
+		if !cmd.Flags().Changed("no-hooks") {
+			opts.NoHooks = viper.GetBool("no_hooks")
 		}
 		if !cmd.Flags().Changed("no-cache") {
 			opts.NoCache = viper.GetBool("no_cache")
@@ -416,7 +436,7 @@ func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params 
 		ProjectType: opts.ProjectType,
 		Team:        params.team,
 		BinaryName:  opts.BinaryName, // Set the binary name from flag
-		SkipHooks:   opts.SkipHooks,  // Skip running post-installation hooks if flag is set
+		SkipHooks:   opts.NoHooks,    // Skip running post-installation hooks if flag is set
 
 		// Configuration options
 		ConfigDir: configDir,

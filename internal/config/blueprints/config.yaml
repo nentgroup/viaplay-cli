@@ -28,9 +28,9 @@ default_language: "go"
 default_type: "service"
 
 # Default repository visibility
-# When true, repositories will be created as private by default
-# Use --private=false flag to override and create public repositories
-default_private: true
+# Options: "private" or "public"
+# Use --public flag to override and create public repositories
+default_visibility: "private"
 
 # -----------------------------------------------
 # Default Behavior Settings
@@ -54,11 +54,11 @@ cleanup_on_error: true
 
 # Skip post-installation hooks by default
 # When true, post-installation scripts won't run unless explicitly enabled with --hooks
-skip_hooks: false
+no_hooks: false
 
 # Skip repository creation by default
 # When true, only scaffolds local project without creating GitHub repository
-skip_repo: false
+no_repo: false
 
 # Disable caching by default
 # When true, templates won't be cached
@@ -71,7 +71,7 @@ no_cache: false
 # Repository templates for each language and project type
 # Format: templates.<language>.<type> = "<source>"
 # Source can be:
-# - GitHub repo: "github@<owner>/<repo>.git"
+# - GitHub repo: "git@github.com:<owner>/<repo>.git"
 # - Local path: "local@/path/to/template"
 # - Tarball URL: "url@https://example.com/template.tar.gz"
 templates:
