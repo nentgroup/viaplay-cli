@@ -6,18 +6,13 @@
 # Default Settings (used when no flags are provided)
 # -----------------------------------------------
 
-# Team name to use for loading configuration templates
-# This determines which team-specific templates to use from ~/.config/viaplay/teams/
+# Default GitHub organization name for repositories
+# This determines which organization-specific settings will be used
+default_organization: ""
+
+# Default team name to use when creating repositories
+# This determines which team-specific templates to use
 default_team: ""
-
-# GitHub account/organization name to use for repositories
-# For personal repos, use your GitHub username
-# For org repos, use the organization name
-default_account: ""
-
-# Whether the default_account is an organization (true) or personal account (false)
-# This affects repository creation behaviour
-is_org: false
 
 # Default programming language for new projects
 # Available options: go, typescript, rust, python
@@ -115,20 +110,36 @@ config_dir: "~/.config/viaplay"
 # Default: ~/.config/viaplay/teams
 teams_dir: "~/.config/viaplay/teams"
 
-# Directory for global configurations (used as fallback if team config not found)
-# Default: ~/.config/viaplay/global
-global_dir: "~/.config/viaplay/global"
+# Directory for organization-specific configurations
+# Default: ~/.config/viaplay/orgs
+orgs_dir: "~/.config/viaplay/orgs"
 
 # -----------------------------------------------
 # GitHub Configuration
 # -----------------------------------------------
 
-# Default branch name for new repositories
-default_branch: "main"
+# GitHub settings with structured account information
+github:
+  # Organization-specific configurations
+  organizations:
+    # Example organization structure (uncomment and replace with your own)
+    # myorg:
+    #   default_team: "platform"
+    #   teams:
+    #     - "platform"
+    #     - "frontend"
+    #     - "data"
+    #   default_templates:
+    #     go: "git@github.com:myorg/go-template.git"
+    #     typescript: "git@github.com:myorg/ts-template.git"
 
-# GitHub API endpoint (change for GitHub Enterprise)
-# Default: https://api.github.com
-github_api: "https://api.github.com"
+    # secondorg:
+    #   default_team: "infra"
+    #   teams:
+    #     - "infra"
+    #     - "backend"
+    #   default_templates:
+    #     go: "git@github.com:secondorg/go-template.git"
 
 # -----------------------------------------------
 # Build and Deployment Settings

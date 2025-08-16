@@ -22,6 +22,8 @@ import (
 type CreateCommandOptions struct {
 	// Repository options
 	RepoName    string
+	RepoOwner   string // Owner of the repository (user or organization)
+	IsOrg       bool   // Deprecated
 	Description string
 	Public      bool // false = private repo (default)
 	RepoSecrets string
@@ -47,106 +49,92 @@ type CreateCommandOptions struct {
 	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur
 }
 
-// createCmd is the parent command for all creation operations
-var createCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create projects and repositories",
-	Long: `Create projects and repositories with GitHub integration.
+//
+//// addCommonFlags adds common flags to a command
+//func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
+//	// Repository flags
+//	cmd.Flags().StringVar(&opts.RepoName, "name", "", "Repository name (required)")
+//	cmd.Flags().StringVar(&opts.Description, "description", "", "Repository description")
+//	cmd.Flags().BoolVar(&opts.Public, "public", false, "Create a public repository (overrides --private)")
+//	cmd.Flags().BoolP("private", "p", false, "Create a private repository (overrides default visibility)")
+//	cmd.Flags().StringVar(&opts.RepoSecrets, "repo-secrets", "", "JSON string containing repository-specific secrets")
+//	cmd.Flags().StringVar(&opts.SecretsFile, "secrets-file", "", "Path to a JSON file containing repository-specific secrets")
+//
+//	// Team/organization flags
+//	cmd.Flags().StringVar(&opts.Team, "team", "", "Team name for loading configuration templates")
+//
+//	// Define flags without setting Viper defaults at initialization time
+//	cmd.Flags().BoolVar(&opts.ApplyEnvs, "apply-envs", false, "Apply environments from team configuration")
+//	cmd.Flags().BoolVar(&opts.ApplyRulesets, "apply-rulesets", false, "Apply rulesets from team configuration")
+//	cmd.Flags().BoolVar(&opts.ApplySecrets, "apply-secrets", false, "Apply secrets from team configuration")
+//	cmd.Flags().BoolVar(&opts.CleanupOnError, "cleanup-on-error", false, "Clean up resources on error")
+//
+//	// Add a PreRun hook to set the defaults from Viper at runtime
+//	originalPreRun := cmd.PreRunE
+//	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+//		// Only apply defaults if flag wasn't explicitly set by user
+//		if !cmd.Flags().Changed("team") {
+//			opts.Team = viper.GetString("default_team")
+//		}
+//		if !cmd.Flags().Changed("apply-envs") {
+//			opts.ApplyEnvs = viper.GetBool("apply_envs")
+//		}
+//		if !cmd.Flags().Changed("apply-rulesets") {
+//			opts.ApplyRulesets = viper.GetBool("apply_rulesets")
+//		}
+//		if !cmd.Flags().Changed("apply-secrets") {
+//			opts.ApplySecrets = viper.GetBool("apply_secrets")
+//		}
+//		if !cmd.Flags().Changed("cleanup-on-error") {
+//			opts.CleanupOnError = viper.GetBool("cleanup_on_error")
+//		}
+//
+//		// Handle repository visibility with priority order:
+//		// 1. --public flag (highest priority)
+//		// 2. --private flag (second priority)
+//		// 3. default_visibility from config (lowest priority)
+//		isPrivateSet, _ := cmd.Flags().GetBool("private")
+//
+//		// If neither flag is explicitly set, use the default_visibility from config
+//		if !cmd.Flags().Changed("public") && !cmd.Flags().Changed("private") {
+//			visibility := viper.GetString("default_visibility")
+//			opts.Public = visibility == "public"
+//		} else if cmd.Flags().Changed("public") && opts.Public {
+//			// --public is set to true, which takes precedence
+//			opts.Public = true
+//		} else if cmd.Flags().Changed("private") && isPrivateSet {
+//			// --private is set to true, make Public = false
+//			opts.Public = false
+//		}
+//		// In case of conflict (both flags set), --public takes precedence
+//
+//		// Add the project-specific flag defaults from Viper
+//		if !cmd.Flags().Changed("no-repo") {
+//			opts.NoRepo = viper.GetBool("no_repo")
+//		}
+//		if !cmd.Flags().Changed("no-hooks") {
+//			opts.NoHooks = viper.GetBool("no_hooks")
+//		}
+//		if !cmd.Flags().Changed("no-cache") {
+//			opts.NoCache = viper.GetBool("no_cache")
+//		}
+//
+//		// Run the original PreRun if it exists
+//		if originalPreRun != nil {
+//			return originalPreRun(cmd, args)
+//		}
+//		return nil
+//	}
+//
+//	// Mark required flags
+//	if err := cmd.MarkFlagRequired("name"); err != nil {
+//		fmt.Printf("Warning: failed to mark required flag 'name': %v\n", err)
+//	}
+//}
 
-This command provides two main creation paths:
-  - 'create project': Create a full project with scaffolding and a GitHub repository
-  - 'create repo': Create only a GitHub repository without code scaffolding
-
-Both commands support applying organization settings like environments, 
-rulesets, and secrets from team configurations.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := cmd.Help(); err != nil {
-			fmt.Printf("Failed to show help: %v\n", err)
-		}
-	},
-}
-
-// NewCreateCommand returns a new create command
-func NewCreateCommand() *cobra.Command {
-	// Create project command
-	projectCmd := newProjectCommand()
-
-	// Create repo command
-	repoCmd := newRepoCommand()
-
-	// Add subcommands to the create command
-	createCmd.AddCommand(projectCmd)
-	createCmd.AddCommand(repoCmd)
-
-	return createCmd
-}
-
-// newProjectCommand creates a new project command
-func newProjectCommand() *cobra.Command {
-	opts := &CreateCommandOptions{}
-
-	cmd := &cobra.Command{
-		Use:   "project",
-		Short: "Create a new project with scaffolding and GitHub repository",
-		Long: `Create a new project with code scaffolding and GitHub repository.
-
-This command:
-1. Creates a GitHub repository
-2. Applies organization settings (environments, rulesets, secrets)
-3. Scaffolds a new project from templates
-4. Optionally clones the project locally
-
-Use this for a complete project setup experience.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return createProjectOrRepo(opts, true)
-		},
-	}
-
-	// Add common flags
-	addCommonFlags(cmd, opts)
-
-	// Add project-specific flags
-	cmd.Flags().StringVar(&opts.Language, "language", "", "Programming language (go, typescript, etc.)")
-	cmd.Flags().StringVar(&opts.ProjectType, "type", "", "Project type (service, cli, lambda, etc.)")
-	cmd.Flags().StringVar(&opts.TemplateSource, "template-source", "", "Custom template source")
-	cmd.Flags().StringVar(&opts.OutputDir, "output-dir", "", "Directory to create the project in (defaults to current dir + repo name)")
-	cmd.Flags().StringVar(&opts.BinaryName, "binary-name", "", "Name of the compiled binary (for compiled languages like Go and Rust)")
-	cmd.Flags().BoolVar(&opts.NoRepo, "no-repo", false, "Skip GitHub repository creation (local project only)")
-	cmd.Flags().BoolVar(&opts.NoHooks, "no-hooks", false, "Skip running post-installation hooks")
-	cmd.Flags().BoolVar(&opts.NoCache, "no-cache", false, "Force update of template cache (ignore cached templates)")
-	return cmd
-}
-
-// newRepoCommand creates a new repo command
-func newRepoCommand() *cobra.Command {
-	opts := &CreateCommandOptions{}
-
-	cmd := &cobra.Command{
-		Use:   "repo",
-		Short: "Create a GitHub repository without code scaffolding",
-		Long: `Create a GitHub repository without code scaffolding.
-
-This command:
-1. Creates a GitHub repository
-2. Applies organization settings (environments, rulesets, secrets)
-
-Use this when you need to create a repository structure but will add code 
-manually or migrate existing code to a new repository.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return createProjectOrRepo(opts, false)
-		},
-	}
-
-	// Add common flags
-	addCommonFlags(cmd, opts)
-
-	return cmd
-}
-
-// addCommonFlags adds common flags to a command
-func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
+// addCommonFlagsExceptName adds common flags to a command, excluding the name flag
+func addCommonFlagsExceptName(cmd *cobra.Command, opts *CreateCommandOptions) {
 	// Repository flags
-	cmd.Flags().StringVar(&opts.RepoName, "name", "", "Repository name (required)")
 	cmd.Flags().StringVar(&opts.Description, "description", "", "Repository description")
 	cmd.Flags().BoolVar(&opts.Public, "public", false, "Create a public repository (overrides --private)")
 	cmd.Flags().BoolP("private", "p", false, "Create a private repository (overrides default visibility)")
@@ -218,11 +206,6 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 		}
 		return nil
 	}
-
-	// Mark required flags
-	if err := cmd.MarkFlagRequired("name"); err != nil {
-		fmt.Printf("Warning: failed to mark required flag 'name': %v\n", err)
-	}
 }
 
 // createProjectOrRepo is a shared function that handles both project and repo creation
@@ -230,7 +213,6 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error {
 	// Start timing the operation
 	startTime := time.Now()
-
 	// Setup GitHub client and get config
 	ghClient, configDir, err := setupGitHubClient()
 	if err != nil {
@@ -337,10 +319,26 @@ type repoParameters struct {
 func validateRepoParameters(opts *CreateCommandOptions, withScaffolding bool) (repoParameters, error) {
 	var params repoParameters
 
-	// Get repo owner from config
-	params.owner = viper.GetString("default_account")
-	if params.owner == "" {
-		return params, fmt.Errorf("repository owner is required (set default_account in config)")
+	// Use RepoOwner from opts if provided, otherwise determine from config
+	if opts.RepoOwner != "" {
+		// Owner explicitly specified in command, use it directly
+		params.owner = opts.RepoOwner
+		output.VerboseMessage(fmt.Sprintf("Using specified repository owner: '%s'", params.owner))
+	} else {
+		// No owner specified, determine based on github.organization setting
+		orgName := viper.GetString("github.organization")
+		username := viper.GetString("github.username")
+
+		// Use organization if set, otherwise fall back to personal username
+		if orgName != "" {
+			params.owner = orgName
+			output.VerboseMessage(fmt.Sprintf("Using organization from config: '%s'", params.owner))
+		} else if username != "" {
+			params.owner = username
+			output.VerboseMessage(fmt.Sprintf("Using username from config: '%s'", params.owner))
+		} else {
+			return params, fmt.Errorf("repository owner is required (use --owner flag or configure github.username/github.organization in config)")
+		}
 	}
 
 	// Get repo name from flag
@@ -428,8 +426,8 @@ func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params 
 		RepoDescription: params.description,
 		RepoOwner:       params.owner,
 		IsPrivate:       !opts.Public, // Convert public flag to private flag
-		IsOrg:           viper.GetBool("is_org"),
-		SkipRepo:        opts.NoRepo, // Skip GitHub repository creation if --no-repo is set
+		IsOrg:           opts.IsOrg,   // Set isOrg based on our determination
+		SkipRepo:        opts.NoRepo,  // Skip GitHub repository creation if --no-repo is set
 
 		// Project options
 		Language:    opts.Language,

@@ -62,12 +62,13 @@ func init() {
 
 	// Register all commands in one central place
 	rootCmd.AddCommand(
-		authCmd,            // Authentication
-		secretsCmd,         // Secrets management
-		cacheCmd,           // Cache management
-		configCmd,          // Configuration
-		versionCmd,         // Version information
-		NewCreateCommand(), // Project and repository creation - properly initialised
+		authCmd,             // Authentication
+		secretsCmd,          // Secrets management
+		cacheCmd,            // Cache management
+		configCmd,           // Configuration
+		versionCmd,          // Version information
+		NewProjectCommand(), // Project management
+		NewRepoCommand(),    // Repository management
 	)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/viaplay/config.yaml)")
@@ -112,9 +113,9 @@ func initConfig() {
 func printBanner() {
 	bannerLines := []string{
 		"██╗   ██╗██╗ █████╗ ██████╗ ██╗      █████╗ ██╗   ██╗      ██████╗██╗     ██╗",
-		"██║   ██║██║██╔══██╗██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝     ██╔════╝██║     ██║",
+		"██║   ██║██║██╔══██╗██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝     ██╔��═══╝██║     ██║",
 		"██║   ██║██║███████║██████╔╝██║     ███████║ ╚████╔╝█████╗██║     ██║     ██║",
-		"╚██╗ ██╔╝██║██╔══██║██╔═══╝ ██║     ██╔══██║  ╚██╔╝ ╚════╝██║     ██║     ██║",
+		"╚██╗ ██╔╝██║██╔══██║██╔═══��� ██║     ██╔══██║  ╚██╔╝ ╚════╝██║     ██║     ██║",
 		" ╚████╔╝ ██║██║  ██║██║     ███████╗██║  ██║   ██║        ╚██████╗███████╗██║",
 		"  ╚═══╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝         ╚═════╝╚══════╝╚═╝",
 	}

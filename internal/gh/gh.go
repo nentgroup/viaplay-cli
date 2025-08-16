@@ -46,3 +46,12 @@ func (ghc *GitHubClient) GetAuthenticatedUser() (string, error) {
 	}
 	return user.GetLogin(), nil
 }
+
+// GetAccountType returns whether the authenticated account is a personal account or an organization
+func (ghc *GitHubClient) GetAccountType() (string, error) {
+	user, _, err := ghc.client.Users.Get(ghc.ctx, "")
+	if err != nil {
+		return "", err
+	}
+	return *user.Type, nil
+}

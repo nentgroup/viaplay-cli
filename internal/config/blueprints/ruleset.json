@@ -1,5 +1,5 @@
 {
-  "name": "example-ruleset",
+  "name": "block-dev-branch",
   "target": "branch",
   "enforcement": "active",
   "conditions": {
@@ -10,7 +10,7 @@
   },
   "rules": [
     {
-      "rule_type": "require_pull_request",
+      "type": "require_pull_request",
       "parameters": {
         "required_approving_review_count": 1,
         "require_code_owner_review": true,
@@ -21,4 +21,3 @@
     }
   ]
 }
-
