@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/nentgroup/viaplay-cli/compare/v2.0.0...v2.0.1) (2025-08-19)
+
+
+### Documentation
+
+* update documentation ([5f03a38](https://github.com/nentgroup/viaplay-cli/commit/5f03a38bccbd37243c3addb22a1c51333265991d))
+
 ## [2.0.0](https://github.com/nentgroup/viaplay-cli/compare/v1.3.0...v2.0.0) (2025-08-19)
 
 
