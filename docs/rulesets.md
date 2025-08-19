@@ -6,13 +6,12 @@ Rulesets in viaplay-cli allow you to enforce policies and automate repository se
 
 ## What is a Ruleset?
 
-A ruleset is a JSON file that defines repository rules, such as:
+A ruleset is a yaml file that defines repository rules, such as:
 - Branch protection (e.g., require PR reviews, status checks)
 - Commit signing requirements
 - Push restrictions
 - Environment protection rules
 
-> **Note:** Only JSON format is supported for rulesets. YAML is not supported.
 
 ---
 
@@ -40,15 +39,33 @@ vip config apply-rulesets
 
 ---
 
-## Example Ruleset (GitHub JSON)
+## Example Ruleset 
 
-```json
-{
-  "branch_protection": {
-    "required_status_checks": ["ci/test", "lint"],
-    "enforce_admins": true,
-    "required_pull_request_reviews": 1
-  },
-  "require_signed_commits": true
-}
+```yaml
+name: branch-protection
+target: branch
+enforcement: active
+
+# You can use template variables for dynamic values
+bypass_actors:
+  - actor_id: {{.Org.TeamID}}
+    actor_type: Team
+    bypass_mode: always
+
+conditions:
+  ref_name:
+    include:
+      - refs/heads/main
+    exclude: []
+
+rules:
+  - type: require_pull_request
+    parameters:
+      required_approving_review_count: 1
+      require_code_owner_review: true
+      dismiss_stale_reviews_on_push: true
+      require_last_push_approval: false
+      allowed_merge_methods:
+        - squash
+        - rebase
 ```

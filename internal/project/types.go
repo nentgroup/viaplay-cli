@@ -58,8 +58,9 @@ type Options struct {
 	RepoDescription string
 	RepoOwner       string
 	IsPrivate       bool
-	IsOrg           bool
-	SkipRepo        bool // Skip GitHub repository creation
+	IsOrg           bool   // Deprecated: use AccountType instead
+	AccountType     string // "personal" or "organization"
+	SkipRepo        bool   // Skip GitHub repository creation
 
 	// Project options
 	Language    string

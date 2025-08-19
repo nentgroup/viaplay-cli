@@ -8,39 +8,82 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v74/github"
+	"github.com/invopop/yaml"
+	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
-
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
 )
 
 // applyConfigurations applies configurations to the GitHub repository
 func (c *Factory) applyConfigurations(opts Options) error {
-	teamDir := filepath.Join(opts.ConfigDir, "teams", opts.Team)
-
-	// Skip all GitHub configurations if SkipRepo is true
+	// Skip all GitHub configurations if NoRepo is true
 	if opts.SkipRepo {
 		return nil
 	}
 
+	// Get authenticated username for personal directory path
+	username, err := c.GitHubClient.GetAuthenticatedUser()
+	if err != nil {
+		c.Reporter.Warning("Auth", fmt.Sprintf("Failed to get authenticated username: %v", err))
+		username = "" // Default to empty if we can't get the username
+	}
+
+	// Determine the appropriate configuration directory based on account type
+	var configDir string
+
+	// For organization repos with team specified, use org team directory
+	if opts.AccountType == "organization" && opts.Team != "" {
+		// For organization repositories, use the organization-specific team directory
+		configDir = c.Config.GetTeamDir(opts.Team, opts.RepoOwner)
+		c.Reporter.Debug(fmt.Sprintf("Using organization-specific team directory: %s", configDir))
+	} else if opts.AccountType == "user" && username != "" {
+		// For personal accounts, use the personal directory
+		configDir = c.Config.GetPersonalDir(username)
+		c.Reporter.Debug(fmt.Sprintf("Using personal directory: %s", configDir))
+
+		// Ensure the user directory and its subdirectories exist
+		if err := os.MkdirAll(filepath.Join(configDir, "envs"), 0o755); err != nil {
+			return fmt.Errorf("failed to create personal envs directory: %w", err)
+		}
+		if err := os.MkdirAll(filepath.Join(configDir, "rulesets"), 0o755); err != nil {
+			return fmt.Errorf("failed to create personal rulesets directory: %w", err)
+		}
+
+		// Check if we have any configuration files, if not create them
+		if _, err := os.Stat(filepath.Join(configDir, "envs", "staging.json")); os.IsNotExist(err) {
+			c.Reporter.Debug(fmt.Sprintf("Creating default environment configs for user: %s", username))
+			if _, err := config.CreatePersonalConfig(username, false); err != nil {
+				c.Reporter.Warning("Config", fmt.Sprintf("Failed to create personal configurations: %v", err))
+			}
+		}
+	} else if opts.Team != "" {
+		// Fallback: For personal repositories with a team specified, use the global team directory (legacy support)
+		configDir = filepath.Join(opts.ConfigDir, "teams", opts.Team)
+		c.Reporter.Debug(fmt.Sprintf("Using global team directory: %s", configDir))
+	} else {
+		c.Reporter.Debug("No team or personal account specified, skipping configurations")
+		return nil // No team or personal account specified, nothing to apply
+	}
+
 	// 1. Apply environments if requested
 	if opts.ApplyEnvs {
-		err := c.applyEnvs(opts.RepoOwner, opts.RepoName, teamDir)
+		err := c.applyEnvs(opts.RepoOwner, opts.RepoName, configDir)
 		if err != nil {
-			return fmt.Errorf("failed to apply team environments: %w", err)
+			return fmt.Errorf("failed to apply environments: %w", err)
 		}
 	}
 
 	// 2. Apply rulesets if requested
 	if opts.ApplyRulesets {
-		if err := c.applyRulesets(opts.RepoOwner, opts.RepoName, teamDir); err != nil {
-			return fmt.Errorf("failed to apply team rulesets: %w", err)
+		if err := c.applyRulesets(opts.RepoOwner, opts.RepoName, configDir); err != nil {
+			return fmt.Errorf("failed to apply rulesets: %w", err)
 		}
 	}
 
 	// 3. Apply secrets if requested
 	if opts.ApplySecrets {
-		if err := c.applySecrets(opts.RepoOwner, opts.RepoName, teamDir); err != nil {
-			return fmt.Errorf("failed to apply team secrets: %w", err)
+		if err := c.applySecrets(opts.RepoOwner, opts.RepoName, configDir); err != nil {
+			return fmt.Errorf("failed to apply secrets: %w", err)
 		}
 	}
 
@@ -95,13 +138,16 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 	appliedCount := 0
 	failedEnvs := []string{}
 
+	// Create a renderer with the template variables
+	renderer := c.getTemplateRenderer()
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 
-		// Only process JSON files
-		if !strings.HasSuffix(entry.Name(), ".json") {
+		// Only process yaml files
+		if !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
 		}
 
@@ -116,11 +162,21 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 			continue
 		}
 
+		// First, render the template variables in the raw content - this is critical for YAML processing
+		c.Reporter.Debug(fmt.Sprintf("Rendering ruleset %s with template variables", entry.Name()))
+		renderedData, err := renderer.RenderString(string(data))
+		if err != nil {
+			errMsg := fmt.Sprintf("Failed to render ruleset %s with template variables: %v", entry.Name(), err)
+			c.Reporter.Warning("Ruleset rendering", errMsg)
+			failedEnvs = append(failedEnvs, errMsg)
+			continue
+		}
+
 		// Parse the environment configuration
 		var envConfig EnvConf
 
 		// Parse JSON
-		if err := json.Unmarshal(data, &envConfig); err != nil {
+		if err := yaml.Unmarshal([]byte(renderedData), &envConfig); err != nil {
 			errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", entry.Name(), err)
 			c.Reporter.Warning("Environment processing", errMsg)
 			failedEnvs = append(failedEnvs, errMsg)
@@ -244,8 +300,9 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 			continue
 		}
 
-		// Only process JSON files
-		if !strings.HasSuffix(f.Name(), ".json") {
+		// Process both JSON and YAML ruleset files
+		ext := strings.ToLower(filepath.Ext(f.Name()))
+		if ext != ".yaml" && ext != ".yml" {
 			continue
 		}
 
@@ -260,7 +317,7 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 			continue
 		}
 
-		// Render the ruleset content with template variables
+		// First, render the template variables in the raw content - this is critical for YAML processing
 		c.Reporter.Debug(fmt.Sprintf("Rendering ruleset %s with template variables", f.Name()))
 		renderedData, err := renderer.RenderString(string(data))
 		if err != nil {
@@ -270,14 +327,21 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 			continue
 		}
 
-		// Unmarshal JSON directly into the GitHub API struct
+		// Debug the rendered data to help troubleshoot
+		c.Reporter.Debug(fmt.Sprintf("Rendered ruleset data for %s: \n%s", f.Name(), renderedData))
+
+		// Unmarshal JSON/YAML into the GitHub API struct
 		var ruleset github.RepositoryRuleset
-		if err := json.Unmarshal([]byte(renderedData), &ruleset); err != nil {
-			errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", f.Name(), err)
+
+		// Unmarshal JSON into the GitHub struct
+		if err := yaml.Unmarshal([]byte(renderedData), &ruleset); err != nil {
+			errMsg := fmt.Sprintf("Failed to parse converted JSON from YAML in %s: %v", f.Name(), err)
 			c.Reporter.Warning("Ruleset processing", errMsg)
 			failedRulesets = append(failedRulesets, errMsg)
 			continue
 		}
+
+		c.Reporter.Debug(fmt.Sprintf("Successfully converted YAML to GitHub ruleset structure for %s", f.Name()))
 
 		// Basic validation
 		if ruleset.Name == "" {
@@ -330,7 +394,7 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 		teamDir = filepath.Join(home, teamDir[1:])
 	}
 
-	secretsPath := filepath.Join(teamDir, "secrets.json")
+	secretsPath := filepath.Join(teamDir, "secrets.yaml")
 	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
 		c.Reporter.Skip(mainOperation, "No secrets.json file found")
 		return nil
@@ -356,7 +420,7 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 	var secretsConfig secrets.Config
 
 	// Parse the rendered JSON
-	if err := json.Unmarshal([]byte(renderedData), &secretsConfig); err != nil {
+	if err := yaml.Unmarshal([]byte(renderedData), &secretsConfig); err != nil {
 		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to parse JSON in %s", secretsPath))
 		return fmt.Errorf("failed to parse secrets JSON: %w", err)
 	}
@@ -543,7 +607,7 @@ func (c *Factory) applySecretOrVariable(isVariable bool, owner, repo, name, valu
 func (c *Factory) createRepository(opts Options) (string, error) {
 	// Only print errors if needed, not process/info messages
 	var org string
-	if opts.IsOrg {
+	if opts.AccountType == "organization" {
 		org = opts.RepoOwner
 	}
 	repoURL, err := c.GitHubClient.CreateRepo(opts.RepoName, org, opts.IsPrivate, opts.RepoDescription)
@@ -552,7 +616,7 @@ func (c *Factory) createRepository(opts Options) (string, error) {
 	}
 
 	// If this is an organization repository and we have a team, add it as admin to the repository
-	if opts.IsOrg && opts.Team != "" {
+	if opts.AccountType == "organization" && opts.Team != "" {
 		c.Reporter.Progress("Repository Setup", 50, fmt.Sprintf("Adding team '%s' as admin to repository", opts.Team))
 		err := c.GitHubClient.AddTeamToRepository(org, opts.RepoName, opts.Team, gh.TeamPermissionAdmin)
 		if err != nil {

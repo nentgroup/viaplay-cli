@@ -14,11 +14,13 @@ import (
 
 // Default paths and constants used throughout the application
 const (
-	AppName        = "viaplay-cli"
-	ConfigDirName  = ".config/viaplay"
-	CacheDirName   = ".cache/viaplay"
-	TeamsDirName   = "teams"
-	ConfigFileName = "config.yaml"
+	AppName         = "viaplay-cli"
+	ConfigDirName   = ".config/viaplay"
+	CacheDirName    = ".cache/viaplay"
+	TeamsDirName    = "teams"
+	OrgsDirName     = "orgs"
+	PersonalDirName = "users" // Directory for user-specific configs (user folders will be inside)
+	ConfigFileName  = "config.yaml"
 )
 
 // Configuration stores the application configuration
@@ -30,19 +32,32 @@ type Configuration struct {
 	TeamsDir   string
 
 	// Default settings
-	DefaultTeam     string
-	DefaultAccount  string
-	DefaultLanguage string
-	DefaultType     string
-	DefaultPrivate  bool
-	IsOrg           bool
+	DefaultTeam         string
+	DefaultLanguage     string
+	DefaultType         string
+	DefaultVisibility   string // Repository visibility: "private" or "public"
+	DefaultOrganization string // Default GitHub organization name
+
+	// GitHub configuration
+	GitHub struct {
+		// No fields needed here anymore, but keeping the struct for backward compatibility
+	}
+
+	// Default flags for project creation
+	ApplyEnvs      bool // Default for applying environments
+	ApplySecrets   bool // Default for applying secrets
+	ApplyRulesets  bool // Default for applying rulesets
+	CleanupOnError bool // Default for cleanup on error
+	NoHooks        bool // Default for skipping post-installation hooks
+	NoRepo         bool // Default for skipping repository creation
+	NoCache        bool // Default for disabling caching
 
 	// Template mappings
 	Templates map[string]map[string]string
 }
 
 // CreateBasicConfig creates a basic configuration file with default settings
-func CreateBasicConfig(configFilePath, username string) error {
+func CreateBasicConfig(configFilePath string) error {
 	// Create the configuration directory if it doesn't exist
 	configDir := filepath.Dir(configFilePath)
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
@@ -54,11 +69,10 @@ func CreateBasicConfig(configFilePath, username string) error {
 
 	// Set default values
 	v.Set("default_team", "")
-	v.Set("default_account", username)
-	v.Set("is_org", false)
+	v.Set("default_organization", "")
 	v.Set("default_language", "go")
 	v.Set("default_type", "service")
-	v.Set("default_private", true)
+	v.Set("default_visibility", "private")
 	v.Set("config_dir", GetDefaultConfigDir())
 	v.Set("teams_dir", GetDefaultTeamsDir())
 	v.Set("config_file", configFilePath)
@@ -106,6 +120,11 @@ func GetDefaultTeamsDir() string {
 	return filepath.Join(GetDefaultConfigDir(), TeamsDirName)
 }
 
+// GetDefaultPersonalDir returns the default personal configuration directory
+func GetDefaultPersonalDir() string {
+	return filepath.Join(GetDefaultConfigDir(), PersonalDirName)
+}
+
 // ExpandPath expands the tilde in path to the user's home directory
 func ExpandPath(path string) string {
 	if path == "" {
@@ -130,12 +149,25 @@ func LoadConfig() (*Configuration, error) {
 		CacheDir:   viper.GetString("cache_dir"),
 		TeamsDir:   viper.GetString("teams_dir"),
 
-		DefaultTeam:     viper.GetString("default_team"),
-		DefaultAccount:  viper.GetString("default_account"),
-		DefaultLanguage: viper.GetString("default_language"),
-		DefaultType:     viper.GetString("default_type"),
-		DefaultPrivate:  viper.GetBool("default_private"),
-		IsOrg:           viper.GetBool("is_org"),
+		DefaultTeam:         viper.GetString("default_team"),
+		DefaultLanguage:     viper.GetString("default_language"),
+		DefaultType:         viper.GetString("default_type"),
+		DefaultVisibility:   viper.GetString("default_visibility"),
+		DefaultOrganization: viper.GetString("default_organization"),
+
+		// GitHub configuration
+		GitHub: struct {
+			// No fields needed here anymore, but keeping the struct for backward compatibility
+		}{},
+
+		// Default flags for project creation
+		ApplyEnvs:      viper.GetBool("apply_envs"),
+		ApplySecrets:   viper.GetBool("apply_secrets"),
+		ApplyRulesets:  viper.GetBool("apply_rulesets"),
+		CleanupOnError: viper.GetBool("cleanup_on_error"),
+		NoHooks:        viper.GetBool("no_hooks"),
+		NoRepo:         viper.GetBool("no_repo"),
+		NoCache:        viper.GetBool("no_cache"),
 
 		Templates: make(map[string]map[string]string),
 	}
@@ -206,7 +238,7 @@ func InitConfig(cfgFile string) error {
 	viper.SetDefault("teams_dir", GetDefaultTeamsDir())
 	viper.SetDefault("default_language", "go")
 	viper.SetDefault("default_type", "service")
-	viper.SetDefault("default_private", true)
+	viper.SetDefault("default_visibility", "private")
 
 	// Read in environment variables that match
 	viper.AutomaticEnv()
@@ -311,7 +343,7 @@ func UpdateConfigValue(configFilePath, key, value string) error {
 }
 
 // refactored helper to reduce nesting
-func writeBlueprintConfig(configFile, team, username string) error {
+func writeBlueprintConfig(configFile, team string) error {
 	// Always use the blueprint config as the starting point
 	configBlueprint, err := GetBlueprintContent(ConfigBlueprintFile)
 	if err != nil {
@@ -320,14 +352,6 @@ func writeBlueprintConfig(configFile, team, username string) error {
 
 	// Start with the blueprint content
 	configContent := string(configBlueprint)
-
-	// Replace values in the template string directly to preserve comments
-	// Replace username placeholder if we have it
-	if username != "" {
-		configContent = strings.Replace(configContent,
-			"default_account: \"\"",
-			fmt.Sprintf("default_account: \"%s\"", username), 1)
-	}
 
 	// Set default_team from the team flag if provided
 	if team != "" {
@@ -370,7 +394,7 @@ func writeBlueprintConfig(configFile, team, username string) error {
 }
 
 // InitializeConfigFile creates or updates the main config file with values from the blueprint
-func InitializeConfigFile(configFile string, override bool, team, username string) error {
+func InitializeConfigFile(configFile string, override bool, team string) error {
 	// Ensure config directory exists
 	configDir := filepath.Dir(configFile)
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
@@ -384,8 +408,90 @@ func InitializeConfigFile(configFile string, override bool, team, username strin
 	}
 
 	if !configExists || override {
-		return writeBlueprintConfig(configFile, team, username)
+		return writeBlueprintConfig(configFile, team)
 	}
 
 	return nil
+}
+
+// GetOrganizationTeamsDir returns the teams directory for a specific organization
+func (c *Configuration) GetOrganizationTeamsDir(orgName string) string {
+	if orgName == "" {
+		// If no organization is specified, return the default teams directory
+		return c.TeamsDir
+	}
+
+	// Create organization-specific teams directory path using the new structure:
+	// ~/.config/viaplay/orgs/{org-name}/teams/
+	return filepath.Join(c.ConfigDir, OrgsDirName, orgName, TeamsDirName)
+}
+
+// GetTeamDir returns the directory for a specific team, potentially within an organization
+func (c *Configuration) GetTeamDir(team string, orgName string) string {
+	if orgName == "" {
+		// If no organization is specified, use the default teams structure
+		return filepath.Join(c.TeamsDir, team)
+	}
+
+	// Use organization-specific team directory with the new structure:
+	// ~/.config/viaplay/orgs/{org-name}/teams/{team-name}/
+	return filepath.Join(c.GetOrganizationTeamsDir(orgName), team)
+}
+
+// HasOrganization checks if an organization name is specified
+func (c *Configuration) HasOrganization(orgName string) bool {
+	return orgName != "" || c.DefaultOrganization != ""
+}
+
+// GetDefaultTeamForOrg returns the default team for a specific organization
+func (c *Configuration) GetDefaultTeamForOrg(orgName string) string {
+	// Always use the global default team setting
+	return c.DefaultTeam
+}
+
+// EnsureOrganizationDirectories creates organization-specific directories if they don't exist
+func (c *Configuration) EnsureOrganizationDirectories(orgName string) error {
+	if orgName == "" {
+		return nil // Nothing to do if no organization specified
+	}
+
+	// Create main organization directory structure
+	orgDir := c.GetOrganizationTeamsDir(orgName)
+	if err := os.MkdirAll(orgDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create organization directory %s: %w", orgDir, err)
+	}
+
+	return nil
+}
+
+// GetPersonalDir returns the directory for personal account configuration
+func (c *Configuration) GetPersonalDir(username string) string {
+	if username == "" {
+		return filepath.Join(c.ConfigDir, PersonalDirName)
+	}
+	return filepath.Join(c.ConfigDir, PersonalDirName, username)
+}
+
+// EnsurePersonalDirectories creates the personal account directory if it doesn't exist
+func (c *Configuration) EnsurePersonalDirectories() error {
+	// Create the personal directory
+	personalDir := c.GetPersonalDir("")
+	if err := os.MkdirAll(personalDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create personal directory %s: %w", personalDir, err)
+	}
+	return nil
+}
+
+// CreatePersonalConfig creates the personal configuration files and directories
+func CreatePersonalConfig(username string, override bool) (*CreationResult, error) {
+	// Get the personal directory path
+	personalDir := filepath.Join(GetDefaultConfigDir(), PersonalDirName, username)
+
+	// Use the common function to create the config structure
+	result, err := CreateConfigStructure(personalDir, override)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create personal config structure: %w", err)
+	}
+
+	return result, nil
 }

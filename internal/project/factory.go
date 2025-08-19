@@ -61,6 +61,13 @@ func (c *Factory) Create(opts Options) (*Summary, error) {
 	// Debug info when available
 	c.Reporter.Debug(fmt.Sprintf("Starting project creation with options: %+v", opts))
 
+	u, err := c.GitHubClient.GetUser(opts.RepoOwner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user %s: %w", opts.RepoOwner, err)
+	}
+
+	opts.AccountType = strings.ToLower(*u.Type) // Normalize account type to lowercase
+
 	// Initialise project summary
 	summary := &Summary{
 		Language:        opts.Language,
@@ -348,6 +355,23 @@ func (c *Factory) optsToTemplateVars(opts Options) *template.Variables {
 	vars.Project.Type = opts.ProjectType
 	vars.Org.Team = opts.Team
 
+	// Only set organization team if this is an organization repository
+	if opts.Team != "" && opts.AccountType == "organization" {
+		// Add the team and organization details
+		vars.Org.Team = opts.Team
+		vars.Org.Name = opts.RepoOwner // Set organization name
+
+		// Try to fetch the team ID
+		c.Reporter.Debug(fmt.Sprintf("Attempting to fetch team ID for '%s' in org '%s'", opts.Team, opts.RepoOwner))
+		teamID, err := c.GitHubClient.GetTeamID(opts.RepoOwner, opts.Team)
+		if err != nil {
+			c.Reporter.Warning("Team ID", fmt.Sprintf("Could not fetch team ID: %v", err))
+		} else {
+			vars.Org.TeamID = teamID
+			c.Reporter.Debug(fmt.Sprintf("Successfully fetched team ID %d for team '%s'", teamID, opts.Team))
+		}
+	}
+
 	// Additional values
 	vars.Meta.CreatedAt = time.Now()
 	vars.Meta.Year = time.Now().Year()
@@ -356,19 +380,6 @@ func (c *Factory) optsToTemplateVars(opts Options) *template.Variables {
 	vars.Service.Name = kebabName // Use kebab case for service name
 	vars.Service.Owner = opts.Team
 	vars.Service.OwnerKey = strings.ToLower(strings.ReplaceAll(opts.Team, " ", "-"))
-
-	// If this is an organization repo and we have a team name, try to fetch the team ID
-	if opts.IsOrg && opts.Team != "" {
-		c.Reporter.Debug(fmt.Sprintf("Attempting to fetch team ID for '%s' in org '%s'", opts.Team, opts.RepoOwner))
-		teamID, err := c.GitHubClient.GetTeamID(opts.RepoOwner, opts.Team)
-		if err != nil {
-			c.Reporter.Warning("Team ID", fmt.Sprintf("Could not fetch team ID: %v", err))
-		} else {
-			vars.Org.TeamID = teamID
-			c.Reporter.Debug(fmt.Sprintf("Successfully fetched team ID %d for team '%s'", teamID, opts.Team))
-			vars.Org.Name = opts.RepoOwner // Set organization name
-		}
-	}
 
 	// Handle binary name for compiled languages (Go, Rust, etc.)
 	binaryName := kebabName // Start with kebab case version

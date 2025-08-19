@@ -6,18 +6,13 @@
 # Default Settings (used when no flags are provided)
 # -----------------------------------------------
 
-# Team name to use for loading configuration templates
-# This determines which team-specific templates to use from ~/.config/viaplay/teams/
+# Default GitHub organization name for repositories
+# This determines which organization-specific settings will be used
+default_organization: ""
+
+# Default team name to use when creating repositories
+# This determines which team-specific templates to use
 default_team: ""
-
-# GitHub account/organization name to use for repositories
-# For personal repos, use your GitHub username
-# For org repos, use the organization name
-default_account: ""
-
-# Whether the default_account is an organization (true) or personal account (false)
-# This affects repository creation behaviour
-is_org: false
 
 # Default programming language for new projects
 # Available options: go, typescript, rust, python
@@ -28,9 +23,41 @@ default_language: "go"
 default_type: "service"
 
 # Default repository visibility
-# When true, repositories will be created as private by default
-# Use --private=false flag to override and create public repositories
-default_private: true
+# Options: "private" or "public"
+# Use --public flag to override and create public repositories
+default_visibility: "private"
+
+# -----------------------------------------------
+# Default Behavior Settings
+# -----------------------------------------------
+
+# Apply team environments to new repositories by default
+# When true, environments from team config will be applied without needing --apply-envs flag
+apply_envs: true
+
+# Apply team secrets to new repositories by default
+# When true, secrets from team config will be applied without needing --apply-secrets flag
+apply_secrets: true
+
+# Apply team rulesets to new repositories by default
+# When true, rulesets from team config will be applied without needing --apply-rulesets flag
+apply_rulesets: true
+
+# Clean up resources on error by default
+# When true, any created resources (repos, directories) will be deleted if an error occurs
+cleanup_on_error: true
+
+# Skip post-installation hooks by default
+# When true, post-installation scripts won't run unless explicitly enabled with --hooks
+no_hooks: false
+
+# Skip repository creation by default
+# When true, only scaffolds local project without creating GitHub repository
+no_repo: false
+
+# Disable caching by default
+# When true, templates won't be cached
+no_cache: false
 
 # -----------------------------------------------
 # Project Templates
@@ -39,7 +66,7 @@ default_private: true
 # Repository templates for each language and project type
 # Format: templates.<language>.<type> = "<source>"
 # Source can be:
-# - GitHub repo: "github@<owner>/<repo>.git"
+# - GitHub repo: "git@github.com:<owner>/<repo>.git"
 # - Local path: "local@/path/to/template"
 # - Tarball URL: "url@https://example.com/template.tar.gz"
 templates:
@@ -83,20 +110,19 @@ config_dir: "~/.config/viaplay"
 # Default: ~/.config/viaplay/teams
 teams_dir: "~/.config/viaplay/teams"
 
-# Directory for global configurations (used as fallback if team config not found)
-# Default: ~/.config/viaplay/global
-global_dir: "~/.config/viaplay/global"
+# Directory for organization-specific configurations
+# Default: ~/.config/viaplay/orgs
+orgs_dir: "~/.config/viaplay/orgs"
 
 # -----------------------------------------------
 # GitHub Configuration
 # -----------------------------------------------
 
-# Default branch name for new repositories
-default_branch: "main"
-
-# GitHub API endpoint (change for GitHub Enterprise)
-# Default: https://api.github.com
-github_api: "https://api.github.com"
+# GitHub API settings and authentication
+github:
+  # Default account type ("personal" or "organization")
+  # This affects repository creation behavior
+  default_account_type: "personal"
 
 # -----------------------------------------------
 # Build and Deployment Settings

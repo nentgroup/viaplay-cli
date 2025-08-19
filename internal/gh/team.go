@@ -80,22 +80,34 @@ func (ghc *GitHubClient) GetTeamID(org, teamName string) (int64, error) {
 	return team.GetID(), nil
 }
 
+// TeamInfo contains basic information about a GitHub team
+type TeamInfo struct {
+	ID          int64
+	Name        string
+	Slug        string
+	Description string
+}
+
 // ListTeams returns a list of teams in the given organization
 func (ghc *GitHubClient) ListTeams(org string) ([]*TeamInfo, error) {
+	// Parameter validation
 	if org == "" {
 		return nil, fmt.Errorf("organization name is required")
 	}
 
-	// Fetch all teams from the organization
+	var allTeams []*TeamInfo
+
 	opts := &github.ListOptions{
 		PerPage: 100, // Maximum number of teams per page
 	}
 
-	var allTeams []*TeamInfo
-
 	for {
 		teams, resp, err := ghc.client.Teams.ListTeams(ghc.ctx, org, opts)
 		if err != nil {
+			// Check if this is a 404 error and provide a more user-friendly message
+			if strings.Contains(err.Error(), "404") {
+				return nil, fmt.Errorf("organization '%s' not found or you don't have access to it", org)
+			}
 			return nil, fmt.Errorf("failed to list teams for organization '%s': %w", org, err)
 		}
 
@@ -119,12 +131,4 @@ func (ghc *GitHubClient) ListTeams(org string) ([]*TeamInfo, error) {
 	}
 
 	return allTeams, nil
-}
-
-// TeamInfo contains basic information about a GitHub team
-type TeamInfo struct {
-	ID          int64
-	Name        string
-	Slug        string
-	Description string
 }

@@ -6,7 +6,7 @@ This section explains how configuration works in viaplay-cli, including global, 
 
 ## Configuration Overview
 
-viaplay-cli uses YAML and JSON configuration files to control default values, paths, team settings, template sources,
+viaplay-cli uses YAML configuration files to control default values, paths, team settings, template sources,
 rulesets, secrets, and more. There are two main types of configuration:
 
 - **Global config:** `~/.config/viaplay/config.yaml` — User-wide defaults and settings.
@@ -16,67 +16,180 @@ rulesets, secrets, and more. There are two main types of configuration:
 
 ## Global Config Example (config.yaml)
 
-This file controls the default behavior of viaplay-cli. Key fields include:
+This file controls the default behavior of viaplay-cli:
 
-- `default_team`: Team name for loading team-specific templates.
-- `default_account`: GitHub username or organization.
-- `is_org`: Whether the default account is an organization.
-- `default_language`, `default_type`, `default_private`: Defaults for new projects.
-- `templates`: Maps languages and project types to template sources (GitHub, local, or URL).
-- `config_dir`, `teams_dir`, `global_dir`: Directory locations for configs.
-- `default_branch`: Default branch for new repos.
-- `github_api`: GitHub API endpoint.
-- `container_registry`: Default container registry.
-- `debug`: Enables verbose logging.
-
-Example:
 ```yaml
 # viaplay-cli Configuration
 # This file controls the behaviour of the viaplay-cli tool
 # See https://github.com/nentgroup/viaplay-cli for documentation
 
+# -----------------------------------------------
+# Default Settings (used when no flags are provided)
+# -----------------------------------------------
+
+# Team name to use for loading configuration templates
+# This determines which team-specific templates to use from ~/.config/viaplay/teams/
 default_team: ""
+
+# GitHub account/organization name to use for repositories
+# For personal repos, use your GitHub username
+# For org repos, use the organization name
 default_account: ""
+
+# Whether the default_account is an organization (true) or personal account (false)
+# This affects repository creation behaviour
 is_org: false
+
+# Default programming language for new projects
+# Available options: go, typescript, rust, python
 default_language: "go"
+
+# Default project type for new projects
+# Available options: service, lambda, cli, package, app
 default_type: "service"
+
+# Default repository visibility
+# When true, repositories will be created as private by default
+# Use --private=false flag to override and create public repositories
 default_private: true
+
+# -----------------------------------------------
+# Default Behavior Settings
+# -----------------------------------------------
+
+# Apply team environments to new repositories by default
+# When true, environments from team config will be applied without needing --apply-envs flag
+apply_envs: true
+
+# Apply team secrets to new repositories by default
+# When true, secrets from team config will be applied without needing --apply-secrets flag
+apply_secrets: true
+
+# Apply team rulesets to new repositories by default
+# When true, rulesets from team config will be applied without needing --apply-rulesets flag
+apply_rulesets: true
+
+# Clean up resources on error by default
+# When true, any created resources (repos, directories) will be deleted if an error occurs
+cleanup_on_error: true
+
+# Skip post-installation hooks by default
+# When true, post-installation scripts won't run unless explicitly enabled with --hooks
+no_hooks: false
+
+# Skip repository creation by default
+# When true, only scaffolds local project without creating GitHub repository
+no_repo: false
+
+# Disable caching by default
+# When true, templates won't be cached
+no_cache: false
+
+# -----------------------------------------------
+# Project Templates
+# -----------------------------------------------
+
+# Repository templates for each language and project type
+# Format: templates.<language>.<type> = "<source>"
+# Source can be:
+# - GitHub repo: "git@githubc:<owner>/<repo>.git"
+# - Local path: "local@/path/to/template"
+# - Tarball URL: "url@https://example.com/template.tar.gz"
 templates:
+  # Go templates
   go:
-    cli: github@github.com/nentgroup/go-cli-template.git
-    lambda: github@github.com/nentgroup/go-lambda-template.git
-    package: github@github.com/nentgroup/go-package-template.git
-    service: github@github.com/nentgroup/go-service-template.git
+    cli:
+      source: "git@github.com:nentgroup/go-cli-template.git"
+    lambda:
+      source: "git@github.com:nentgroup/go-lambda-template.git"
+    package:
+      source: "git@github.com:nentgroup/go-package-template.git"
+    service:
+      source: "git@github.com:nentgroup/go-service-template.git"
+      hooks:
+        post:
+          install:
+            cmd:
+              - "echo 'Go service template installed successfully'"
+
+  # Rust templates
   rust:
-    http-service: local@/Users/alescole/.config/viaplay/templates_cache/rust/http-service
-  typescript:
-    service: github@github.com/nentgroup/ts-service-template.git
-    lambda: github@github.com/nentgroup/ts-lambda-template.git
+    service:
+        source: git@github.com:nentgroup/rust-service-template.git
+
+  # Node templates
+  node:
+    service:
+      source: git@github.com:nentgroup/node-service-template.git
+  # Add more language templates as needed
+
+
+# -----------------------------------------------
+# Directory Configuration
+# -----------------------------------------------
+
+# Base directory for all configuration files
+# Default: ~/.config/viaplay
 config_dir: "~/.config/viaplay"
+
+# Directory for team-specific configurations
+# Default: ~/.config/viaplay/teams
 teams_dir: "~/.config/viaplay/teams"
+
+# Directory for global configurations (used as fallback if team config not found)
+# Default: ~/.config/viaplay/global
 global_dir: "~/.config/viaplay/global"
+
+# -----------------------------------------------
+# GitHub Configuration
+# -----------------------------------------------
+
+# Default branch name for new repositories
 default_branch: "main"
+
+# GitHub API endpoint (change for GitHub Enterprise)
+# Default: https://api.github.com
 github_api: "https://api.github.com"
+
+# -----------------------------------------------
+# Build and Deployment Settings
+# -----------------------------------------------
+
+# Default container registry for services
+# Options: "ecr", "gcr", "dockerhub", etc.
 container_registry: "ecr"
+
+# -----------------------------------------------
+# Advanced Settings
+# -----------------------------------------------
+
+# Debug mode (enables verbose logging)
 debug: false
 ```
 
 ---
 
-## Environment Example (environment.json)
+## Environment Example (environment.yaml)
 
 Defines environment-specific settings, such as deployment policies and reviewers.
 
-```json
-{
-  "name": "staging",
-  "wait_timer": 0,
-  "reviewers": [],
-  "deployment_branch_policy": {
-    "protected_branches": false,
-    "custom_branch_policies": true
-  }
-}
+```yaml
+name: staging
+wait_timer: 0
+reviewers:
+  - type: Team
+    id: {{.Org.TeamID}}
+deployment_branch_policy:
+  protected_branches: false
+  custom_branch_policies: true
+  branch_patterns:
+    - name: main              # This represents a DeploymentBranchPolicyRequest
+      type: branch            # Values could be "branch" or "tag"
+    - name: "release/*"       # Another pattern example
+      type: branch
+    - name: "*"
+      type: tag
+
 ```
 
 ---
@@ -85,30 +198,37 @@ Defines environment-specific settings, such as deployment policies and reviewers
 
 Rulesets define branch protection and repository rules for GitHub repositories. You can specify a ruleset file in your config and it will be applied automatically to new repositories. Example ruleset file:
 
-```json
-{
-  "name": "example-ruleset",
-  "target": "branch",
-  "enforcement": "active",
-  "conditions": {
-    "ref_name": {
-      "include": ["refs/heads/main"],
-      "exclude": []
-    }
-  },
-  "rules": [
-    {
-      "rule_type": "require_pull_request",
-      "parameters": {
-        "required_approving_review_count": 1,
-        "require_code_owner_review": true,
-        "dismiss_stale_reviews_on_push": true,
-        "require_last_push_approval": false,
-        "allowed_merge_methods": ["squash", "rebase"]
-      }
-    }
-  ]
-}
+```yaml
+# Example GitHub branch ruleset
+# This file defines a ruleset for GitHub repositories
+# It supports template variables like {{.Org.TeamID}} for dynamic values
+
+name: branch-protection
+target: branch
+enforcement: active
+
+# You can use template variables for dynamic values
+bypass_actors:
+  - actor_id: {{.Org.TeamID}}
+    actor_type: Team
+    bypass_mode: always
+
+conditions:
+  ref_name:
+    include:
+      - refs/heads/main
+    exclude: []
+
+rules:
+  - type: require_pull_request
+    parameters:
+      required_approving_review_count: 1
+      require_code_owner_review: true
+      dismiss_stale_reviews_on_push: true
+      require_last_push_approval: false
+      allowed_merge_methods:
+        - squash
+        - rebase
 ```
 
 - For more details on GitHub rulesets, see the [GitHub Ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets).
@@ -118,7 +238,7 @@ Rulesets define branch protection and repository rules for GitHub repositories. 
 
 ## Post-Installation Hooks
 
-Hooks allow you to run commands or scripts after project creation. They are defined in the template configurations and run automatically unless disabled with the `--skip-hooks` flag during project creation.
+Hooks allow you to run commands or scripts after project creation. They are defined in the template configurations and run automatically unless disabled with the `--no-hooks` flag during project creation.
 
 ### Hook Configuration
 
@@ -128,7 +248,7 @@ Hooks are configured under the `templates` section in your config file, associat
 templates:
   go:
     service:
-      source: github@github.com/nentgroup/go-service-template.git
+      source: github@github.com:nentgroup/go-service-template.git
       hooks:
         post:
           install:
@@ -165,11 +285,11 @@ When hooks are executed, they have access to the same template variables used du
 #!/bin/bash
 # This is an example post-install hook script
 
-echo "Project name: {{{ProjectName}}}"
-echo "Repository: {{{RepoURL}}}"
+echo "Project name: {{.Project.Name}}"
+echo "Repository: {{.Repo.Name}}"
 
 # Set up a custom environment based on the project type
-if [ "{{{ProjectType}}}" = "service" ]; then
+if [ "{{.Project.Type}}" = "service" ]; then
   echo "Setting up service-specific environment..."
 fi
 ```
@@ -183,7 +303,7 @@ Hooks are automatically executed after a project is scaffolded using the `vip cr
 vip create project --name myservice --language go --type service
 
 # Create a project but skip executing hooks
-vip create project --name myservice --language go --type service --skip-hooks
+vip create project --name myservice --language go --type service --no-hooks
 ```
 
 ### Locating Hook Scripts
@@ -213,7 +333,7 @@ To create a new hook script:
 
 - Use `vip config set <key> <value>` to update values.
 - Use `vip config get <key>` to view current values.
-- Edit YAML or JSON files directly for advanced changes.
+- Edit YAML files directly for advanced changes.
 
 ---
 
