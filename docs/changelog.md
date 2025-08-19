@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.4](https://github.com/nentgroup/viaplay-cli/compare/v2.0.3...v2.0.4) (2025-08-19)
+
+
+### Bug Fixes
+
+* skip personal configs if they don't exists ([#45](https://github.com/nentgroup/viaplay-cli/issues/45)) ([d0750e1](https://github.com/nentgroup/viaplay-cli/commit/d0750e11cce89787562d4630c0c5226a8a3d67f2))
+
 ## [2.0.3](https://github.com/nentgroup/viaplay-cli/compare/v2.0.2...v2.0.3) (2025-08-19)
 
 
