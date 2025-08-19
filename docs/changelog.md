@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/nentgroup/viaplay-cli/compare/v2.0.1...v2.0.2) (2025-08-19)
+
+
+### Bug Fixes
+
+* restore banner ([b974e1b](https://github.com/nentgroup/viaplay-cli/commit/b974e1bb41b3f48ad799719bc2adfbd58ca29a47))
+
 ## [2.0.1](https://github.com/nentgroup/viaplay-cli/compare/v2.0.0...v2.0.1) (2025-08-19)
 
 
