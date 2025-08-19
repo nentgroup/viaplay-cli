@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/nentgroup/viaplay-cli/compare/v1.3.0...v2.0.0) (2025-08-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **config:** refactor configs ([#39](https://github.com/nentgroup/viaplay-cli/issues/39))
+
+### Code Refactoring
+
+* **config:** refactor configs ([#39](https://github.com/nentgroup/viaplay-cli/issues/39)) ([591acbb](https://github.com/nentgroup/viaplay-cli/commit/591acbbfaa4c15e8d5fa511f06ea17bc736c81c3))
+
 ## [1.3.0](https://github.com/nentgroup/viaplay-cli/compare/v1.2.2...v1.3.0) (2025-08-15)
 
 
