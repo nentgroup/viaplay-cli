@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/go-github/v74/github"
 	"github.com/invopop/yaml"
-	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
 )
@@ -31,9 +30,9 @@ func (c *Factory) applyConfigurations(opts Options) error {
 	// Determine the appropriate configuration directory based on account type
 	var configDir string
 
-	// For organization repos with team specified, use org team directory
+	// For organisation repos with team specified, use org team directory
 	if opts.AccountType == "organization" && opts.Team != "" {
-		// For organization repositories, use the organization-specific team directory
+		// For organisation repositories, use the organisation-specific team directory
 		configDir = c.Config.GetTeamDir(opts.Team, opts.RepoOwner)
 		c.Reporter.Debug(fmt.Sprintf("Using organization-specific team directory: %s", configDir))
 	} else if opts.AccountType == "user" && username != "" {
@@ -41,20 +40,16 @@ func (c *Factory) applyConfigurations(opts Options) error {
 		configDir = c.Config.GetPersonalDir(username)
 		c.Reporter.Debug(fmt.Sprintf("Using personal directory: %s", configDir))
 
-		// Ensure the user directory and its subdirectories exist
-		if err := os.MkdirAll(filepath.Join(configDir, "envs"), 0o755); err != nil {
-			return fmt.Errorf("failed to create personal envs directory: %w", err)
-		}
-		if err := os.MkdirAll(filepath.Join(configDir, "rulesets"), 0o755); err != nil {
-			return fmt.Errorf("failed to create personal rulesets directory: %w", err)
+		// Ensure the user directory exists
+		if _, err := os.Stat(configDir); os.IsNotExist(err) {
+			if err := os.MkdirAll(configDir, 0o755); err != nil {
+				return fmt.Errorf("failed to create personal config directory: %w", err)
+			}
 		}
 
-		// Check if we have any configuration files, if not create them
-		if _, err := os.Stat(filepath.Join(configDir, "envs", "staging.json")); os.IsNotExist(err) {
-			c.Reporter.Debug(fmt.Sprintf("Creating default environment configs for user: %s", username))
-			if _, err := config.CreatePersonalConfig(username, false); err != nil {
-				c.Reporter.Warning("Config", fmt.Sprintf("Failed to create personal configurations: %v", err))
-			}
+		// Check if config files exist
+		if _, err := os.Stat(filepath.Join(configDir, "envs")); os.IsNotExist(err) {
+			c.Reporter.Debug(fmt.Sprintf("Personal environment configs for user %s not found, skipping", username))
 		}
 	} else if opts.Team != "" {
 		// Fallback: For personal repositories with a team specified, use the global team directory (legacy support)
@@ -99,7 +94,7 @@ func (c *Factory) applyConfigurations(opts Options) error {
 
 // applyEnvs applies environments defined in the team directory
 func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
-	mainOperation := "Applying team environments"
+	mainOperation := "Applying environments"
 
 	// Start the overall operation
 	c.Reporter.Start(mainOperation, "")
@@ -253,7 +248,7 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 
 // applyRulesets applies rulesets defined in the team directory
 func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
-	mainOperation := "Applying team rulesets"
+	mainOperation := "Applying rulesets"
 	// Start the overall operation
 	c.Reporter.Start(mainOperation, "")
 
@@ -375,13 +370,18 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 		return fmt.Errorf("some rulesets could not be applied: %s", strings.Join(failedRulesets[:1], ", "))
 	}
 
-	c.Reporter.Complete(mainOperation, fmt.Sprintf("Successfully applied %d rulesets", appliedCount))
+	// Finalise the overall operation
+	if appliedCount > 0 {
+		c.Reporter.Complete(mainOperation, fmt.Sprintf("Successfully applied %d environments", appliedCount))
+	} else {
+		c.Reporter.Skip(mainOperation, "No new environments were applied")
+	}
 	return nil
 }
 
 // applySecrets applies secrets defined in the team directory
 func (c *Factory) applySecrets(owner, repo, teamDir string) error {
-	mainOperation := "Applying team secrets"
+	mainOperation := "Applying secrets"
 	c.Reporter.Start(mainOperation, "")
 
 	// Expand tilde in path if it exists
@@ -413,7 +413,7 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 	// Render the secrets.json content with template variables
 	renderedData, err := renderer.RenderString(string(data))
 	if err != nil {
-		c.Reporter.Failed(mainOperation, err, "Failed to render secrets.json with template variables")
+		c.Reporter.Failed(mainOperation, err, "Failed to render secrets.yaml with template variables")
 		return fmt.Errorf("failed to render secrets.json with template variables: %w", err)
 	}
 
@@ -421,7 +421,7 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 
 	// Parse the rendered JSON
 	if err := yaml.Unmarshal([]byte(renderedData), &secretsConfig); err != nil {
-		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to parse JSON in %s", secretsPath))
+		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to parse YAML in %s", secretsPath))
 		return fmt.Errorf("failed to parse secrets JSON: %w", err)
 	}
 
