@@ -2,6 +2,8 @@
 
 This page explains how to configure environments for your repositories using viaplay-cli. Environments allow you to define deployment targets (such as staging, production, etc.) and set up environment-specific policies in your GitHub repositories.
 
+For detailed information about GitHub's Environment API, see the [GitHub Environments API documentation](https://docs.github.com/en/rest/deployments/environments?apiVersion=2022-11-28).
+
 ---
 
 ## What is an Environment?

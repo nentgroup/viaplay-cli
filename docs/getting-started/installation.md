@@ -76,6 +76,9 @@ Move `vip.exe` to a directory in your PATH.
 - Git (for template cloning)
 - macOS <i class="fa-brands fa-apple" style="color:#888;"></i>, Linux <i class="fa-brands fa-linux" style="color:#888;"></i>, or Windows <i class="fa-brands fa-windows" style="color:#888;"></i>
 
+### Optional
+- [Nerd Fonts](https://www.nerdfonts.com/) - For an enhanced CLI experience with proper icons and symbols. Without Nerd Fonts, some visual elements may display as placeholder characters.
+
 ---
 
 ## Upgrading

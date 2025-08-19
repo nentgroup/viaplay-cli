@@ -102,8 +102,10 @@ secrets:
 
 Example usage with the CLI flag:
 ```bash
-vip create project --name myservice --repo-secrets '{"secrets":[{"name":"API_KEY","value":"${{ secrets.GH_TOKEN }}","type":"secret"}]}'
+vip project create nentgroup/myservice --language go --type service --repo-secrets '{"secrets":[{"name":"API_KEY","value":"${{ secrets.GH_TOKEN }}","type":"secret"}]}'
 ```
+
+> **Note:** When the `env` field is omitted or left empty for a secret, it will be created at the repository level, making it available to all workflows. When an environment name is specified, the secret will only be available within that specific environment.
 
 ## Using Template Variables in Secrets
 

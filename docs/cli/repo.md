@@ -13,12 +13,11 @@ The `vip repo` command is used to manage GitHub repositories without scaffolding
 ### Usage
 
 ```bash
-vip repo create --name <repo-name> [flags]
+vip repo create <org/repo-name> [flags]
 ```
 
 ### Flags
 
-- `--name` (required): Repository name
 - `--description`: Repository description
 - `--public`: Create a public repository (overrides --private)
 - `--private`, `-p`: Create a private repository (overrides default visibility)
@@ -37,19 +36,22 @@ vip repo create --name <repo-name> [flags]
 
 ```bash
 # Create a private repository with default settings
-vip repo create --name myrepo --team platform
+vip repo create nentgroup/myrepo --team platform
 
 # Create a public repository
-vip repo create --name mypublicrepo --public --team frontend
+vip repo create nentgroup/mypublicrepo --public --team frontend
 
 # Force a private repository (overrides default_visibility if set to "public")
-vip repo create --name privaterepo --private
+vip repo create nentgroup/privaterepo --private
 
 # Create a repository with a specific description
-vip repo create --name myrepo --description "This is my custom repository description"
+vip repo create nentgroup/myrepo --description "This is my custom repository description"
 
 # Create a repository and apply team secrets
-vip repo create --name myrepo --team platform --apply-secrets
+vip repo create nentgroup/myrepo --team platform --apply-secrets
+
+# Create a repository in your personal GitHub account
+vip repo create username/myrepo --description "Personal repository"
 ```
 
 ---
@@ -61,10 +63,17 @@ By default, repositories are created with the visibility defined in your `defaul
 - `--public` to force a public repository
 - `--private` (or `-p`) to force a private repository 
 
-If both flags are specified, `--public` takes precedence.
+If both flags are specified, `--private` takes precedence.
+
+---
+
+## Repository Location
+
+The command takes one argument in the format `org/repo-name` or `username/repo-name`:
+- `org/repo-name` creates the repository in the specified organization
+- `username/repo-name` creates the repository in your personal GitHub account
 
 ---
 
 See `vip repo create --help` for more details.
----
 

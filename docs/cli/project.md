@@ -15,12 +15,11 @@ The `vip project` command is used to manage projects with GitHub integration.
 ### Usage
 
 ```bash
-vip project create --name <project-name> [flags]
+vip project create <org/repo-name> [flags]
 ```
 
 ### Flags
 
-- `--name` (required): Repository name
 - `--description`: Repository description
 - `--public`: Create a public repository (overrides --private)
 - `--private`, `-p`: Create a private repository (overrides default visibility)
@@ -47,19 +46,22 @@ vip project create --name <project-name> [flags]
 
 ```bash
 # Create a Go service with default settings (private repository by default)
-vip project create --name myservice --language go --type service --team myteam --verbose
+vip project create nentgroup/myservice --language go --type service --team myteam --verbose
 
 # Create a public project
-vip project create --name mypublicproject --public --team myteam --verbose
+vip project create nentgroup/mypublicproject --public --team myteam --verbose
 
 # Force a private project (overrides default_visibility if set to "public")
-vip project create --name privateproject --private
+vip project create nentgroup/privateproject --private
 
 # Create a Rust service with custom binary name
-vip project create --name myservice --language rust --type service --binary-name custom-binary
+vip project create nentgroup/myservice --language rust --type service --binary-name custom-binary
+
+# Create a project in your personal GitHub account
+vip project create username/local-app --language go --type cli
 
 # Create a local project without a GitHub repository
-vip project create --name local-app --language go --type cli --no-repo
+vip project create username/local-app --language go --type cli --no-repo
 ```
 
 ---
@@ -72,6 +74,14 @@ By default, repositories are created with the visibility defined in your `defaul
 - `--private` (or `-p`) to force a private repository 
 
 If both flags are specified, `--public` takes precedence.
+
+---
+
+## Repository Location
+
+The command takes one argument in the format `org/repo-name` or `username/repo-name`:
+- `org/repo-name` creates the project in the specified organization
+- `username/repo-name` creates the project in your personal GitHub account
 
 ---
 
