@@ -1,6 +1,4 @@
-Let's rethink the config init and try to simplyfy it. As we are logged we can be sure to use the logged in user as the default user in github.username. Actualy we dont even need the username in the config at all because we already know who is logged in.
-We can also fetch all the orgs the user has access to right?
-so we can do gonfig init --team team-1 --org org1 and it will init the global config, team configs for the team-1 in the org-1 and also personal configs for the logged in user. What do you think?# repo Command
+# repo Command
 
 The `vip repo` command is used to manage GitHub repositories without scaffolding code.
 
