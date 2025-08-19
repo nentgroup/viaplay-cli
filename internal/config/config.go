@@ -19,7 +19,7 @@ const (
 	CacheDirName    = ".cache/viaplay"
 	TeamsDirName    = "teams"
 	OrgsDirName     = "orgs"
-	PersonalDirName = "users" // Directory for user-specific configs (user folders will be inside)
+	PersonalDirName = "users" // Directory for user-specific configs
 	ConfigFileName  = "config.yaml"
 )
 
@@ -118,11 +118,6 @@ func GetDefaultCacheDir() string {
 // GetDefaultTeamsDir returns the default teams directory
 func GetDefaultTeamsDir() string {
 	return filepath.Join(GetDefaultConfigDir(), TeamsDirName)
-}
-
-// GetDefaultPersonalDir returns the default personal configuration directory
-func GetDefaultPersonalDir() string {
-	return filepath.Join(GetDefaultConfigDir(), PersonalDirName)
 }
 
 // ExpandPath expands the tilde in path to the user's home directory
@@ -426,6 +421,14 @@ func (c *Configuration) GetOrganizationTeamsDir(orgName string) string {
 	return filepath.Join(c.ConfigDir, OrgsDirName, orgName, TeamsDirName)
 }
 
+// GetPersonalDir returns the directory for personal account configuration
+func (c *Configuration) GetPersonalDir(username string) string {
+	if username == "" {
+		return filepath.Join(c.ConfigDir, PersonalDirName)
+	}
+	return filepath.Join(c.ConfigDir, PersonalDirName, username)
+}
+
 // GetTeamDir returns the directory for a specific team, potentially within an organization
 func (c *Configuration) GetTeamDir(team string, orgName string) string {
 	if orgName == "" {
@@ -462,14 +465,6 @@ func (c *Configuration) EnsureOrganizationDirectories(orgName string) error {
 	}
 
 	return nil
-}
-
-// GetPersonalDir returns the directory for personal account configuration
-func (c *Configuration) GetPersonalDir(username string) string {
-	if username == "" {
-		return filepath.Join(c.ConfigDir, PersonalDirName)
-	}
-	return filepath.Join(c.ConfigDir, PersonalDirName, username)
 }
 
 // EnsurePersonalDirectories creates the personal account directory if it doesn't exist
