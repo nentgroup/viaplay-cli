@@ -40,8 +40,7 @@ type Configuration struct {
 
 	// GitHub configuration
 	GitHub struct {
-		DefaultAccountType string                 // "personal" or "organization"
-		Organizations      map[string]OrgSettings // Map of organization names to their settings
+		// No fields needed here anymore, but keeping the struct for backward compatibility
 	}
 
 	// Default flags for project creation
@@ -55,13 +54,6 @@ type Configuration struct {
 
 	// Template mappings
 	Templates map[string]map[string]string
-}
-
-// OrgSettings stores organization-specific settings
-type OrgSettings struct {
-	DefaultTeam      string            // Default team for this organization
-	Teams            []string          // Teams within this organization
-	DefaultTemplates map[string]string // Default templates for this organization
 }
 
 // CreateBasicConfig creates a basic configuration file with default settings
@@ -78,7 +70,6 @@ func CreateBasicConfig(configFilePath string) error {
 	// Set default values
 	v.Set("default_team", "")
 	v.Set("default_organization", "")
-	v.Set("github.default_account_type", "personal")
 	v.Set("default_language", "go")
 	v.Set("default_type", "service")
 	v.Set("default_visibility", "private")
@@ -166,12 +157,8 @@ func LoadConfig() (*Configuration, error) {
 
 		// GitHub configuration
 		GitHub: struct {
-			DefaultAccountType string
-			Organizations      map[string]OrgSettings
-		}{
-			DefaultAccountType: viper.GetString("github.default_account_type"),
-			Organizations:      make(map[string]OrgSettings),
-		},
+			// No fields needed here anymore, but keeping the struct for backward compatibility
+		}{},
 
 		// Default flags for project creation
 		ApplyEnvs:      viper.GetBool("apply_envs"),
@@ -220,44 +207,6 @@ func LoadConfig() (*Configuration, error) {
 					config.Templates[lang][typeName] = sourceStr
 				}
 			}
-		}
-	}
-
-	// Load organizations from config
-	orgsMap := viper.GetStringMap("github.organizations")
-	for orgName, settings := range orgsMap {
-		if settingsMap, ok := settings.(map[string]interface{}); ok {
-			org := OrgSettings{
-				DefaultTemplates: make(map[string]string),
-			}
-
-			// Extract settings for this organization
-			if defaultTeam, ok := settingsMap["default_team"].(string); ok {
-				org.DefaultTeam = defaultTeam
-			}
-
-			// Extract teams list
-			if teamsIface, ok := settingsMap["teams"].([]interface{}); ok {
-				teams := make([]string, 0, len(teamsIface))
-				for _, teamIface := range teamsIface {
-					if team, ok := teamIface.(string); ok {
-						teams = append(teams, team)
-					}
-				}
-				org.Teams = teams
-			}
-
-			// Extract default templates
-			if templatesIface, ok := settingsMap["default_templates"].(map[string]interface{}); ok {
-				for key, valIface := range templatesIface {
-					if val, ok := valIface.(string); ok {
-						org.DefaultTemplates[key] = val
-					}
-				}
-			}
-
-			// Store the organization settings
-			config.GitHub.Organizations[orgName] = org
 		}
 	}
 
@@ -489,38 +438,14 @@ func (c *Configuration) GetTeamDir(team string, orgName string) string {
 	return filepath.Join(c.GetOrganizationTeamsDir(orgName), team)
 }
 
-// HasOrganization checks if an organization is defined in the configuration
+// HasOrganization checks if an organization name is specified
 func (c *Configuration) HasOrganization(orgName string) bool {
-	if orgName == "" {
-		return false
-	}
-	_, exists := c.GitHub.Organizations[orgName]
-	return exists
-}
-
-// GetOrganizationSettings retrieves settings for a specific organization
-func (c *Configuration) GetOrganizationSettings(orgName string) (OrgSettings, bool) {
-	if orgName == "" {
-		return OrgSettings{}, false
-	}
-
-	settings, exists := c.GitHub.Organizations[orgName]
-	return settings, exists
+	return orgName != "" || c.DefaultOrganization != ""
 }
 
 // GetDefaultTeamForOrg returns the default team for a specific organization
 func (c *Configuration) GetDefaultTeamForOrg(orgName string) string {
-	// If no organization specified, use global default
-	if orgName == "" {
-		return c.DefaultTeam
-	}
-
-	// Check if the organization exists and has a default team
-	if settings, exists := c.GitHub.Organizations[orgName]; exists && settings.DefaultTeam != "" {
-		return settings.DefaultTeam
-	}
-
-	// Fall back to global default if organization has no default team
+	// Always use the global default team setting
 	return c.DefaultTeam
 }
 
@@ -530,20 +455,10 @@ func (c *Configuration) EnsureOrganizationDirectories(orgName string) error {
 		return nil // Nothing to do if no organization specified
 	}
 
-	// Create main organization directory
+	// Create main organization directory structure
 	orgDir := c.GetOrganizationTeamsDir(orgName)
 	if err := os.MkdirAll(orgDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create organization directory %s: %w", orgDir, err)
-	}
-
-	// If the organization has defined teams, create directories for each team
-	if settings, exists := c.GitHub.Organizations[orgName]; exists {
-		for _, team := range settings.Teams {
-			teamDir := filepath.Join(orgDir, team)
-			if err := os.MkdirAll(teamDir, 0o755); err != nil {
-				return fmt.Errorf("failed to create team directory %s: %w", teamDir, err)
-			}
-		}
 	}
 
 	return nil
@@ -569,54 +484,14 @@ func (c *Configuration) EnsurePersonalDirectories() error {
 
 // CreatePersonalConfig creates the personal configuration files and directories
 func CreatePersonalConfig(username string, override bool) (*CreationResult, error) {
-	result := &CreationResult{
-		Created:  []string{},
-		Overrode: []string{},
-		Skipped:  []string{},
-	}
-
 	// Get the personal directory path
 	personalDir := filepath.Join(GetDefaultConfigDir(), PersonalDirName, username)
-	if err := os.MkdirAll(personalDir, 0o755); err != nil {
-		return nil, fmt.Errorf("failed to create personal directory: %w", err)
-	}
 
-	// Create envs/ and rulesets/ subfolders
-	envsDir := filepath.Join(personalDir, "envs")
-	rulesetsDir := filepath.Join(personalDir, "rulesets")
-	if err := os.MkdirAll(envsDir, 0o755); err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(rulesetsDir, 0o755); err != nil {
-		return nil, err
-	}
-
-	// Create environment configs
-	envResult, err := CreateEnvironmentConfigs(envsDir, override)
+	// Use the common function to create the config structure
+	result, err := CreateConfigStructure(personalDir, override)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create personal config structure: %w", err)
 	}
-	result.Created = append(result.Created, envResult.Created...)
-	result.Overrode = append(result.Overrode, envResult.Overrode...)
-	result.Skipped = append(result.Skipped, envResult.Skipped...)
-
-	// Create ruleset configs
-	rulesetResult, err := CreateRulesetConfigs(rulesetsDir, override)
-	if err != nil {
-		return nil, err
-	}
-	result.Created = append(result.Created, rulesetResult.Created...)
-	result.Overrode = append(result.Overrode, rulesetResult.Overrode...)
-	result.Skipped = append(result.Skipped, rulesetResult.Skipped...)
-
-	// Create secrets.json at the personal root
-	secretsResult, err := CreateSecretsConfig(personalDir, override)
-	if err != nil {
-		return nil, err
-	}
-	result.Created = append(result.Created, secretsResult.Created...)
-	result.Overrode = append(result.Overrode, secretsResult.Overrode...)
-	result.Skipped = append(result.Skipped, secretsResult.Skipped...)
 
 	return result, nil
 }

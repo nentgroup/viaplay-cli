@@ -65,7 +65,8 @@ Use `vip config init --team <team>` to scaffold a team config. Place your team s
 
 **Can I override team settings for a specific project?**
 
-You can provide repository-specific secrets using the `--repo-secrets` flag or a JSON file, but all other settings are managed at the team/global level.
+You can provide repository-specific secrets using the `--repo-secrets` flag or a YAML file, but all other settings are 
+managed at the team/global level.
 
 ---
 

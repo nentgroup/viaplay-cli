@@ -118,28 +118,11 @@ orgs_dir: "~/.config/viaplay/orgs"
 # GitHub Configuration
 # -----------------------------------------------
 
-# GitHub settings with structured account information
+# GitHub API settings and authentication
 github:
-  # Organization-specific configurations
-  organizations:
-    # Example organization structure (uncomment and replace with your own)
-    # myorg:
-    #   default_team: "platform"
-    #   teams:
-    #     - "platform"
-    #     - "frontend"
-    #     - "data"
-    #   default_templates:
-    #     go: "git@github.com:myorg/go-template.git"
-    #     typescript: "git@github.com:myorg/ts-template.git"
-
-    # secondorg:
-    #   default_team: "infra"
-    #   teams:
-    #     - "infra"
-    #     - "backend"
-    #   default_templates:
-    #     go: "git@github.com:secondorg/go-template.git"
+  # Default account type ("personal" or "organization")
+  # This affects repository creation behavior
+  default_account_type: "personal"
 
 # -----------------------------------------------
 # Build and Deployment Settings

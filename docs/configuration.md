@@ -6,7 +6,7 @@ This section explains how configuration works in viaplay-cli, including global, 
 
 ## Configuration Overview
 
-viaplay-cli uses YAML and JSON configuration files to control default values, paths, team settings, template sources,
+viaplay-cli uses YAML configuration files to control default values, paths, team settings, template sources,
 rulesets, secrets, and more. There are two main types of configuration:
 
 - **Global config:** `~/.config/viaplay/config.yaml` — User-wide defaults and settings.
@@ -92,7 +92,7 @@ no_cache: false
 # Repository templates for each language and project type
 # Format: templates.<language>.<type> = "<source>"
 # Source can be:
-# - GitHub repo: "github@<owner>/<repo>.git"
+# - GitHub repo: "git@githubc:<owner>/<repo>.git"
 # - Local path: "local@/path/to/template"
 # - Tarball URL: "url@https://example.com/template.tar.gz"
 templates:
@@ -169,24 +169,27 @@ debug: false
 
 ---
 
-## Environment Example (environment.json)
+## Environment Example (environment.yaml)
 
 Defines environment-specific settings, such as deployment policies and reviewers.
 
-```json
-{
-  "name": "staging",
-  "wait_timer": 0,
-  "reviewers": [],
-  "deployment_branch_policy": {
-    "protected_branches": false,
-    "custom_branch_policies": true,
-    "branch_patterns": [
-      { "name": "main", "type": "branch" },
-      { "name": "*", "type": "tag" }
-    ]
-  }
-}
+```yaml
+name: staging
+wait_timer: 0
+reviewers:
+  - type: Team
+    id: {{.Org.TeamID}}
+deployment_branch_policy:
+  protected_branches: false
+  custom_branch_policies: true
+  branch_patterns:
+    - name: main              # This represents a DeploymentBranchPolicyRequest
+      type: branch            # Values could be "branch" or "tag"
+    - name: "release/*"       # Another pattern example
+      type: branch
+    - name: "*"
+      type: tag
+
 ```
 
 ---
@@ -195,37 +198,37 @@ Defines environment-specific settings, such as deployment policies and reviewers
 
 Rulesets define branch protection and repository rules for GitHub repositories. You can specify a ruleset file in your config and it will be applied automatically to new repositories. Example ruleset file:
 
-```json
-{
-  "name": "example-ruleset",
-  "target": "branch",
-  "enforcement": "active",
-  "bypass_actors": [
-    {
-      "actor_id": "{{.Org.TeamID}}",
-    "actor_type": "Team",
-    "bypass_mode": "always"
-    }
-  ],
-  "conditions": {
-    "ref_name": {
-      "include": ["refs/heads/main"],
-      "exclude": []
-    }
-  },
-  "rules": [
-    {
-      "type": "require_pull_request",
-      "parameters": {
-        "required_approving_review_count": 1,
-        "require_code_owner_review": true,
-        "dismiss_stale_reviews_on_push": true,
-        "require_last_push_approval": false,
-        "allowed_merge_methods": ["squash", "rebase"]
-      }
-    }
-  ]
-}
+```yaml
+# Example GitHub branch ruleset
+# This file defines a ruleset for GitHub repositories
+# It supports template variables like {{.Org.TeamID}} for dynamic values
+
+name: branch-protection
+target: branch
+enforcement: active
+
+# You can use template variables for dynamic values
+bypass_actors:
+  - actor_id: {{.Org.TeamID}}
+    actor_type: Team
+    bypass_mode: always
+
+conditions:
+  ref_name:
+    include:
+      - refs/heads/main
+    exclude: []
+
+rules:
+  - type: require_pull_request
+    parameters:
+      required_approving_review_count: 1
+      require_code_owner_review: true
+      dismiss_stale_reviews_on_push: true
+      require_last_push_approval: false
+      allowed_merge_methods:
+        - squash
+        - rebase
 ```
 
 - For more details on GitHub rulesets, see the [GitHub Ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets).
@@ -330,7 +333,7 @@ To create a new hook script:
 
 - Use `vip config set <key> <value>` to update values.
 - Use `vip config get <key>` to view current values.
-- Edit YAML or JSON files directly for advanced changes.
+- Edit YAML files directly for advanced changes.
 
 ---
 

@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"text/template"
+
+	"github.com/nentgroup/viaplay-cli/internal/output"
 )
 
 // CreationResult represents the result of a configuration creation operation
@@ -16,27 +18,28 @@ type CreationResult struct {
 	Skipped  []string // Files that were skipped (already exist)
 }
 
-// CreateTeamConfig creates the team configuration files and directories
-func CreateTeamConfig(teamsDir, team string, override bool) (*CreationResult, error) {
+// CreateConfigStructure creates a standard configuration directory structure with
+// environments, rulesets, and secrets configurations
+func CreateConfigStructure(baseDir string, override bool) (*CreationResult, error) {
 	result := &CreationResult{
 		Created:  []string{},
 		Overrode: []string{},
 		Skipped:  []string{},
 	}
 
-	teamDir := filepath.Join(teamsDir, team)
-	if err := os.MkdirAll(teamDir, 0o755); err != nil {
-		return nil, err
+	// Ensure the base directory exists
+	if err := os.MkdirAll(baseDir, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create directory %s: %w", baseDir, err)
 	}
 
 	// Create envs/ and rulesets/ subfolders
-	envsDir := filepath.Join(teamDir, "envs")
-	rulesetsDir := filepath.Join(teamDir, "rulesets")
+	envsDir := filepath.Join(baseDir, "envs")
+	rulesetsDir := filepath.Join(baseDir, "rulesets")
 	if err := os.MkdirAll(envsDir, 0o755); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create envs directory: %w", err)
 	}
 	if err := os.MkdirAll(rulesetsDir, 0o755); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create rulesets directory: %w", err)
 	}
 
 	// Create environment configs
@@ -57,8 +60,8 @@ func CreateTeamConfig(teamsDir, team string, override bool) (*CreationResult, er
 	result.Overrode = append(result.Overrode, rulesetResult.Overrode...)
 	result.Skipped = append(result.Skipped, rulesetResult.Skipped...)
 
-	// Create secrets.json at the team root
-	secretsResult, err := CreateSecretsConfig(teamDir, override)
+	// Create secrets.json at the root
+	secretsResult, err := CreateSecretsConfig(baseDir, override)
 	if err != nil {
 		return nil, err
 	}
@@ -66,15 +69,26 @@ func CreateTeamConfig(teamsDir, team string, override bool) (*CreationResult, er
 	result.Overrode = append(result.Overrode, secretsResult.Overrode...)
 	result.Skipped = append(result.Skipped, secretsResult.Skipped...)
 
+	return result, nil
+}
+
+// CreateTeamConfig creates the team configuration files and directories
+func CreateTeamConfig(teamsDir, team string, override bool) (*CreationResult, error) {
+	teamDir := filepath.Join(teamsDir, team)
+	result, err := CreateConfigStructure(teamDir, override)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create team config structure: %w", err)
+	}
+
 	// Print results
 	for _, path := range result.Created {
-		fmt.Printf("Created config file: %s\n", path)
+		output.VerboseMessage(fmt.Sprintf("Created config file %s", path))
 	}
 	for _, path := range result.Overrode {
-		fmt.Printf("Overrode config file: %s\n", path)
+		output.VerboseMessage(fmt.Sprintf("Overrode config file: %s\n", path))
 	}
 	for _, path := range result.Skipped {
-		fmt.Printf("Config file already exists: %s\n", path)
+		output.VerboseMessage(fmt.Sprintf("Skipped config file: %s\n", path))
 	}
 
 	return result, nil
@@ -89,31 +103,23 @@ func CreateEnvironmentConfigs(envsDir string, override bool) (*CreationResult, e
 	}
 
 	exampleEnvs := map[string]string{
-		"staging.json": "staging",
-		"prod.json":    "production",
+		"staging.yaml": "staging",
+		"prod.yaml":    "production",
 	}
 
 	for fname, envName := range exampleEnvs {
 		fpath := filepath.Join(envsDir, fname)
-		fileExists := true
-		if _, err := os.Stat(fpath); os.IsNotExist(err) {
-			fileExists = false
+
+		// Create the environment blueprint
+		envResult, err := CreateEnvironmentFromBlueprint(fpath, envName, override)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create environment from blueprint: %w", err)
 		}
 
-		if !fileExists || override {
-			// Use the embedded template with the appropriate environment name
-			if err := CreateEnvironmentFromBlueprint(fpath, envName); err != nil {
-				return nil, fmt.Errorf("failed to create environment from blueprint: %w", err)
-			}
-
-			if fileExists && override {
-				result.Overrode = append(result.Overrode, fpath)
-			} else {
-				result.Created = append(result.Created, fpath)
-			}
-		} else {
-			result.Skipped = append(result.Skipped, fpath)
-		}
+		// Merge results
+		result.Created = append(result.Created, envResult.Created...)
+		result.Overrode = append(result.Overrode, envResult.Overrode...)
+		result.Skipped = append(result.Skipped, envResult.Skipped...)
 	}
 
 	return result, nil
@@ -128,31 +134,22 @@ func CreateRulesetConfigs(rulesetsDir string, override bool) (*CreationResult, e
 	}
 
 	exampleRulesets := map[string]string{
-		"block-dev-branch.json":  "Block dev branch creation",
-		"branch-protection.json": "Standard branch protection rules",
+		"block-dev-branch.yaml": "Block dev branch creation",
 	}
 
 	for fname, ruleName := range exampleRulesets {
 		fpath := filepath.Join(rulesetsDir, fname)
-		fileExists := true
-		if _, err := os.Stat(fpath); os.IsNotExist(err) {
-			fileExists = false
+
+		// Create the ruleset blueprint
+		rulesetResult, err := CreateRulesetFromBlueprint(fpath, ruleName, override)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ruleset from blueprint: %w", err)
 		}
 
-		if !fileExists || override {
-			// Use the embedded template
-			if err := CreateRulesetFromBlueprint(fpath, ruleName); err != nil {
-				return nil, fmt.Errorf("failed to create ruleset from blueprint: %w", err)
-			}
-
-			if fileExists && override {
-				result.Overrode = append(result.Overrode, fpath)
-			} else {
-				result.Created = append(result.Created, fpath)
-			}
-		} else {
-			result.Skipped = append(result.Skipped, fpath)
-		}
+		// Merge results
+		result.Created = append(result.Created, rulesetResult.Created...)
+		result.Overrode = append(result.Overrode, rulesetResult.Overrode...)
+		result.Skipped = append(result.Skipped, rulesetResult.Skipped...)
 	}
 
 	return result, nil
@@ -166,106 +163,102 @@ func CreateSecretsConfig(teamDir string, override bool) (*CreationResult, error)
 		Skipped:  []string{},
 	}
 
-	secretsPath := filepath.Join(teamDir, "secrets.json")
-	secretsExists := true
-	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
-		secretsExists = false
+	secretsPath := filepath.Join(teamDir, "secrets.yaml")
+
+	// Create the secrets blueprint
+	secretsResult, err := CreateSecretsFromBlueprint(secretsPath, override)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create secrets from blueprint: %w", err)
 	}
 
-	if !secretsExists || override {
-		if err := CreateSecretsFromBlueprint(secretsPath); err != nil {
-			return nil, fmt.Errorf("failed to create secrets from blueprint: %w", err)
-		}
+	// Merge results
+	result.Created = append(result.Created, secretsResult.Created...)
+	result.Overrode = append(result.Overrode, secretsResult.Overrode...)
+	result.Skipped = append(result.Skipped, secretsResult.Skipped...)
 
-		if secretsExists && override {
-			result.Overrode = append(result.Overrode, secretsPath)
-		} else {
-			result.Created = append(result.Created, secretsPath)
+	return result, nil
+}
+
+// handleBlueprintCreation is a helper function that handles the common pattern of
+// creating a file from a blueprint and processing the result
+func handleBlueprintCreation(blueprintFile string, destPath string, templateData interface{}, override bool) (*CreationResult, error) {
+	result := &CreationResult{
+		Created:  []string{},
+		Overrode: []string{},
+		Skipped:  []string{},
+	}
+
+	// Check if the file exists first
+	fileExists := true
+	if _, err := os.Stat(destPath); os.IsNotExist(err) {
+		fileExists = false
+	}
+
+	// Skip if file exists and override is false
+	if fileExists && !override {
+		result.Skipped = append(result.Skipped, destPath)
+		return result, nil
+	}
+
+	// Read the blueprint content
+	blueprintData, err := GetBlueprintContent(blueprintFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read blueprint %s: %w", blueprintFile, err)
+	}
+
+	// If no template data is provided, just write the file directly
+	if templateData == nil {
+		err = os.WriteFile(destPath, blueprintData, 0o600)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create file %s: %w", destPath, err)
 		}
 	} else {
-		result.Skipped = append(result.Skipped, secretsPath)
+		// Parse the blueprint as a template
+		templateName := filepath.Base(blueprintFile)
+		tmpl, err := template.New(templateName).Parse(string(blueprintData))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse blueprint %s: %w", blueprintFile, err)
+		}
+
+		// Create the destination file
+		f, err := os.Create(destPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create file %s: %w", destPath, err)
+		}
+		defer f.Close()
+
+		// Execute the blueprint with the provided data
+		err = tmpl.Execute(f, templateData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute blueprint %s: %w", blueprintFile, err)
+		}
+	}
+
+	// Update the result based on whether we created or overrode the file
+	if fileExists {
+		result.Overrode = append(result.Overrode, destPath)
+	} else {
+		result.Created = append(result.Created, destPath)
 	}
 
 	return result, nil
 }
 
 // CreateEnvironmentFromBlueprint creates an environment configuration file from the embedded blueprint
-func CreateEnvironmentFromBlueprint(destPath, envName string) error {
-	// Read the environment blueprint
-	blueprintData, err := GetBlueprintContent(EnvironmentBlueprintFile)
-	if err != nil {
-		return fmt.Errorf("failed to read environment blueprint: %w", err)
-	}
-
-	// Parse the blueprint
-	tmpl, err := template.New("environment").Parse(string(blueprintData))
-	if err != nil {
-		return fmt.Errorf("failed to parse environment blueprint: %w", err)
-	}
-
-	// Create the destination file
-	f, err := os.Create(destPath)
-	if err != nil {
-		return fmt.Errorf("failed to create environment file: %w", err)
-	}
-	defer f.Close()
-
-	// Execute the blueprint with the environment name
-	err = tmpl.Execute(f, map[string]string{
+func CreateEnvironmentFromBlueprint(destPath, envName string, override bool) (*CreationResult, error) {
+	return handleBlueprintCreation(EnvironmentBlueprintFile, destPath, map[string]string{
 		"Name": envName,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to execute environment blueprint: %w", err)
-	}
-
-	return nil
+	}, override)
 }
 
 // CreateRulesetFromBlueprint creates a ruleset configuration file from the embedded blueprint
-func CreateRulesetFromBlueprint(destPath, ruleName string) error {
-	// Read the ruleset blueprint
-	blueprintData, err := GetBlueprintContent(RulesetBlueprintFile)
-	if err != nil {
-		return fmt.Errorf("failed to read ruleset blueprint: %w", err)
-	}
-
-	// Parse the blueprint
-	tmpl, err := template.New("ruleset").Parse(string(blueprintData))
-	if err != nil {
-		return fmt.Errorf("failed to parse ruleset blueprint: %w", err)
-	}
-
-	// Create the destination file
-	f, err := os.Create(destPath)
-	if err != nil {
-		return fmt.Errorf("failed to create ruleset file: %w", err)
-	}
-	defer f.Close()
-
-	// Execute the blueprint with the ruleset name
-	err = tmpl.Execute(f, map[string]string{
+func CreateRulesetFromBlueprint(destPath, ruleName string, override bool) (*CreationResult, error) {
+	return handleBlueprintCreation(RulesetBlueprintFile, destPath, map[string]string{
 		"Name": ruleName,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to execute ruleset blueprint: %w", err)
-	}
-
-	return nil
+	}, override)
 }
 
 // CreateSecretsFromBlueprint creates a secrets configuration file from the embedded blueprint
-func CreateSecretsFromBlueprint(destPath string) error {
-	// Read the secrets blueprint
-	blueprintData, err := GetBlueprintContent(SecretsBlueprintFile)
-	if err != nil {
-		return fmt.Errorf("failed to read secrets blueprint: %w", err)
-	}
-
-	// Create the destination file
-	err = os.WriteFile(destPath, blueprintData, 0o600)
-	if err != nil {
-		return fmt.Errorf("failed to create secrets file: %w", err)
-	}
-
-	return nil
+func CreateSecretsFromBlueprint(destPath string, override bool) (*CreationResult, error) {
+	return handleBlueprintCreation(SecretsBlueprintFile, destPath, nil, override)
 }

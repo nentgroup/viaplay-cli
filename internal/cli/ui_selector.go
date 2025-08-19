@@ -265,7 +265,7 @@ func SelectTeamWithBubbles(ghClient *gh.GitHubClient, orgName string) (string, e
 	}
 
 	// Fetch teams in the organization
-	teams, err := ghClient.ListOrgTeams(orgName)
+	teams, err := ghClient.ListTeams(orgName)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch teams: %w", err)
 	}
@@ -278,19 +278,19 @@ func SelectTeamWithBubbles(ghClient *gh.GitHubClient, orgName string) (string, e
 	var items []Item
 	for _, team := range teams {
 		desc := ""
-		if team.Description != nil && *team.Description != "" {
-			desc = *team.Description
+		if team.Description != "" {
+			desc = team.Description
 		}
 
 		items = append(items, Item{
-			TitleText:       *team.Name,
+			TitleText:       team.Name,
 			DescriptionText: desc,
-			Value:           slugify(*team.Name),
+			Value:           slugify(team.Name),
 		})
 	}
 
 	// Run the selector
-	selected, err := RunSelector(fmt.Sprintf("SELECT a team FROM %S", orgName), items)
+	selected, err := RunSelector(fmt.Sprintf("Choose a team from %s", orgName), items)
 	if err != nil {
 		return "", err
 	}

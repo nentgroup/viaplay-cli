@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v74/github"
+	"github.com/invopop/yaml"
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
-
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
 )
 
@@ -138,13 +138,16 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 	appliedCount := 0
 	failedEnvs := []string{}
 
+	// Create a renderer with the template variables
+	renderer := c.getTemplateRenderer()
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 
-		// Only process JSON files
-		if !strings.HasSuffix(entry.Name(), ".json") {
+		// Only process yaml files
+		if !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
 		}
 
@@ -159,11 +162,21 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 			continue
 		}
 
+		// First, render the template variables in the raw content - this is critical for YAML processing
+		c.Reporter.Debug(fmt.Sprintf("Rendering ruleset %s with template variables", entry.Name()))
+		renderedData, err := renderer.RenderString(string(data))
+		if err != nil {
+			errMsg := fmt.Sprintf("Failed to render ruleset %s with template variables: %v", entry.Name(), err)
+			c.Reporter.Warning("Ruleset rendering", errMsg)
+			failedEnvs = append(failedEnvs, errMsg)
+			continue
+		}
+
 		// Parse the environment configuration
 		var envConfig EnvConf
 
 		// Parse JSON
-		if err := json.Unmarshal(data, &envConfig); err != nil {
+		if err := yaml.Unmarshal([]byte(renderedData), &envConfig); err != nil {
 			errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", entry.Name(), err)
 			c.Reporter.Warning("Environment processing", errMsg)
 			failedEnvs = append(failedEnvs, errMsg)
@@ -287,8 +300,9 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 			continue
 		}
 
-		// Only process JSON files
-		if !strings.HasSuffix(f.Name(), ".json") {
+		// Process both JSON and YAML ruleset files
+		ext := strings.ToLower(filepath.Ext(f.Name()))
+		if ext != ".yaml" && ext != ".yml" {
 			continue
 		}
 
@@ -303,7 +317,7 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 			continue
 		}
 
-		// Render the ruleset content with template variables
+		// First, render the template variables in the raw content - this is critical for YAML processing
 		c.Reporter.Debug(fmt.Sprintf("Rendering ruleset %s with template variables", f.Name()))
 		renderedData, err := renderer.RenderString(string(data))
 		if err != nil {
@@ -313,14 +327,21 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 			continue
 		}
 
-		// Unmarshal JSON directly into the GitHub API struct
+		// Debug the rendered data to help troubleshoot
+		c.Reporter.Debug(fmt.Sprintf("Rendered ruleset data for %s: \n%s", f.Name(), renderedData))
+
+		// Unmarshal JSON/YAML into the GitHub API struct
 		var ruleset github.RepositoryRuleset
-		if err := json.Unmarshal([]byte(renderedData), &ruleset); err != nil {
-			errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", f.Name(), err)
+
+		// Unmarshal JSON into the GitHub struct
+		if err := yaml.Unmarshal([]byte(renderedData), &ruleset); err != nil {
+			errMsg := fmt.Sprintf("Failed to parse converted JSON from YAML in %s: %v", f.Name(), err)
 			c.Reporter.Warning("Ruleset processing", errMsg)
 			failedRulesets = append(failedRulesets, errMsg)
 			continue
 		}
+
+		c.Reporter.Debug(fmt.Sprintf("Successfully converted YAML to GitHub ruleset structure for %s", f.Name()))
 
 		// Basic validation
 		if ruleset.Name == "" {
@@ -373,7 +394,7 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 		teamDir = filepath.Join(home, teamDir[1:])
 	}
 
-	secretsPath := filepath.Join(teamDir, "secrets.json")
+	secretsPath := filepath.Join(teamDir, "secrets.yaml")
 	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
 		c.Reporter.Skip(mainOperation, "No secrets.json file found")
 		return nil
@@ -399,7 +420,7 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 	var secretsConfig secrets.Config
 
 	// Parse the rendered JSON
-	if err := json.Unmarshal([]byte(renderedData), &secretsConfig); err != nil {
+	if err := yaml.Unmarshal([]byte(renderedData), &secretsConfig); err != nil {
 		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to parse JSON in %s", secretsPath))
 		return fmt.Errorf("failed to parse secrets JSON: %w", err)
 	}

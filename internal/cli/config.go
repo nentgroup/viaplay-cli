@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -289,23 +288,17 @@ func showConfigPaths() {
 
 // initializeConfigFile creates or updates the main config file
 func initializeConfigFile(override bool, team string, organization string, ghClient *gh.GitHubClient) error {
-	// Get the authenticated user's GitHub account type (personal or organization)
-	accountType, err := ghClient.GetAccountType()
-	if err != nil {
-		return fmt.Errorf("failed to determine GitHub account type: %w", err)
-	}
-
 	// Use the centralised function from the config package
 	if err := config.InitializeConfigFile(defaultConfigFile, override, team); err != nil {
 		return err
 	}
 
-	// If this is an organization account, set the organization field
-	if accountType == "Organization" && organization != "" {
-		if err := config.UpdateConfigValue(defaultConfigFile, "github.organization", organization); err != nil {
-			fmt.Printf("Warning: Failed to update GitHub organization in config: %v\n", err)
+	// Update the default_organization in config if provided
+	if organization != "" {
+		if err := config.UpdateConfigValue(defaultConfigFile, "default_organization", organization); err != nil {
+			fmt.Printf("Warning: Failed to update default_organization in config: %v\n", err)
 		} else {
-			fmt.Printf("Set GitHub organization to '%s' based on your logged-in account\n", organization)
+			fmt.Printf("Set default_organization = %s\n", organization)
 		}
 	}
 
@@ -424,179 +417,72 @@ func scaffoldTeamConfig(team string, override bool, organization string) error {
 	return nil
 }
 
-// updateOrganizationConfig updates or creates an organization entry in the github.organizations section
+// updateOrganizationConfig updates the top-level organization and team settings
 func updateOrganizationConfig(organization, team string) {
-	// Read the current config file content
-	content, err := os.ReadFile(defaultConfigFile)
-	if err != nil {
-		fmt.Printf("Warning: Could not read config file to update organization: %v\n", err)
-		return
+	// Simply update the default_organization and default_team values
+	if err := config.UpdateConfigValue(defaultConfigFile, "default_organization", organization); err != nil {
+		fmt.Printf("Warning: Failed to update default_organization in config: %v\n", err)
 	}
 
-	// Check if the organization already exists in the config
-	orgKey := fmt.Sprintf("github.organizations.%s", organization)
-	orgExists := viper.IsSet(orgKey)
-
-	if orgExists {
-		// If the organization exists, check if the team is already in its teams list
-		teams := viper.GetStringSlice(fmt.Sprintf("%s.teams", orgKey))
-		teamExists := false
-		for _, t := range teams {
-			if t == team {
-				teamExists = true
-				break
-			}
-		}
-
-		// If the team doesn't exist in the organization's teams list, add it
-		if !teamExists {
-			teams = append(teams, team)
-			// The Set() method doesn't return anything, it was incorrectly treated as returning an error
-			viper.Set(fmt.Sprintf("%s.teams", orgKey), teams)
-
-			// Try to save the updated config
-			if err := viper.WriteConfig(); err != nil {
-				fmt.Printf("Warning: Failed to write updated config: %v\n", err)
-			} else {
-				fmt.Printf("Added team '%s' to organization '%s' in configuration\n", team, organization)
-			}
-		}
-	} else {
-		// If the organization doesn't exist, we need to add it with proper YAML structure
-		// This is a bit tricky with viper, so we'll update the file manually with proper indentation
-
-		// Find where to insert the organization config
-		lines := strings.Split(string(content), "\n")
-		orgSectionFound := false
-		insertIndex := -1
-		indentLevel := "  " // Default indent level for YAML
-
-		// Look for the github.organizations section
-		for i, line := range lines {
-			trimmedLine := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmedLine, "organizations:") {
-				orgSectionFound = true
-				insertIndex = i + 1
-
-				// Calculate the indent level based on the current line
-				indent := line[:len(line)-len(trimmedLine)]
-				indentLevel = indent + "  " // Add two spaces for child elements
-				break
-			}
-		}
-
-		// If we didn't find the organizations section, look for the github: section
-		if !orgSectionFound {
-			for i, line := range lines {
-				trimmedLine := strings.TrimSpace(line)
-				if trimmedLine == "github:" {
-					// Insert at the end of the github section
-					// First, find the end of the github section
-					j := i + 1
-					for ; j < len(lines); j++ {
-						// If we find a line that's not indented more than the github line,
-						// we've reached the end of the github section
-						if !strings.HasPrefix(lines[j], "  ") && lines[j] != "" {
-							break
-						}
-					}
-					insertIndex = j
-					indentLevel = "  " // Standard indent for sections under github
-					break
-				}
-			}
-		}
-
-		// If we still haven't found where to insert, add to the end of the file
-		if insertIndex == -1 {
-			lines = append(lines, "", "github:", "  organizations:")
-			insertIndex = len(lines)
-			indentLevel = "    " // Indent for items under organizations
-		}
-
-		// Create the new organization config
-		var orgConfig []string
-
-		if orgSectionFound {
-			// If the organizations section exists, add the new org directly under it
-			orgConfig = []string{
-				fmt.Sprintf("%s%s:", indentLevel, organization),
-				fmt.Sprintf("%s  default_team: \"%s\"", indentLevel, team),
-				fmt.Sprintf("%s  teams:", indentLevel),
-				fmt.Sprintf("%s    - \"%s\"", indentLevel, team),
-			}
+	// If team is specified, set it as default for this organization
+	if team != "" {
+		if err := config.UpdateConfigValue(defaultConfigFile, "default_team", team); err != nil {
+			fmt.Printf("Warning: Failed to update default_team in config: %v\n", err)
 		} else {
-			// If we're adding to the github section, we need to include the organizations key
-			orgConfig = []string{
-				"  organizations:",
-				fmt.Sprintf("    %s:", organization),
-				fmt.Sprintf("      default_team: \"%s\"", team),
-				fmt.Sprintf("      teams:"),
-				fmt.Sprintf("        - \"%s\"", team),
-			}
-		}
-
-		// Insert the organization config at the determined position
-		if insertIndex >= len(lines) {
-			lines = append(lines, orgConfig...)
-		} else {
-			// Insert the new lines at the insertIndex
-			newLines := make([]string, 0, len(lines)+len(orgConfig))
-			newLines = append(newLines, lines[:insertIndex]...)
-			newLines = append(newLines, orgConfig...)
-			newLines = append(newLines, lines[insertIndex:]...)
-			lines = newLines
-		}
-
-		// Write the updated config back to file
-		if err := os.WriteFile(defaultConfigFile, []byte(strings.Join(lines, "\n")), 0o600); err != nil {
-			fmt.Printf("Warning: Failed to write updated config file: %v\n", err)
-		} else {
-			fmt.Printf("Added organization '%s' with team '%s' to configuration\n", organization, team)
-
-			// Reload viper config to reflect changes
-			if err := viper.ReadInConfig(); err != nil {
-				fmt.Printf("Warning: Failed to reload config after updates: %v\n", err)
-			}
+			fmt.Printf("Set default_team = %s for organization %s\n", team, organization)
 		}
 	}
 }
 
-// Message display functions
-
-// showInitSuccessMessage displays a success message after initialization
-func showInitSuccessMessage(team string, organization string) {
-	fmt.Println("\n✅ viaplay-cli initialized successfully!")
-	fmt.Println("- Configuration directory: ", defaultConfigDir)
-	fmt.Println("- Teams directory:        ", defaultTeamsDir)
-
-	// Provide hints for next steps
-	if team == "" {
-		fmt.Println("\nTip: Set up a team configuration with:")
-		fmt.Println("  vip config init --team <team-name>")
-	}
-}
-
-// scaffoldPersonalConfig creates personal account configuration files and directories
+// scaffoldPersonalConfig creates personal account configurations
 func scaffoldPersonalConfig(username string, override bool) error {
-	fmt.Printf("Setting up personal account configurations for '%s'\n", username)
-
-	// Use the config package's personal config creation functionality
+	// Use the config package's CreatePersonalConfig function
 	result, err := config.CreatePersonalConfig(username, override)
 	if err != nil {
-		return fmt.Errorf("failed to create personal configuration: %w", err)
+		return err
 	}
 
-	// Print a summary of what happened
-	if len(result.Created) > 0 {
-		fmt.Printf("\nCreated %d config files for personal account\n", len(result.Created))
+	// Print results
+	for _, path := range result.Created {
+		fmt.Printf("Created personal config file: %s\n", path)
 	}
-	if len(result.Overrode) > 0 {
-		fmt.Printf("Overrode %d existing config files for personal account\n", len(result.Overrode))
+	for _, path := range result.Overrode {
+		fmt.Printf("Overrode personal config file: %s\n", path)
 	}
-	if len(result.Skipped) > 0 {
-		fmt.Printf("Skipped %d existing config files for personal account\n", len(result.Skipped))
+	for _, path := range result.Skipped {
+		fmt.Printf("Personal config file already exists: %s\n", path)
 	}
 
 	return nil
+}
+
+// showInitSuccessMessage displays a success message with next steps
+func showInitSuccessMessage(team string, organization string) {
+	fmt.Printf("\n%s %s\n\n", output.ActiveIcons.Success, output.SuccessBold("Configuration initialized successfully!"))
+
+	fmt.Println("Next steps:")
+
+	if team != "" {
+		fmt.Printf("  %s Set '%s' as your default team\n", output.ActiveIcons.Bullet, team)
+		if organization != "" {
+			fmt.Printf("  %s Configuration is set up for team '%s' in organization '%s'\n",
+				output.ActiveIcons.Bullet, team, organization)
+		}
+		fmt.Printf("  %s Create your first project with: %s\n",
+			output.ActiveIcons.Bullet,
+			output.Bold("vip create project --name myproject --team "+team))
+	} else {
+		fmt.Printf("  %s Create a team configuration with: %s\n",
+			output.ActiveIcons.Bullet,
+			output.Bold("vip config init --team myteam"))
+		fmt.Printf("  %s Create your first project with: %s\n",
+			output.ActiveIcons.Bullet,
+			output.Bold("vip create project --name myproject"))
+	}
+
+	fmt.Printf("  %s View your config with: %s\n",
+		output.ActiveIcons.Bullet,
+		output.Bold("vip config get"))
+
+	fmt.Println()
 }

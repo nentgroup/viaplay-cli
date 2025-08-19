@@ -13,7 +13,7 @@ Secrets are sensitive values (such as API keys, tokens, or passwords) that are r
 ## Where are Secrets Stored?
 
 - **Team secrets:**
-  - Configured in `~/.config/viaplay/teams/<team>/secrets.json` (or the global secrets file)
+  - Configured in `~/.config/viaplay/teams/<team>/secrets.yaml` (or the global secrets file)
   - The actual secret values are always stored securely in your operating system's keyring (e.g., macOS Keychain, Windows Credential Manager, or Linux Secret Service), not in the config files themselves.
   - The config files only reference the secret names and metadata, never the values.
 
@@ -21,14 +21,20 @@ Secrets are sensitive values (such as API keys, tokens, or passwords) that are r
 
 ## Example Team Secrets File
 
-```json
-{
-  "secrets": [
-    { "name": "GH_TOKEN", "value": "${{ secrets.GH_TOKEN }}", "env": "", "type": "secret" },
-    { "name": "STAGING_API_KEY", "value": "${{ secrets.STAGING_API_KEY }}", "env": "staging", "type": "secret" },
-    { "name": "DATABASE_URL", "value": "${{ secrets.DATABASE_URL }}", "env": "production", "type": "variable" }
-  ]
-}
+```yaml
+secrets:
+  - name: GH_TOKEN
+    value: ${{ secrets.GH_TOKEN }}
+    env: ""
+    type: secret
+  - name: STAGING_API_KEY
+    value: ${{ secrets.STAGING_API_KEY }}
+    env: staging
+    type: secret
+  - name: DATABASE_URL
+    value: ${{ secrets.DATABASE_URL }}
+    env: production
+    type: variable
 ```
 
 - `env`: Target environment where the secret/variable will be created
@@ -40,14 +46,19 @@ Secrets are sensitive values (such as API keys, tokens, or passwords) that are r
 
 The `env` parameter lets you target secrets to specific deployment environments:
 
-```json
-{
-  "secrets": [
-    { "name": "API_KEY", "value": "${{ secrets.DEV_API_KEY }}", "env": "development", "type": "secret" },
-    { "name": "API_KEY", "value": "${{ secrets.PROD_API_KEY }}", "env": "production", "type": "secret" },
-    { "name": "GLOBAL_SECRET", "value": "${{ secrets.GLOBAL_SECRET }}", "type": "secret" }
-  ]
-}
+```yaml
+secrets:
+  - name: API_KEY
+    value: ${{ secrets.DEV_API_KEY }}
+    env: development
+    type: secret
+  - name: API_KEY
+    value: ${{ secrets.PROD_API_KEY }}
+    env: production
+    type: secret
+  - name: GLOBAL_SECRET
+    value: ${{ secrets.GLOBAL_SECRET }}
+    type: secret
 ```
 
 In this example:
@@ -79,15 +90,14 @@ The preferred and most secure way to reference a secret is using the `${{ secret
 
 - `${{ secrets.SECRET_KEY }}` can be used:
   - In the `--repo-secrets` inline flag (as a value or reference)
-  - Inside the JSON secrets config (e.g., `secrets.json`)
+  - Inside the YAML secrets config (e.g., `secrets.yaml`)
 
 Example usage in a secrets config:
-```json
-{
-  "secrets": [
-    { "name": "API_KEY", "value": "${{ secrets.GH_TOKEN }}", "type": "secret" }
-  ]
-}
+```yaml
+secrets:
+  - name: API_KEY
+    value: ${{ secrets.GH_TOKEN }}
+    type: secret
 ```
 
 Example usage with the CLI flag:
@@ -99,28 +109,19 @@ vip create project --name myservice --repo-secrets '{"secrets":[{"name":"API_KEY
 
 You can reference template variables in your secret values using Go template syntax. This is particularly useful for creating dynamic values that incorporate project information:
 
-```json
-{
-  "secrets": [
-    { 
-      "name": "RESOURCE_PREFIX", 
-      "value": "{{.Project.Name}}-resources",
-      "type": "variable"
-    },
-    {
-      "name": "STACK_NAME",
-      "value": "Dev-{{.Service.Name | pascal}}",
-      "type": "variable",
-      "env": "dev"
-    },
-    {
-      "name": "SERVICE_URL",
-      "value": "https://api.example.com/{{.Repo.Name | kebab}}/v1",
-      "type": "variable",
-      "env": "production"
-    }
-  ]
-}
+```yaml
+secrets:
+  - name: RESOURCE_PREFIX
+    value: "{{.Project.Name}}-resources"
+    type: variable
+  - name: STACK_NAME
+    value: "Dev-{{.Service.Name | pascal}}"
+    type: variable
+    env: dev
+  - name: SERVICE_URL
+    value: "https://api.example.com/{{.Repo.Name | kebab}}/v1"
+    type: variable
+    env: production
 ```
 
 In the example above:

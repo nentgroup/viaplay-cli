@@ -12,26 +12,33 @@ An environment in GitHub is a named context for deployments, such as `staging`, 
 
 ## How to Configure Environments
 
-Environments are configured using JSON files placed in your team configuration directory:
+Environments are configured using YAML files placed in your team configuration directory:
 
 ```bash
 mkdir -p ~/.config/viaplay/teams/<team>/envs
 ```
 
-Each environment should have its own JSON file. For example, to define a `staging` environment:
+Each environment should have its own YAML file. For example, to define a `staging` environment:
 
-### Example: `staging.json`
+### Example: `staging.yaml`
 
-```json
-{
-  "name": "staging",
-  "wait_timer": 0,
-  "reviewers": [],
-  "deployment_branch_policy": {
-    "protected_branches": false,
-    "custom_branch_policies": true
-  }
-}
+```yaml
+name: staging
+wait_timer: 0
+reviewers:
+  - type: Team
+    id: {{.Org.TeamID}}
+deployment_branch_policy:
+  protected_branches: false
+  custom_branch_policies: true
+  branch_patterns:
+    - name: main              # This represents a DeploymentBranchPolicyRequest
+      type: branch            # Values could be "branch" or "tag"
+    - name: "release/*"       # Another pattern example
+      type: branch
+    - name: "*"
+      type: tag
+
 ```
 
 - `name`: The name of the environment (required)
