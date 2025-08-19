@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.5](https://github.com/nentgroup/viaplay-cli/compare/v2.0.4...v2.0.5) (2025-08-19)
+
+
+### Documentation
+
+* update quickstart ([#47](https://github.com/nentgroup/viaplay-cli/issues/47)) ([31b4af6](https://github.com/nentgroup/viaplay-cli/commit/31b4af6be76b6da592d06994f297ebd76dbf5df0))
+
 ## [2.0.4](https://github.com/nentgroup/viaplay-cli/compare/v2.0.3...v2.0.4) (2025-08-19)
 
 
