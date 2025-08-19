@@ -7,10 +7,11 @@ This section explains how configuration works in viaplay-cli, including global, 
 ## Configuration Overview
 
 viaplay-cli uses YAML configuration files to control default values, paths, team settings, template sources,
-rulesets, secrets, and more. There are two main types of configuration:
+rulesets, secrets, and more. There are three main types of configuration:
 
 - **Global config:** `~/.config/viaplay/config.yaml` — User-wide defaults and settings.
-- **Team config:** `~/.config/viaplay/teams/<team>/config.yaml` — Team-specific settings, rulesets, and secrets.
+- **Organization team configs:** `~/.config/viaplay/orgs/<organization>/<team>/` — Team-specific settings folder containing various configuration files like rulesets, environments, and secrets within an organization.
+- **Personal user configs:** `~/.config/viaplay/users/<username>/` — User-specific settings folder containing configuration files for personal repositories.
 
 ---
 
@@ -27,18 +28,13 @@ This file controls the default behavior of viaplay-cli:
 # Default Settings (used when no flags are provided)
 # -----------------------------------------------
 
-# Team name to use for loading configuration templates
-# This determines which team-specific templates to use from ~/.config/viaplay/teams/
+# Default GitHub organization name for repositories
+# This determines which organization-specific settings will be used
+default_organization: ""
+
+# Default team name to use when creating repositories
+# This determines which team-specific templates to use
 default_team: ""
-
-# GitHub account/organization name to use for repositories
-# For personal repos, use your GitHub username
-# For org repos, use the organization name
-default_account: ""
-
-# Whether the default_account is an organization (true) or personal account (false)
-# This affects repository creation behaviour
-is_org: false
 
 # Default programming language for new projects
 # Available options: go, typescript, rust, python
@@ -49,9 +45,9 @@ default_language: "go"
 default_type: "service"
 
 # Default repository visibility
-# When true, repositories will be created as private by default
-# Use --private=false flag to override and create public repositories
-default_private: true
+# Options: "private" or "public"
+# Use --public flag to override and create public repositories
+default_visibility: "private"
 
 # -----------------------------------------------
 # Default Behavior Settings
@@ -92,7 +88,7 @@ no_cache: false
 # Repository templates for each language and project type
 # Format: templates.<language>.<type> = "<source>"
 # Source can be:
-# - GitHub repo: "git@githubc:<owner>/<repo>.git"
+# - GitHub repo: "git@github.com:<owner>/<repo>.git"
 # - Local path: "local@/path/to/template"
 # - Tarball URL: "url@https://example.com/template.tar.gz"
 templates:
@@ -115,7 +111,7 @@ templates:
   # Rust templates
   rust:
     service:
-        source: git@github.com:nentgroup/rust-service-template.git
+      source: git@github.com:nentgroup/rust-service-template.git
 
   # Node templates
   node:
@@ -132,24 +128,9 @@ templates:
 # Default: ~/.config/viaplay
 config_dir: "~/.config/viaplay"
 
-# Directory for team-specific configurations
-# Default: ~/.config/viaplay/teams
-teams_dir: "~/.config/viaplay/teams"
-
-# Directory for global configurations (used as fallback if team config not found)
-# Default: ~/.config/viaplay/global
-global_dir: "~/.config/viaplay/global"
-
-# -----------------------------------------------
-# GitHub Configuration
-# -----------------------------------------------
-
-# Default branch name for new repositories
-default_branch: "main"
-
-# GitHub API endpoint (change for GitHub Enterprise)
-# Default: https://api.github.com
-github_api: "https://api.github.com"
+# Directory for organization-specific configurations
+# Default: ~/.config/viaplay/orgs
+orgs_dir: "~/.config/viaplay/orgs"
 
 # -----------------------------------------------
 # Build and Deployment Settings
@@ -296,14 +277,14 @@ fi
 
 ### Using Hooks
 
-Hooks are automatically executed after a project is scaffolded using the `vip create project` command, unless explicitly disabled:
+Hooks are automatically executed after a project is scaffolded using the `vip project create` command, unless explicitly disabled:
 
 ```bash
 # Create a project and execute hooks
-vip create project --name myservice --language go --type service
+vip project create nentgroup/myservice --language go --type service --team myteam
 
 # Create a project but skip executing hooks
-vip create project --name myservice --language go --type service --no-hooks
+vip project create nentgroup/myservice --language go --type service --team myteam --no-hooks
 ```
 
 ### Locating Hook Scripts

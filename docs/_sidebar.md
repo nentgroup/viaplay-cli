@@ -5,6 +5,7 @@
 - [Templates](templates.md)
 - [Secrets](secrets.md)
 - [Environments](envs.md)
+- [Rulesets](rulesets.md)
 - [Project & Repo Creation](project-creation.md)
 - [CLI Reference](cli/index.md)
   - [Project](cli/project.md)

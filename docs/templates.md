@@ -14,6 +14,13 @@ Owner: {{ .Repo.Owner }}
 Service Port: {{ .Service.Port }}
 ```
 
+Template variables can be used in:
+- File content (as shown above)
+- Filenames (e.g., `{{.Project.Name}}.md`, `{{.Service.Name}}-config.yaml`)
+- Folder names (e.g., `src/{{.Service.Name}}`, `{{kebab .Project.Name}}/lib`)
+
+This allows you to dynamically name files and folders based on the project attributes.
+
 ---
 
 ## Supported Template Variables

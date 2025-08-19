@@ -14,10 +14,9 @@ viaplay-cli can scaffold new projects from templates and automate the creation o
 
 - **Project Creation:**
   - Scaffolds a new project from a template (with your chosen language and type)
-  - Creates a new GitHub repository
+  - Creates a new GitHub repository (in an organization or your personal account)
   - Applies team/org settings (environments, rulesets, secrets)
   - Executes post-installation hooks (if defined and not skipped)
-  - Optionally clones the project locally and sets up initial config files
 
 - **Repository Creation:**
   - Creates a new GitHub repository (no code scaffolding)
@@ -27,32 +26,42 @@ viaplay-cli can scaffold new projects from templates and automate the creation o
 
 ## What Gets Created?
 
-- A new project directory with all files from the templa  te, rendered with your variables (for project creation)
+- A new project directory with all files from the template, rendered with your variables (for project creation)
 - A new GitHub repository (if enabled), with rulesets and secrets applied
 
 ---
 
 ## Examples
 
-### Creating a Go Service with Custom Binary Name
+### Creating a Go Service with Custom Binary Name in an Organization
 
 ```bash
-vip create project --name my-awesome-service --language go --type service --team myteam --binary-name custombin
+vip project create nentgroup/repo-name --language go --type service --team myteam --binary-name custombin
 ```
 
 This will create a Go service project where the compiled binary will be named `custombin` instead of defaulting to the repository name.
 
-### Creating a TypeScript Web Application
+### Creating a TypeScript Web Application in an Organization
 
 ```bash
-vip create project --name my-web-app --language typescript --type webapp --team myteam
+vip project create nentgroup/repo-name --language typescript --type webapp --team myteam
 ```
+
+### Creating a Project in Your Personal GitHub Account
+
+```bash
+vip project create username/repo-name --language go --type library
+```
+
+Note that the command takes one argument in the format `org/repo-name` or `username/repo-name`, where:
+- `org/repo-name` creates the project in the specified organization
+- `username/repo-name` creates the project in your personal GitHub account
 
 ---
 
 ## Learn More
 
-- For detailed usage, flags, and subcommands, see the [create command reference](cli/create.md).
+- For detailed usage, flags, and subcommands, see the [project command reference](cli/project.md).
 - For template details, see [Templates](templates.md).
 - For team/org configuration, see [Configuration](configuration.md).
 

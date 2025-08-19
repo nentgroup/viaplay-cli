@@ -21,13 +21,19 @@ vip auth login
 ## 3. Create a New Project
 
 ```
-vip create project --name <name> --language <lang> --type <type> [options]
+vip project create <org/repo-name> --language <lang> --type <type> [options]
 ```
 
 Example:
 
 ```
-vip create --name my-service --language rust --type service --team gecko
+vip project create nentgroup/my-service --language rust --type service --team gecko
+```
+
+Or for your personal account:
+
+```
+vip project create username/my-service --language rust --type service
 ```
 
 ---
