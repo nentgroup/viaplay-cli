@@ -29,10 +29,10 @@ This step will:
 - Configure default settings based on your GitHub account
 - Let you select your organization and team (if applicable)
 
-You can also specify a team directly:
+You can also specify a team and organization directly:
 
 ```
-vip config init --team myteam
+vip config init --team myteam -o myorg
 ```
 
 ---

@@ -24,13 +24,21 @@ A template typically contains:
 Specify the template source when creating a project:
 
 ```bash
-vip create --repo-name my-service --template-source git@github.com:nentgroup/rust-http-service-template-2.git
+# Basic usage
+vip project create my-service --language rust --type service --template-source git@github.com:nentgroup/rust-http-service-template-2.git
+
+# With explicit organization/owner
+vip project create myorg/my-service --language rust --type service --template-source git@github.com:nentgroup/rust-http-service-template-2.git
 ```
 
 Or use a local template:
 
 ```bash
-vip create --repo-name my-service --template-source ~/my-templates/rust-service
+# Basic usage
+vip project create my-service --language rust --type service --template-source ~/my-templates/rust-service
+
+# With explicit organization/owner
+vip project create myorg/my-service --language rust --type service --template-source ~/my-templates/rust-service
 ```
 
 ---
