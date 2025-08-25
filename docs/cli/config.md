@@ -73,12 +73,4 @@ vip config paths
 
 ---
 
-## Best Practices
-
-- Use `vip config set` to update values without editing YAML manually.
-- Keep team configs versioned for consistency.
-- Use `vip config paths` to troubleshoot or verify config locations.
-
----
-
 For more details, see the [Rulesets and Configuration](../rulesets.md) section.

@@ -312,7 +312,6 @@ To create a new hook script:
 
 ## How to Edit Configuration
 
-- Use `vip config set <key> <value>` to update values.
 - Use `vip config get <key>` to view current values.
 - Edit YAML files directly for advanced changes.
 
