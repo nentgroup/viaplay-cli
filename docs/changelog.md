@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/nentgroup/viaplay-cli/compare/v2.0.5...v2.1.0) (2025-08-25)
+
+
+### Features
+
+* streamline config handling and improve CLI output ([#49](https://github.com/nentgroup/viaplay-cli/issues/49)) ([461ba48](https://github.com/nentgroup/viaplay-cli/commit/461ba48e5414a5bd4e6dc0d06eff37bfa960deff))
+
 ## [2.0.5](https://github.com/nentgroup/viaplay-cli/compare/v2.0.4...v2.0.5) (2025-08-19)
 
 
