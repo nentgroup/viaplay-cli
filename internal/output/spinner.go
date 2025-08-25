@@ -29,12 +29,12 @@ type Spinner struct {
 // NewSpinner creates a new spinner
 func NewSpinner() *Spinner {
 	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-	s.Writer = os.Stdout
+	s.Writer = os.Stderr
 	s.Color("red", "bold")
 
 	return &Spinner{
 		spinner:      s,
-		output:       os.Stdout,
+		output:       os.Stderr,
 		successStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("76")),  // Green
 		errorStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("161")), // Red
 		skipStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("240")), // Gray

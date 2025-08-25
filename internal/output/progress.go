@@ -1,11 +1,7 @@
-// Package progress provides types and functions for tracking operation progress
-// throughout the application in a presentation-agnostic way.
-package progress
+package output
 
 import (
 	"fmt"
-
-	"github.com/nentgroup/viaplay-cli/internal/output"
 )
 
 // Status represents the current status of an operation
@@ -155,23 +151,23 @@ func (r *NoopReporter) Error(message string) {}
 // DefaultCB is a default callback implementation that uses the output.Spinner
 // to display progress updates with appropriate icons and formatting.
 // It maintains a single spinner instance across multiple callbacks.
-var spinnerInstance *output.Spinner
+var spinnerInstance *Spinner
 
 func DefaultCB(operation string, status Status, details string, err error) {
 	// Initialise spinner once
 	if spinnerInstance == nil {
-		spinnerInstance = output.NewSpinner()
+		spinnerInstance = NewSpinner()
 	}
 
 	switch status {
 	case StatusDebug:
-		output.VerboseMessage(details)
+		VerboseMessage(details)
 		return
 	case StatusInfo:
-		output.InfoMessage(details)
+		InfoMessage(details)
 		return
 	case StatusError:
-		output.ErrorMessage(details)
+		ErrorMessage(details)
 		return
 	case StatusStarted:
 		spinnerInstance.Start(operation)
@@ -210,6 +206,6 @@ func DefaultCB(operation string, status Status, details string, err error) {
 // and automatically sets debug mode based on the output package's verbose setting
 func NewDefaultReporter() Reporter {
 	// Get verbose status from output package
-	isVerbose := output.IsVerboseEnabled()
+	isVerbose := IsVerboseEnabled()
 	return NewCallbackReporter(DefaultCB, isVerbose)
 }

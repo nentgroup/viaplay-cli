@@ -5,7 +5,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -22,29 +21,21 @@ var (
 	defaultTeamsDir   string
 )
 
-func init() {
-	// Initialise paths using the config package functions
-	defaultConfigDir = config.GetDefaultConfigDir()
-	defaultConfigFile = config.GetDefaultConfigFile()
-	defaultTeamsDir = config.GetDefaultTeamsDir()
-}
-
 // configCmd represents the config command
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage viaplay-cli configuration and team settings",
 	Long: `Manage global and team-specific configuration for viaplay-cli.
 
-- View and update CLI settings
+- View CLI settings
 - Scaffold team config folders and example JSON files
 - Set up directories for rulesets, secrets, and environments
 - Integrate with $HOME/.config/viaplay/config.yaml by default
 
 Examples:
-  vip config init                     # Initialize config file
-  vip config init --team myteam       # Initialize with team config
-  vip config get default_account      # Get a config value
-  vip config set default_account user # Set a config value
+  vip config init                     				# Initialize config file
+  vip config init --team myteam --organization nentgroup        # Initialize with team config
+  vip config get default_account      				# Get a config value
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := cmd.Help(); err != nil {
@@ -79,11 +70,6 @@ Examples:
 			return fmt.Errorf("you must be authenticated with GitHub to initialize viaplay-cli configuration. Run 'vip auth login' first")
 		}
 
-		override, err := cmd.Flags().GetBool("override")
-		if err != nil {
-			return fmt.Errorf("failed to get 'override' flag: %w", err)
-		}
-
 		team, err := cmd.Flags().GetString("team")
 		if err != nil {
 			return fmt.Errorf("failed to get 'team' flag: %w", err)
@@ -92,6 +78,11 @@ Examples:
 		organization, err := cmd.Flags().GetString("organization")
 		if err != nil {
 			return fmt.Errorf("failed to get 'org' flag: %w", err)
+		}
+
+		override, err := cmd.Flags().GetBool("override")
+		if err != nil {
+			return fmt.Errorf("failed to get 'override' flag: %w", err)
 		}
 
 		// Create GitHub client
@@ -104,25 +95,6 @@ Examples:
 		}
 		fmt.Printf("Authenticated as: %s\n", output.Bold(username))
 
-		// If organization flag is specified but not a specific org, list available organizations
-		if cmd.Flags().Changed("organization") && organization == "" {
-			orgs, err := ghClient.GetUserOrganizations()
-			if err != nil {
-				fmt.Printf("Warning: Failed to fetch organizations: %v\n", err)
-			} else if len(orgs) > 0 {
-				fmt.Println("\nOrganizations you belong to:")
-				for i, org := range orgs {
-					fmt.Printf("  %d. %s\n", i+1, *org.Login)
-				}
-				fmt.Println("\nSpecify an organization with --org flag")
-			} else {
-				fmt.Println("You don't belong to any organizations.")
-			}
-
-			// Exit early if the user just wanted to see their organizations
-			return nil
-		}
-
 		// Interactive organisation and team selection if neither team nor organisation flags are set
 		if !cmd.Flags().Changed("team") && !cmd.Flags().Changed("organization") {
 			// Interactive selection of organization
@@ -132,7 +104,6 @@ Examples:
 				// Continue without organization if there's an error
 			} else if selectedOrg != "" {
 				organization = selectedOrg
-				fmt.Printf("Selected organization: %s\n", output.Bold(organization))
 
 				// If we have an organization, also select a team
 				selectedTeam, err := SelectTeamWithBubbles(ghClient, organization)
@@ -141,33 +112,24 @@ Examples:
 					// Continue without team if there's an error
 				} else if selectedTeam != "" {
 					team = selectedTeam
-					fmt.Printf("Selected team: %s\n", output.Bold(team))
 				}
 			}
 		}
 
-		// Initialise main config file with authenticated user information
-		if err := initializeConfigFile(override, team, organization, ghClient); err != nil {
-			return err
+		// Set up team configurations if specified
+		if team != "" && organization != "" {
+			if err := scaffoldTeamConfig(organization, team, override); err != nil {
+				return err
+			}
 		}
 
 		// Always set up personal configurations for the authenticated user
-		fmt.Println("\nSetting up personal account configurations...")
 		if err := scaffoldPersonalConfig(username, override); err != nil {
 			return err
 		}
 
-		// Set up team configurations if specified
-		if team != "" {
-			fmt.Printf("\nSetting up team configurations for '%s'", team)
-			if organization != "" {
-				fmt.Printf(" in organization '%s'", organization)
-			}
-			fmt.Println("...")
-
-			if err := scaffoldTeamConfig(team, override, organization); err != nil {
-				return err
-			}
+		if err := initializeConfigFile(organization, team, override); err != nil {
+			return fmt.Errorf("failed to initialize config file: %w", err)
 		}
 
 		// Show success message and next steps
@@ -206,23 +168,6 @@ Examples:
 	},
 }
 
-// setCmd sets a configuration value
-var setCmd = &cobra.Command{
-	Use:   "set [key] [value]",
-	Short: "Set a configuration value",
-	Long: `Set a configuration value in the config file.
-
-Examples:
-  vip config set default_account myusername
-  vip config set default_team myteam
-  vip config set default_language typescript
-`,
-	Args: cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return updateConfigFile(args[0], args[1])
-	},
-}
-
 // pathsCmd shows the configuration paths
 var pathsCmd = &cobra.Command{
 	Use:   "paths",
@@ -237,19 +182,6 @@ This includes:
 	Run: func(cmd *cobra.Command, args []string) {
 		showConfigPaths()
 	},
-}
-
-func init() {
-	// Add all subcommands to the config command
-	configCmd.AddCommand(initCmd)
-	configCmd.AddCommand(getCmd)
-	configCmd.AddCommand(setCmd)
-	configCmd.AddCommand(pathsCmd)
-
-	// Define flags for the init command
-	initCmd.Flags().StringP("team", "t", "", "Team name to scaffold configs for (optional)")
-	initCmd.Flags().Bool("override", false, "Override existing config files if they exist")
-	initCmd.Flags().StringP("organization", "o", "", "Organization name for team configs (optional)")
 }
 
 // Path handling functions
@@ -275,7 +207,7 @@ func ensureConfigLoaded() error {
 func showConfigPaths() {
 	fmt.Println("Configuration paths:")
 	fmt.Printf("  Config file:    %s\n", defaultConfigFile)
-	fmt.Printf("  Config dir:     %s\n", defaultConfigDir)
+	fmt.Printf("  Org dir:     %s\n", defaultConfigDir)
 	fmt.Printf("  Teams dir:      %s\n", defaultTeamsDir)
 
 	// Show the actual config file being used by viper
@@ -284,22 +216,11 @@ func showConfigPaths() {
 	}
 }
 
-// Config file manipulation functions
-
 // initializeConfigFile creates or updates the main config file
-func initializeConfigFile(override bool, team string, organization string, ghClient *gh.GitHubClient) error {
+func initializeConfigFile(org string, team string, override bool) error { //nolint:gofumpt
 	// Use the centralised function from the config package
-	if err := config.InitializeConfigFile(defaultConfigFile, override, team); err != nil {
+	if err := config.InitializeConfigFile(defaultConfigFile, override, team, org); err != nil {
 		return err
-	}
-
-	// Update the default_organization in config if provided
-	if organization != "" {
-		if err := config.UpdateConfigValue(defaultConfigFile, "default_organization", organization); err != nil {
-			fmt.Printf("Warning: Failed to update default_organization in config: %v\n", err)
-		} else {
-			fmt.Printf("Set default_organization = %s\n", organization)
-		}
 	}
 
 	// Display appropriate messages based on the operation
@@ -324,8 +245,6 @@ func initializeConfigFile(override bool, team string, organization string, ghCli
 	return nil
 }
 
-// Config value functions
-
 // showAllConfig displays all configuration values
 func showAllConfig() error {
 	allSettings := viper.AllSettings()
@@ -347,58 +266,10 @@ func getConfigValue(key string) error {
 	return nil
 }
 
-// updateConfigFile updates a value in the configuration file while preserving comments
-func updateConfigFile(key, value string) error {
-	if err := ensureConfigLoaded(); err != nil {
-		return err
-	}
-
-	// Use the config package's UpdateConfigValue function
-	if err := config.UpdateConfigValue(defaultConfigFile, key, value); err != nil {
-		return err
-	}
-
-	fmt.Printf("Set %s = %s\n", key, value)
-	return nil
-}
-
-// Team config scaffolding functions
-
 // scaffoldTeamConfig creates the team configuration files and directories
-func scaffoldTeamConfig(team string, override bool, organization string) error {
-	// Determine the appropriate base directory based on whether an organization is specified
-	var baseDir string
-
-	if organization != "" {
-		// For organization teams, use the organization-specific directory
-		configDir := filepath.Dir(defaultTeamsDir) // Get the .config/viaplay directory
-		baseDir = filepath.Join(configDir, config.OrgsDirName, organization, config.TeamsDirName)
-
-		// Ensure the organization directory exists
-		if err := os.MkdirAll(baseDir, 0o755); err != nil {
-			return fmt.Errorf("failed to create organization team directory: %w", err)
-		}
-
-		fmt.Printf("Using organization-specific path for team '%s' in organization '%s'\n", team, organization)
-
-		// Update the default_organization in config file if not already set
-		if viper.GetString("default_organization") == "" {
-			if err := config.UpdateConfigValue(defaultConfigFile, "default_organization", organization); err != nil {
-				fmt.Printf("Warning: Failed to update default_organization in config: %v\n", err)
-			} else {
-				fmt.Printf("Set default_organization = %s\n", organization)
-			}
-		}
-
-		// Update or create the organization entry in github.organizations
-		updateOrganizationConfig(organization, team)
-	} else {
-		// For regular teams, use the default teams directory
-		baseDir = defaultTeamsDir
-	}
-
-	// Use the config package's team creation functionality
-	result, err := config.CreateTeamConfig(baseDir, team, override)
+func scaffoldTeamConfig(org string, team string, override bool) error {
+	// Use the config package's team setup functionality (which will create any needed directories)
+	result, err := config.SetupTeam(org, team, override)
 	if err != nil {
 		return err
 	}
@@ -417,27 +288,9 @@ func scaffoldTeamConfig(team string, override bool, organization string) error {
 	return nil
 }
 
-// updateOrganizationConfig updates the top-level organization and team settings
-func updateOrganizationConfig(organization, team string) {
-	// Simply update the default_organization and default_team values
-	if err := config.UpdateConfigValue(defaultConfigFile, "default_organization", organization); err != nil {
-		fmt.Printf("Warning: Failed to update default_organization in config: %v\n", err)
-	}
-
-	// If team is specified, set it as default for this organization
-	if team != "" {
-		if err := config.UpdateConfigValue(defaultConfigFile, "default_team", team); err != nil {
-			fmt.Printf("Warning: Failed to update default_team in config: %v\n", err)
-		} else {
-			fmt.Printf("Set default_team = %s for organization %s\n", team, organization)
-		}
-	}
-}
-
 // scaffoldPersonalConfig creates personal account configurations
 func scaffoldPersonalConfig(username string, override bool) error {
-	// Use the config package's CreatePersonalConfig function
-	result, err := config.CreatePersonalConfig(username, override)
+	result, err := config.SetupPersonal(username, override)
 	if err != nil {
 		return err
 	}
@@ -485,4 +338,21 @@ func showInitSuccessMessage(team string, organization string) {
 		output.Bold("vip config get"))
 
 	fmt.Println()
+}
+
+// init sets up the configuration command and its subcommands
+func init() {
+	defaultConfigDir = config.GetDefaultConfigDir()
+	defaultConfigFile = config.GetDefaultConfigFile()
+	defaultTeamsDir = config.GetDefaultTeamsDir()
+
+	// Add all subcommands to the config command
+	configCmd.AddCommand(initCmd)
+	configCmd.AddCommand(getCmd)
+	configCmd.AddCommand(pathsCmd)
+
+	// Define flags for the init command
+	initCmd.Flags().StringP("team", "t", "", "Team name to scaffold configs for (optional)")
+	initCmd.Flags().Bool("override", false, "Override existing config files if they exist")
+	initCmd.Flags().StringP("organization", "o", "", "Organization name for team configs (optional)")
 }

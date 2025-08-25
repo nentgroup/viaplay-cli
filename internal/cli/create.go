@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/output"
-	"github.com/nentgroup/viaplay-cli/internal/progress"
 	"github.com/nentgroup/viaplay-cli/internal/project"
 )
 
@@ -48,89 +48,6 @@ type CreateCommandOptions struct {
 	// Error handling options
 	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur
 }
-
-//
-//// addCommonFlags adds common flags to a command
-//func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
-//	// Repository flags
-//	cmd.Flags().StringVar(&opts.RepoName, "name", "", "Repository name (required)")
-//	cmd.Flags().StringVar(&opts.Description, "description", "", "Repository description")
-//	cmd.Flags().BoolVar(&opts.Public, "public", false, "Create a public repository (overrides --private)")
-//	cmd.Flags().BoolP("private", "p", false, "Create a private repository (overrides default visibility)")
-//	cmd.Flags().StringVar(&opts.RepoSecrets, "repo-secrets", "", "JSON string containing repository-specific secrets")
-//	cmd.Flags().StringVar(&opts.SecretsFile, "secrets-file", "", "Path to a JSON file containing repository-specific secrets")
-//
-//	// Team/organization flags
-//	cmd.Flags().StringVar(&opts.Team, "team", "", "Team name for loading configuration templates")
-//
-//	// Define flags without setting Viper defaults at initialization time
-//	cmd.Flags().BoolVar(&opts.ApplyEnvs, "apply-envs", false, "Apply environments from team configuration")
-//	cmd.Flags().BoolVar(&opts.ApplyRulesets, "apply-rulesets", false, "Apply rulesets from team configuration")
-//	cmd.Flags().BoolVar(&opts.ApplySecrets, "apply-secrets", false, "Apply secrets from team configuration")
-//	cmd.Flags().BoolVar(&opts.CleanupOnError, "cleanup-on-error", false, "Clean up resources on error")
-//
-//	// Add a PreRun hook to set the defaults from Viper at runtime
-//	originalPreRun := cmd.PreRunE
-//	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
-//		// Only apply defaults if flag wasn't explicitly set by user
-//		if !cmd.Flags().Changed("team") {
-//			opts.Team = viper.GetString("default_team")
-//		}
-//		if !cmd.Flags().Changed("apply-envs") {
-//			opts.ApplyEnvs = viper.GetBool("apply_envs")
-//		}
-//		if !cmd.Flags().Changed("apply-rulesets") {
-//			opts.ApplyRulesets = viper.GetBool("apply_rulesets")
-//		}
-//		if !cmd.Flags().Changed("apply-secrets") {
-//			opts.ApplySecrets = viper.GetBool("apply_secrets")
-//		}
-//		if !cmd.Flags().Changed("cleanup-on-error") {
-//			opts.CleanupOnError = viper.GetBool("cleanup_on_error")
-//		}
-//
-//		// Handle repository visibility with priority order:
-//		// 1. --public flag (highest priority)
-//		// 2. --private flag (second priority)
-//		// 3. default_visibility from config (lowest priority)
-//		isPrivateSet, _ := cmd.Flags().GetBool("private")
-//
-//		// If neither flag is explicitly set, use the default_visibility from config
-//		if !cmd.Flags().Changed("public") && !cmd.Flags().Changed("private") {
-//			visibility := viper.GetString("default_visibility")
-//			opts.Public = visibility == "public"
-//		} else if cmd.Flags().Changed("public") && opts.Public {
-//			// --public is set to true, which takes precedence
-//			opts.Public = true
-//		} else if cmd.Flags().Changed("private") && isPrivateSet {
-//			// --private is set to true, make Public = false
-//			opts.Public = false
-//		}
-//		// In case of conflict (both flags set), --public takes precedence
-//
-//		// Add the project-specific flag defaults from Viper
-//		if !cmd.Flags().Changed("no-repo") {
-//			opts.NoRepo = viper.GetBool("no_repo")
-//		}
-//		if !cmd.Flags().Changed("no-hooks") {
-//			opts.NoHooks = viper.GetBool("no_hooks")
-//		}
-//		if !cmd.Flags().Changed("no-cache") {
-//			opts.NoCache = viper.GetBool("no_cache")
-//		}
-//
-//		// Run the original PreRun if it exists
-//		if originalPreRun != nil {
-//			return originalPreRun(cmd, args)
-//		}
-//		return nil
-//	}
-//
-//	// Mark required flags
-//	if err := cmd.MarkFlagRequired("name"); err != nil {
-//		fmt.Printf("Warning: failed to mark required flag 'name': %v\n", err)
-//	}
-//}
 
 // addCommonFlagsExceptName adds common flags to a command, excluding the name flag
 func addCommonFlagsExceptName(cmd *cobra.Command, opts *CreateCommandOptions) {
@@ -417,7 +334,11 @@ func validateRepositoryDoesNotExist(ghClient *gh.GitHubClient, owner, repoName s
 
 // executeProjectCreation executes the project creation workflow
 func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params repoParameters, opts *CreateCommandOptions, secretsData string, withScaffolding bool) (*project.Summary, error) { // Create project creator with reporter
-	creator := project.NewFactory(ghClient, progress.NewCallbackReporter(progress.DefaultCB, viper.GetBool("verbose")))
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+	creator := project.NewFactory(ghClient, output.NewCallbackReporter(output.DefaultCB, viper.GetBool("verbose")), cfg)
 
 	// Set up options
 	projectOpts := project.Options{

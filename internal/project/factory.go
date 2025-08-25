@@ -13,7 +13,7 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/git"
-	"github.com/nentgroup/viaplay-cli/internal/progress"
+	"github.com/nentgroup/viaplay-cli/internal/output"
 	"github.com/nentgroup/viaplay-cli/internal/registry"
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
 	"github.com/nentgroup/viaplay-cli/internal/template"
@@ -21,24 +21,13 @@ import (
 )
 
 // NewFactory creates a new project creator with a custom progress reporter
-func NewFactory(ghClient *gh.GitHubClient, reporter progress.Reporter) *Factory {
-	// Load configuration
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		// Use default configuration if loading fails
-		cfg = &config.Configuration{
-			ConfigDir: config.GetDefaultConfigDir(),
-			CacheDir:  config.GetDefaultCacheDir(),
-			TeamsDir:  config.GetDefaultTeamsDir(),
-		}
-	}
-
+func NewFactory(ghClient *gh.GitHubClient, reporter output.Reporter, cfg *config.Configuration) *Factory {
 	// Create cache manager
 	cacheManager := cache.NewManager(cfg)
 
 	// Create template registry
 	templateRegistry := registry.NewRegistry(cfg)
-	err = templateRegistry.LoadTemplates()
+	err := templateRegistry.LoadTemplates()
 	if err != nil {
 		fmt.Printf("Warning: failed to load templates: %v\n", err)
 	}
@@ -66,7 +55,7 @@ func (c *Factory) Create(opts Options) (*Summary, error) {
 		return nil, fmt.Errorf("failed to get user %s: %w", opts.RepoOwner, err)
 	}
 
-	opts.AccountType = strings.ToLower(*u.Type) // Normalize account type to lowercase
+	opts.AccountType = strings.ToLower(*u.Type) // Normalise account type to lowercase
 
 	// Initialise project summary
 	summary := &Summary{
@@ -318,14 +307,6 @@ func (c *Factory) setUp(opts Options, templateVars *template.Variables) error {
 	return nil
 }
 
-// valueOrEmpty returns the value or a default value if empty
-func valueOrEmpty(value, defaultValue string) string {
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
 // optsToTemplateVars converts project creation options to template variables
 func (c *Factory) optsToTemplateVars(opts Options) *template.Variables {
 	vars := template.NewTemplateVariables()
@@ -421,4 +402,12 @@ func (c *Factory) optsToTemplateVars(opts Options) *template.Variables {
 func (c *Factory) getTemplateRenderer() *template.Renderer {
 	// Create a new renderer using the template variables
 	return template.NewRenderer(c.templateVars)
+}
+
+// valueOrEmpty returns the value or a default value if empty
+func valueOrEmpty(value, defaultValue string) string {
+	if value == "" {
+		return defaultValue
+	}
+	return value
 }

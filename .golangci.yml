@@ -62,6 +62,9 @@ linters:
     misspell:
       locale: UK
       mode: restricted
+      ignore-rules:
+        - organization
+        - organizations
     nolintlint:
       require-explanation: true
       require-specific: true
