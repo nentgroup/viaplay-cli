@@ -18,13 +18,6 @@ Get a config value (or all values if no key is provided).
 **Arguments:**
 - `key` (optional): The config key to retrieve (e.g., `default_team`).
 
-### `vip config set <key> <value>`
-Set a config value.
-
-**Arguments:**
-- `key`: The config key to set (e.g., `default_team`).
-- `value`: The value to assign.
-
 ### `vip config paths`
 Show config, teams, and cache paths. No flags or arguments.
 
@@ -75,7 +68,6 @@ debug: false
 vip config init
 vip config init --team myteam
 vip config get default_account
-vip config set default_team myteam
 vip config paths
 ```
 

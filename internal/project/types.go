@@ -2,11 +2,11 @@ package project
 
 import (
 	"github.com/google/go-github/v74/github"
+	"github.com/nentgroup/viaplay-cli/internal/output"
 
 	"github.com/nentgroup/viaplay-cli/internal/cache"
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
-	"github.com/nentgroup/viaplay-cli/internal/progress"
 	"github.com/nentgroup/viaplay-cli/internal/registry"
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
 	"github.com/nentgroup/viaplay-cli/internal/template"
@@ -46,7 +46,7 @@ type Factory struct {
 	Scaffolder *scaffolding.ProjectScaffolder
 
 	// Progress reporter for tracking operation progress
-	Reporter progress.Reporter
+	Reporter output.Reporter
 
 	templateVars *template.Variables
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/git"
 	"github.com/nentgroup/viaplay-cli/internal/output"
+	"github.com/nentgroup/viaplay-cli/pkg/paths"
 )
 
 // Config provides configuration for the cache manager
@@ -102,20 +103,6 @@ func NewManagerFromConfig(cfg *config.Configuration) *Manager {
 	return NewManager(cfg)
 }
 
-// NewManagerWithCacheConfig creates a cache manager from a simple CacheConfig
-func NewManagerWithCacheConfig(cfg *Config) *Manager {
-	if cfg == nil {
-		return NewManager(nil)
-	}
-	// Ensure the cache directory exists
-	if err := os.MkdirAll(cfg.BaseCacheDir, 0o755); err != nil {
-		fmt.Printf("Warning: Failed to create cache directory %s: %v\n", cfg.BaseCacheDir, err)
-	}
-	return &Manager{
-		BaseCacheDir: cfg.BaseCacheDir,
-	}
-}
-
 // ParseSource parses a template source string into a Source struct
 // Format:
 // - GitHub repo: "github@<owner>/<repo>.git[@branch/tag]"
@@ -173,7 +160,7 @@ func ParseSource(sourceStr string) (Source, error) {
 	case "local":
 		// Expand tilde in local path
 		if strings.HasPrefix(location, "~") {
-			location = config.ExpandPath(location)
+			location = paths.Expand(location)
 		}
 		return Source{
 			Type:     SourceTypeLocal,

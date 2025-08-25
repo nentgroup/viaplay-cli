@@ -115,16 +115,6 @@ teams_dir: "~/.config/viaplay/teams"
 orgs_dir: "~/.config/viaplay/orgs"
 
 # -----------------------------------------------
-# GitHub Configuration
-# -----------------------------------------------
-
-# GitHub API settings and authentication
-github:
-  # Default account type ("personal" or "organization")
-  # This affects repository creation behavior
-  default_account_type: "personal"
-
-# -----------------------------------------------
 # Build and Deployment Settings
 # -----------------------------------------------
 

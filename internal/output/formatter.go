@@ -336,7 +336,7 @@ func VerboseMessage(message interface{}) {
 				formatted = fmt.Sprintf("%+v", v)
 			}
 		}
-		fmt.Printf("\n%s %s %s\n", ActiveIcons.Debug, DebugColor("[DEBUG]"), formatted)
+		fmt.Fprintf(os.Stderr, "\n%s %s %s\n", ActiveIcons.Debug, DebugColor("[DEBUG]"), formatted)
 	}
 }
 

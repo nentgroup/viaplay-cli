@@ -4,6 +4,8 @@ package cli
 
 import (
 	"strings"
+
+	"github.com/nentgroup/viaplay-cli/internal/gh"
 )
 
 // parseOwnerRepoArg parses the owner/repo argument in the format "owner/repo"
@@ -22,4 +24,13 @@ func parseOwnerRepoArg(arg string, opts *CreateCommandOptions) {
 	// Otherwise, it's just the repo name (owner defaults to config or GitHub username)
 	opts.RepoName = parts[0]
 	return
+}
+
+func isAuthenticated() bool {
+	token, err := gh.GetToken()
+	if err != nil || token == "" {
+		return false
+	}
+
+	return true
 }

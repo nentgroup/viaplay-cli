@@ -1,17 +1,20 @@
 # Example GitHub branch ruleset
 # This file defines a ruleset for GitHub repositories
 # It supports template variables like {{.Org.TeamID}} for dynamic values
+# See http://nentgroup.github.io/viaplay-cli/#/rulesets
+# ! Your rulesets won't be enforced on private repositories until you move to GitHub Team organization account.
+# https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets
 
 name: branch-protection
 target: branch
 enforcement: active
-
+{{{if .IsTeam}}}
 # You can use template variables for dynamic values
 bypass_actors:
   - actor_id: {{.Org.TeamID}}
     actor_type: Team
     bypass_mode: always
-
+{{{end}}}
 conditions:
   ref_name:
     include:

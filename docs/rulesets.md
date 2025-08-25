@@ -14,7 +14,6 @@ A ruleset is a YAML file that defines repository rules, such as:
 - Push restrictions
 - Environment protection rules
 
-
 ---
 
 ## Using Rulesets

@@ -32,12 +32,6 @@ func (ghc *GitHubClient) CreateRepo(repoName, org string, private bool, descript
 	return createdRepo.GetHTMLURL(), nil
 }
 
-// SetBranchProtection sets branch protection rules for a given repo/branch
-// TODO: Implement this using github.ProtectionRequest if needed, or remove if not used
-func (ghc *GitHubClient) SetBranchProtection(owner, repo, branch string, rules map[string]interface{}) error {
-	return fmt.Errorf("setBranchProtection not implemented with go-github; use ruleset.go for advanced protection")
-}
-
 // RepositoryExists checks if a repository with the given name already exists
 func (ghc *GitHubClient) RepositoryExists(owner, repo string) (bool, error) {
 	// Use the GitHub API to check if the repository exists

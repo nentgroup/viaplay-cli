@@ -1,8 +1,14 @@
-name: staging
+# Example environment configuration
+# This file defines the environment settings for staging deployments.
+# See http://nentgroup.github.io/viaplay-cli/#/envs
+
+name: stage
 wait_timer: 0
+{{{if .IsTeam}}}
 reviewers:
   - type: Team
     id: {{.Org.TeamID}}
+{{{ end }}}
 deployment_branch_policy:
   protected_branches: false
   custom_branch_policies: true
