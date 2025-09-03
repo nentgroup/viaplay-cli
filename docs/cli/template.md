@@ -11,7 +11,7 @@ The `template test` command helps template developers validate and test their te
 - **Purpose**: Test templates in isolation during development or CI pipelines
 - **Authentication**: No GitHub authentication required
 - **Configuration**: Works independently of your Viaplay CLI configuration
-- **Output**: Scaffolds to a temporary directory by default
+- **Output**: Always outputs to a temporary directory for simple testing
 
 ### Usage
 
@@ -29,7 +29,7 @@ vip template test [flags]
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--output` | Custom directory where the scaffolded template will be output | Auto-generated temp dir |
+| `--json` | Output results in JSON format for scripting | `false` |
 | `--force` | Force refresh of template cache | `false` |
 | `--name` | Project name for template variables | `test-project` |
 | `--owner` | Project owner for template variables | `test-owner` |
@@ -47,15 +47,21 @@ vip template test --template-path ./path/to/my-template
 
 The command will output the path to the temporary directory where your files are scaffolded.
 
-#### Custom Output Directory
+#### Using JSON Output for Scripts
 
-When you want to specify your own output location:
+When you want to use the command in scripts and CI pipelines:
 
 ```bash
 vip template test \
   --template-path ./path/to/my-template \
-  --output ./my-test-output
+  --json
 ```
+
+This will output a JSON object containing:
+- `success`: Boolean indicating if the operation succeeded
+- `outputPath`: The path to the output directory
+- `templatePath`: The path to the template source
+- `error`: Any error message (only present if there was an error)
 
 #### Customizing Template Variables
 
@@ -85,13 +91,16 @@ vip template test --template-path ./my-template
 cat /tmp/vip-template-test-20250903-120145-a1b2c3/src/main.go
 ```
 
-#### CI/CD Pipeline Testing
+#### CI/CD Pipeline Testing with JSON
 
-Include template validation in your CI/CD pipeline:
+Include template validation in your CI/CD pipeline using JSON output:
 
 ```bash
 # Example CI step
-OUTPUT_DIR=$(vip template test --template-path ./templates/go-service --name test-service | grep "Output directory" | cut -d' ' -f3)
+JSON_OUTPUT=$(vip template test --template-path ./templates/go-service --name test-service --json)
+
+# Extract the output directory using jq
+OUTPUT_DIR=$(echo "$JSON_OUTPUT" | jq -r .outputPath)
 
 # Validate output structure
 if [ ! -f "$OUTPUT_DIR/main.go" ]; then
@@ -113,8 +122,8 @@ vip template test \
 
 ### Notes
 
-- By default, the command creates a unique temporary directory in your OS's standard temp location
+- The command always creates a unique temporary directory in your OS's standard temp location
 - The temporary directory includes a timestamp in the format `vip-template-test-YYYYMMDD-HHMMSS-XXXXX`
-- You can override the temporary directory with the `--output` flag
-- The command prints the output directory path so you can locate your files
+- The command outputs the path to the temporary directory for easy access
+- JSON output is available for scripting and CI/CD pipeline integration
 - Template variables are minimal by default and may need customization for complex templates

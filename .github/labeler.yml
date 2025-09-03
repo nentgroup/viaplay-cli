@@ -3,17 +3,17 @@
 # this file is for the labeler workflow job
 # Documentation https://github.com/marketplace/actions/labeler
 
-"type: bug":
+"bug":
   - head-branch: ['^bug', '^fix', 'bug', 'fix']
 
-"type: enhancement":
+"enhancement":
   - head-branch: ['^feature', '^feat', 'feature']
 
-"type: documentation":
+"documentation":
   - changed-files:
       - any-glob-to-any-file: ['.github/*', './*.md']
 
-"type: maintenance":
+"maintenance":
   - changed-files:
       - any-glob-to-any-file: ['.github/workflows/*']
 
