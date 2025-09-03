@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/nentgroup/viaplay-cli/compare/v2.2.0...v2.3.0) (2025-09-03)
+
+
+### Features
+
+* add json-flag to template test command ([#57](https://github.com/nentgroup/viaplay-cli/issues/57)) ([3171313](https://github.com/nentgroup/viaplay-cli/commit/31713137bfb364d62a68fb36fec53e1713efad17))
+
 ## [2.2.0](https://github.com/nentgroup/viaplay-cli/compare/v2.1.1...v2.2.0) (2025-09-03)
 
 
