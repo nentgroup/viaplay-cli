@@ -11,9 +11,10 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
+
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/output"
-	"golang.org/x/term"
 )
 
 // UI styling constants
@@ -90,7 +91,7 @@ func NewSelector(title string, items []Item, width, height int) SelectModel {
 	}
 }
 
-// Init initializes the model
+// Init initialises the model
 func (m SelectModel) Init() tea.Cmd {
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-github/v74/github"
 	"github.com/invopop/yaml"
+
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
 )

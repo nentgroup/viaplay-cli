@@ -217,7 +217,7 @@ func showConfigPaths() {
 }
 
 // initializeConfigFile creates or updates the main config file
-func initializeConfigFile(org string, team string, override bool) error { //nolint:gofumpt
+func initializeConfigFile(org, team string, override bool) error { //nolint:gofumpt
 	// Use the centralised function from the config package
 	if err := config.InitializeConfigFile(defaultConfigFile, override, team, org); err != nil {
 		return err
@@ -267,7 +267,7 @@ func getConfigValue(key string) error {
 }
 
 // scaffoldTeamConfig creates the team configuration files and directories
-func scaffoldTeamConfig(org string, team string, override bool) error {
+func scaffoldTeamConfig(org, team string, override bool) error {
 	// Use the config package's team setup functionality (which will create any needed directories)
 	result, err := config.SetupTeam(org, team, override)
 	if err != nil {
@@ -310,7 +310,7 @@ func scaffoldPersonalConfig(username string, override bool) error {
 }
 
 // showInitSuccessMessage displays a success message with next steps
-func showInitSuccessMessage(team string, organization string) {
+func showInitSuccessMessage(team, organization string) {
 	fmt.Printf("\n%s %s\n\n", output.ActiveIcons.Success, output.SuccessBold("Configuration initialized successfully!"))
 
 	fmt.Println("Next steps:")
