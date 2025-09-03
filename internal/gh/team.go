@@ -38,7 +38,7 @@ func (ghc *GitHubClient) AddTeamToRepository(org, repo, team string, permission 
 	}
 
 	// GitHub API uses "slug" format for team names in the URL, so we convert spaces to hyphens
-	// and make it lowercase to match GitHub's behavior
+	// and make it lowercase to match GitHub's behaviour
 	teamSlug := strings.ToLower(strings.ReplaceAll(team, " ", "-"))
 
 	// Add team to the repository
@@ -63,7 +63,7 @@ func (ghc *GitHubClient) GetTeamID(org, teamName string) (int64, error) {
 	}
 
 	// GitHub API uses "slug" format for team names in the URL, so we convert spaces to hyphens
-	// and make it lowercase to match GitHub's behavior
+	// and make it lowercase to match GitHub's behaviour
 	teamSlug := strings.ToLower(strings.ReplaceAll(teamName, " ", "-"))
 
 	// Try to fetch the team information

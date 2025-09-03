@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nentgroup/viaplay-cli/pkg/paths"
 	"github.com/spf13/viper"
+
+	"github.com/nentgroup/viaplay-cli/pkg/paths"
 )
 
 // Default paths and constants used throughout the application
@@ -295,7 +296,7 @@ func (c *Configuration) GetPersonalDir(username string) string {
 }
 
 // GetTeamDir returns the directory for a specific team, potentially within an organization
-func (c *Configuration) GetTeamDir(team string, orgName string) string {
+func (c *Configuration) GetTeamDir(team, orgName string) string {
 	if orgName == "" {
 		// If no organization is specified, use the default teams structure
 		return filepath.Join(c.TeamsDir, team)

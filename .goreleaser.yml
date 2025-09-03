@@ -51,7 +51,8 @@ homebrew_casks:
       template: "https://github.com/nentgroup/viaplay-cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
       using: "GitHubPrivateRepositoryReleaseDownloadStrategy"
     custom_block: |
-      require File.expand_path("lib/custom_download_strategy.rb", __dir__)
+      tap_path = File.expand_path("Library/Taps/nentgroup/homebrew-viaplay-cli/Casks/lib/custom_download_strategy.rb", ENV["HOMEBREW_PREFIX"])
+      require tap_path
 checksum:
   name_template: 'checksums.txt'
 snapshot:

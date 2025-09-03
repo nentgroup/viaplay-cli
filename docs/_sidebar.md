@@ -11,6 +11,7 @@
   - [Project](cli/project.md)
   - [Repo](cli/repo.md)
   - [Config](cli/config.md)
+  - [Template](cli/template.md)
   - [Secrets](cli/secrets.md)
   - [Auth](cli/auth.md)
   - [Cache](cli/cache.md)

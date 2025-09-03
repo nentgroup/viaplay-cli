@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/nentgroup/viaplay-cli/internal/config"
 
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/output"

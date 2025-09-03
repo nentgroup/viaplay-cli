@@ -4,6 +4,7 @@ env:
   PLATFORM: local
   APP_NAME: vip
   GO_VERSION: '1.24'
+  DOCKER_REGISTRY: docker-registry.dev.mtg-api.com
 
 vars:
   CURRENT_DATE:

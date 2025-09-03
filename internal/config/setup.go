@@ -42,7 +42,7 @@ func (r *FileOps) PrintVerbose(prefix string) {
 	}
 }
 
-// NewFileOps initializes an empty FileOps
+// NewFileOps initialises an empty FileOps
 func NewFileOps() *FileOps {
 	return &FileOps{
 		Created:  []string{},
@@ -124,7 +124,7 @@ func SetupPersonal(username string, override bool) (*FileOps, error) {
 
 // createFileFromBlueprint creates a file from a blueprint template, handling file existence checks
 // and returning appropriate operation results
-func createFileFromBlueprint(blueprintFile string, destPath string, isTeam, override bool) (*FileOps, error) { //nolint:gofumpt
+func createFileFromBlueprint(blueprintFile, destPath string, isTeam, override bool) (*FileOps, error) { //nolint:gofumpt
 	result := NewFileOps()
 
 	// Check if the file exists first

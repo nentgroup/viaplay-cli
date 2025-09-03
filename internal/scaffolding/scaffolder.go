@@ -70,6 +70,12 @@ func (ps *ProjectScaffolder) ScaffoldProject(destPath, language, projectType, te
 // copyTemplateFiles copies files from the template directory to the destination
 // with variable substitution using the template renderer
 func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, renderer *templ.Renderer) error {
+	// check if the template path has the special _template directory and use it if present
+	specialTemplateDir := filepath.Join(templatePath, "_template")
+	if stat, err := os.Stat(specialTemplateDir); err == nil && stat.IsDir() {
+		templatePath = specialTemplateDir
+	}
+
 	// List of directories to skip
 	skipDirs := map[string]bool{
 		".git":         true,
