@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.2.0](https://github.com/nentgroup/viaplay-cli/compare/v2.1.1...v2.2.0) (2025-09-03)
+
+
+### Features
+
+* add template test command ([#56](https://github.com/nentgroup/viaplay-cli/issues/56)) ([5252dc0](https://github.com/nentgroup/viaplay-cli/commit/5252dc0285e434b550f9d9788f9f2d9317f84dc7))
+
+
+### Dependencies
+
+* **deps:** update dependency font-awesome to v7.0.1 ([#55](https://github.com/nentgroup/viaplay-cli/issues/55)) ([4f421c6](https://github.com/nentgroup/viaplay-cli/commit/4f421c6a0df9f241bae9b16f6cda20f727a6cb00))
+* **deps:** update module github.com/spf13/cobra to v1.10.1 ([#53](https://github.com/nentgroup/viaplay-cli/issues/53)) ([6ca8eda](https://github.com/nentgroup/viaplay-cli/commit/6ca8edad2156ab7cf2c31d3121810fc464ab4871))
+
 ## [2.1.1](https://github.com/nentgroup/viaplay-cli/compare/v2.1.0...v2.1.1) (2025-08-25)
 
 
