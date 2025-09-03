@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,14 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
 	"github.com/nentgroup/viaplay-cli/internal/template"
 )
+
+// TestResult represents the result of a template test
+type TestResult struct {
+	Success      bool   `json:"success"`
+	OutputPath   string `json:"outputPath"`
+	TemplatePath string `json:"templatePath"`
+	Error        string `json:"error,omitempty"`
+}
 
 // createTempDir creates a temporary directory with the given prefix
 // and returns the path to that directory. The directory will be created
@@ -40,10 +49,10 @@ func NewTemplateCommand() *cobra.Command {
 func newTemplateTestCommand() *cobra.Command {
 	var (
 		templatePath string
-		outputPath   string
 		forceRefresh bool
 		projectName  string
 		projectOwner string
+		jsonOutput   bool
 	)
 
 	testCmd := &cobra.Command{
@@ -53,12 +62,22 @@ func newTemplateTestCommand() *cobra.Command {
 This command is useful for template developers who want to test their 
 templates during development or in CI pipelines.
 
-By default, scaffolded templates are output to a temporary directory.
-You can override this with the --output flag.`,
+Templates are output to a temporary directory that is automatically created.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Initialise result object for potential JSON output
+			result := TestResult{
+				TemplatePath: templatePath,
+				Success:      false,
+			}
+
 			// Use a minimal configuration that's independent of user config
 			cfg, err := config.LoadConfig()
 			if err != nil {
+				result.Error = fmt.Sprintf("failed to load configuration: %v", err)
+				if jsonOutput {
+					printJSONResult(result)
+					return nil
+				}
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
 
@@ -67,22 +86,21 @@ You can override this with the --output flag.`,
 			// Initialise project scaffolder
 			scaffolder := scaffolding.NewProjectScaffolder(cacheManager, cfg)
 
-			// If no outputPath is provided, create a temporary directory
-			if outputPath == "" {
-				// Generate a temp directory name based on current time
-				timestamp := time.Now().Format("20060102-150405")
-				tempDirPrefix := fmt.Sprintf("vip-template-test-%s-", timestamp)
-				tempDir, err := createTempDir(tempDirPrefix)
-				if err != nil {
-					return fmt.Errorf("failed to create temporary directory: %w", err)
+			// Create a temporary directory for output
+			timestamp := time.Now().Format("20060102-150405")
+			tempDirPrefix := fmt.Sprintf("vip-template-test-%s-", timestamp)
+			outputPath, err := createTempDir(tempDirPrefix)
+			if err != nil {
+				result.Error = fmt.Sprintf("failed to create temporary directory: %v", err)
+				if jsonOutput {
+					printJSONResult(result)
+					return nil
 				}
-				outputPath = tempDir
+				return fmt.Errorf("failed to create temporary directory: %w", err)
 			}
 
-			// Create a clean output directory
-			if err := os.MkdirAll(outputPath, 0o755); err != nil {
-				return fmt.Errorf("failed to create output directory: %w", err)
-			}
+			// Update result with output path
+			result.OutputPath = outputPath
 
 			// Create template variables
 			vars := &template.Variables{
@@ -142,32 +160,66 @@ You can override this with the --output flag.`,
 				},
 			}
 
-			fmt.Printf("🧪 Testing template scaffolding...\n")
-			fmt.Printf("📁 Output directory: %s\n", outputPath)
-
-			// Create the output directory if it doesn't exist
+			// Get absolute path for output
 			absOutputPath, err := filepath.Abs(outputPath)
 			if err != nil {
+				result.Error = fmt.Sprintf("failed to get absolute path for output: %v", err)
+				if jsonOutput {
+					printJSONResult(result)
+					return nil
+				}
 				return fmt.Errorf("failed to get absolute path for output: %w", err)
+			}
+
+			// Print progress info based on mode
+			if !jsonOutput {
+				fmt.Fprintf(os.Stderr, "🧪 Testing template scaffolding...\n")
+				fmt.Fprintf(os.Stderr, "📁 Output directory: %s\n", outputPath)
 			}
 
 			// Run the scaffolding
 			err = scaffolder.ScaffoldProject(absOutputPath, "", "", templatePath, vars, true, forceRefresh)
 			if err != nil {
+				result.Error = fmt.Sprintf("failed to scaffold template: %v", err)
+				if jsonOutput {
+					printJSONResult(result)
+					return nil
+				}
 				return fmt.Errorf("failed to scaffold template: %w", err)
 			}
 
-			fmt.Printf("✅ Template successfully scaffolded to: %s\n", absOutputPath)
+			// Success!
+			result.Success = true
+
+			// Output in the appropriate format
+			if jsonOutput {
+				// JSON output always goes to stdout for piping to other tools
+				printJSONResult(result)
+			} else {
+				// Normal mode: print success message to stderr, path to stdout
+				fmt.Fprintf(os.Stderr, "✅ Template successfully scaffolded to: %s\n", absOutputPath)
+			}
+
 			return nil
 		},
 	}
 
 	// Add flags
 	testCmd.Flags().StringVar(&templatePath, "template-path", "", "Local path to a template directory")
-	testCmd.Flags().StringVar(&outputPath, "output", "", "Directory where the scaffolded template will be output (defaults to a temporary directory)")
 	testCmd.Flags().BoolVar(&forceRefresh, "force", false, "Force refresh of template cache")
 	testCmd.Flags().StringVar(&projectName, "name", "test-project", "Project name for template variables")
 	testCmd.Flags().StringVar(&projectOwner, "owner", "test-owner", "Project owner for template variables")
+	testCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format for scripting")
 
 	return testCmd
+}
+
+// printJSONResult outputs the test result as JSON to stdout
+func printJSONResult(result TestResult) {
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling JSON: %v\n", err)
+		return
+	}
+	fmt.Println(string(jsonData))
 }
