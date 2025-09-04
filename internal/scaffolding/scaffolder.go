@@ -129,6 +129,11 @@ func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, re
 			return fmt.Errorf("failed to parse path as template: %s: %w", relPath, err)
 		}
 
+		// Special case for .env.example files - rename to .env
+		if strings.HasSuffix(destRelPath, ".env.example") {
+			destRelPath = strings.TrimSuffix(destRelPath, ".example")
+		}
+
 		destFilePath := filepath.Join(destPath, destRelPath)
 
 		// Handle directories
