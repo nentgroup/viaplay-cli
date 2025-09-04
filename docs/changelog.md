@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.3.1](https://github.com/nentgroup/viaplay-cli/compare/v2.3.0...v2.3.1) (2025-09-04)
+
+
+### Bug Fixes
+
+* handle support for .env files correctly ([#62](https://github.com/nentgroup/viaplay-cli/issues/62)) ([d48fc7f](https://github.com/nentgroup/viaplay-cli/commit/d48fc7f923f8145362f9e36fb512be38814ae017))
+
+
+### Dependencies
+
+* **deps:** update actions/setup-go action to v6 ([#59](https://github.com/nentgroup/viaplay-cli/issues/59)) ([e2afc23](https://github.com/nentgroup/viaplay-cli/commit/e2afc232b99b5faad4a08b0b378c5156c3a8fee7))
+
 ## [2.3.0](https://github.com/nentgroup/viaplay-cli/compare/v2.2.0...v2.3.0) (2025-09-03)
 
 
