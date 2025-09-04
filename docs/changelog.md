@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.2](https://github.com/nentgroup/viaplay-cli/compare/v2.3.1...v2.3.2) (2025-09-04)
+
+
+### Dependencies
+
+* **deps:** update actions/labeler action to v6 ([#61](https://github.com/nentgroup/viaplay-cli/issues/61)) ([90b6dd9](https://github.com/nentgroup/viaplay-cli/commit/90b6dd9effc325dda6bdc65a8c6cd64974319168))
+
 ## [2.3.1](https://github.com/nentgroup/viaplay-cli/compare/v2.3.0...v2.3.1) (2025-09-04)
 
 
