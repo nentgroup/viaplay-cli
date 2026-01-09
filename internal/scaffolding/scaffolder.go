@@ -146,20 +146,28 @@ func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, re
 			return fmt.Errorf("failed to check if file is binary: %w", err)
 		}
 
-		if isBinary {
+		if isBinary { //nolint:nestif
 			// Use helper to copy binary file
-			if err := copyBinaryFile(path, destFilePath, info.Mode()); err != nil {
+			if err = copyBinaryFile(path, destFilePath, info.Mode()); err != nil {
 				return err
 			}
 		} else {
-			// Always render non-binary files as templates
-			if err := renderer.RenderFile(path, destFilePath, true); err != nil {
-				return fmt.Errorf("failed to render template file %s: %w", relPath, err)
+			if strings.HasSuffix(baseName, ".raw") {
+				// Remove .raw extension for and copy as it is
+				destFilePath = strings.TrimSuffix(destFilePath, ".raw")
+				if err = copyBinaryFile(path, destFilePath, info.Mode()); err != nil {
+					return err
+				}
+			} else {
+				// Always render non-binary files as templates
+				if err = renderer.RenderFile(path, destFilePath, true); err != nil {
+					return fmt.Errorf("failed to render template file %s: %w", relPath, err)
+				}
 			}
 		}
 
 		// Copy file mode from the template file to preserve executability
-		if err := os.Chmod(destFilePath, info.Mode()); err != nil {
+		if err = os.Chmod(destFilePath, info.Mode()); err != nil {
 			fmt.Printf("Warning: Failed to set file mode for %s: %v\n", destFilePath, err)
 		}
 

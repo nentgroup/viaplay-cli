@@ -6,7 +6,7 @@
   <img src="./.github/assets/vip.png" alt="viaplay-cli screenshot" width="600">
 </p>
 
-## 📦 Installation
+## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-install-dark.svg"><img src="./.github/assets/icon-install.svg" alt="Install" width="18" height="18" aria-label="Install"></picture> Installation
 
 ### Homebrew (macOS & Linux)
 
@@ -56,7 +56,7 @@ go build -o vip ./cmd/vip
 sudo mv vip /usr/local/bin/
 ```
 
-## ⚡ What is viaplay-cli?
+## What is viaplay-cli?
 
 viaplay-cli is a CLI tool for developers to:
 - Scaffold new projects from templates (Go, TypeScript, etc.)
@@ -64,7 +64,7 @@ viaplay-cli is a CLI tool for developers to:
 - Apply team/organization settings (rulesets, secrets, environments)
 - Manage secrets securely using your system keyring
 
-## 🚀 Quick Start
+## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-quickstart-dark.svg"><img src="./.github/assets/icon-quickstart.svg" alt="Quick Start" width="18" height="18" aria-label="Quick Start"></picture> Quick Start
 
 ### Authentication
 
@@ -98,7 +98,7 @@ vip create repo --name my-repo --team platform --description "My awesome reposit
 vip auth status
 ```
 
-## 🛠️ Development
+## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-dev-dark.svg"><img src="./.github/assets/icon-dev.svg" alt="Development" width="18" height="18" aria-label="Development"></picture> Development
 
 ### Prerequisites
 - Go 1.21 or later
@@ -128,7 +128,7 @@ golangci-lint run --fix
 go test ./...
 ```
 
-## 📚 Documentation
+## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-docs-dark.svg"><img src="./.github/assets/icon-docs.svg" alt="Documentation" width="18" height="18" aria-label="Documentation"></picture> Documentation
 
 **Full documentation is available at: [https://nentgroup.github.io/viaplay-cli](https://nentgroup.github.io/viaplay-cli)**
 
@@ -143,7 +143,7 @@ The documentation includes:
 - [Environments & Rulesets](https://nentgroup.github.io/viaplay-cli/#/envs)
 - [Secrets Management](https://nentgroup.github.io/viaplay-cli/#/secrets)
 
-## 🧩 Features
+## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-features-dark.svg"><img src="./.github/assets/icon-features.svg" alt="Features" width="18" height="18" aria-label="Features"></picture> Features
 
 - **Project Templates**: Create new projects with best practices pre-configured
 - **GitHub Integration**: Create and configure repositories directly from the CLI
@@ -151,6 +151,6 @@ The documentation includes:
 - **Secure Authentication**: GitHub tokens stored securely in your system keyring
 - **Extensible Architecture**: Easy to add new templates and project types
 
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](LICENSE).
