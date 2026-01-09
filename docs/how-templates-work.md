@@ -19,6 +19,14 @@ A template typically contains:
 
 ---
 
+## Raw Files (no rendering)
+
+Add the `.raw` suffix to any template file you want copied verbatim. The file is copied as-is and the `.raw` suffix is stripped in the generated project.
+
+Example: `template.go.tmpl.raw` is copied to `template.go.tmpl` without any rendering.
+
+---
+
 ## Using a Template
 
 Specify the template source when creating a project:
