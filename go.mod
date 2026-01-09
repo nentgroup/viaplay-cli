@@ -11,7 +11,6 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/go-github/v81 v81.0.0
-	github.com/google/go-github/v81 v81.0.0
 	github.com/invopop/yaml v0.3.1
 	github.com/muesli/termenv v0.16.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
@@ -21,7 +20,7 @@ require (
 	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/crypto v0.46.0
 	golang.org/x/oauth2 v0.34.0
-	golang.org/x/term v0.38.0
+	golang.org/x/term v0.39.0
 )
 
 require (
@@ -59,7 +58,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
