@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/nentgroup/viaplay-cli/compare/v2.4.0...v2.4.1) (2026-01-09)
+
+
+### Documentation
+
+* update dark svg icons ([#110](https://github.com/nentgroup/viaplay-cli/issues/110)) ([091d2eb](https://github.com/nentgroup/viaplay-cli/commit/091d2eb79530466f7842c84c735c9a1643b9b976))
+
 ## [2.4.0](https://github.com/nentgroup/viaplay-cli/compare/v2.3.2...v2.4.0) (2026-01-09)
 
 
