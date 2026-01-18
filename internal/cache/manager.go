@@ -58,14 +58,20 @@ type Template struct {
 	LastUsed time.Time
 	// Source of the template
 	Source Source
+	// Version of the template (derived from git tags or commit hash)
+	Version string
+	// RemoteURL of the template repository (e.g. git@github.com:org/repo.git or https URL)
+	RemoteURL string
 }
 
 // TemplateInfo represents template information for display
 type TemplateInfo struct {
-	Language string
-	Type     string
-	Path     string
-	LastUsed time.Time
+	Language  string
+	Type      string
+	Path      string
+	LastUsed  time.Time
+	Version   string
+	RemoteURL string
 }
 
 // Manager manages the template cache
@@ -403,12 +409,35 @@ func (m *Manager) ListTemplates() ([]Template, error) {
 					}
 				}
 
+				// Derive version information from git
+				version, err := git.DescribeVersion(path)
+				if err != nil {
+					version = "unknown"
+				}
+
+				// Get repository info to extract remote URL
+				repoInfo, err := git.GetRepositoryInfo(path)
+				remoteURL := "unknown"
+				if err == nil && repoInfo != nil && repoInfo.RemoteURL != "" {
+					remoteURL = repoInfo.RemoteURL
+
+					// Normalise GitHub SSH URLs (git@github.com:org/repo.git) to HTTPS
+					if strings.HasPrefix(remoteURL, "git@github.com:") {
+						// Strip git@github.com: and optional .git suffix
+						repoPath := strings.TrimPrefix(remoteURL, "git@github.com:")
+						repoPath = strings.TrimSuffix(repoPath, ".git")
+						remoteURL = "https://github.com/" + repoPath
+					}
+				}
+
 				templates = append(templates, Template{
 					Language:     parts[0],
 					Type:         parts[1],
 					Path:         path,
 					LastModified: info.ModTime(),
 					Source:       source,
+					Version:      version,
+					RemoteURL:    remoteURL,
 				})
 			}
 		}

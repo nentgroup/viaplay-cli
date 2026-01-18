@@ -27,10 +27,21 @@ func FormatTemplateList(templates []Template) string {
 
 	var builder strings.Builder
 	for _, tmpl := range templates {
-		builder.WriteString(fmt.Sprintf("  %s/%s (last modified: %s)\n",
+		version := tmpl.Version
+		if version == "" {
+			version = "unknown"
+		}
+
+		remote := tmpl.RemoteURL
+		if remote == "" {
+			remote = "unknown"
+		}
+
+		builder.WriteString(fmt.Sprintf("  %s/%s (version: %s, remote: %s)\n",
 			tmpl.Language,
 			tmpl.Type,
-			tmpl.LastModified.Format("2006-01-02 15:04:05")))
+			version,
+			remote))
 	}
 
 	return builder.String()
