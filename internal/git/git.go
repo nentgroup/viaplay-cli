@@ -446,3 +446,39 @@ func ConvertToSSHURL(url string) string {
 	// If it's not a recognised format, return the original URL
 	return url
 }
+
+// DescribeVersion returns a human-friendly version string for the repository at repoPath.
+// It prefers the latest tag reachable from HEAD; if none is found, it falls back to a
+// short commit hash. On failure it returns an error so callers can decide how to
+// represent unknown versions.
+func DescribeVersion(repoPath string) (string, error) {
+	if !IsGitRepository(repoPath) {
+		return "", fmt.Errorf("not a git repository: %s", repoPath)
+	}
+
+	// Try to get the latest tag reachable from HEAD (similar to `git describe --tags --abbrev=0`).
+	describeTagCmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
+	describeTagCmd.Dir = repoPath
+	tagOutput, err := describeTagCmd.Output()
+	if err == nil {
+		version := strings.TrimSpace(string(tagOutput))
+		if version != "" {
+			return version, nil
+		}
+	}
+
+	// Fallback: use short commit hash of HEAD.
+	shaCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	shaCmd.Dir = repoPath
+	shaOutput, err := shaCmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to determine version for repo %s: %w", repoPath, err)
+	}
+
+	version := strings.TrimSpace(string(shaOutput))
+	if version == "" {
+		return "", fmt.Errorf("empty version string for repo %s", repoPath)
+	}
+
+	return version, nil
+}

@@ -257,15 +257,22 @@ func listCache() {
 		}
 		totalSize += size
 
-		age := time.Since(t.LastUsed)
-		ageStr := output.Duration(age)
+		version := t.Version
+		if version == "" {
+			version = "unknown"
+		}
+
+		remote := t.RemoteURL
+		if remote == "" {
+			remote = "unknown"
+		}
 
 		rows = append(rows, []string{
 			t.Language,
 			t.Type,
 			output.FormatSize(size),
-			t.LastUsed.Format("2006-01-02"),
-			ageStr,
+			version,
+			remote,
 		})
 
 		languages[t.Language] = struct{}{}
@@ -282,7 +289,7 @@ func listCache() {
 
 	// Print the table
 	fmt.Print(output.Table(
-		[]string{"Language", "Type", "Size", "Last Used", "Age"},
+		[]string{"Language", "Type", "Size", "Version", "Repository"},
 		rows,
 		0,
 	))
