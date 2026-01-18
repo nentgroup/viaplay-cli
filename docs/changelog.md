@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.2](https://github.com/nentgroup/viaplay-cli/compare/v2.4.1...v2.4.2) (2026-01-12)
+
+
+### Dependencies
+
+* **deps:** update module golang.org/x/crypto to v0.47.0 ([#114](https://github.com/nentgroup/viaplay-cli/issues/114)) ([61bd9ba](https://github.com/nentgroup/viaplay-cli/commit/61bd9ba52cf70aac37bc85aaa18a6e330f68cedd))
+* **deps:** update module golang.org/x/term to v0.39.0 ([#112](https://github.com/nentgroup/viaplay-cli/issues/112)) ([cbf7a55](https://github.com/nentgroup/viaplay-cli/commit/cbf7a55e9d2e0d09a46c02d02c7d8aaaa5aeb2eb))
+
 ## [2.4.1](https://github.com/nentgroup/viaplay-cli/compare/v2.4.0...v2.4.1) (2026-01-09)
 
 
