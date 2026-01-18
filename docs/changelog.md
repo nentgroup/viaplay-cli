@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/nentgroup/viaplay-cli/compare/v2.4.2...v2.5.0) (2026-01-18)
+
+
+### Features
+
+* refactor cache list output ([#115](https://github.com/nentgroup/viaplay-cli/issues/115)) ([6484cd2](https://github.com/nentgroup/viaplay-cli/commit/6484cd2743a68600056faaaaf2deca88c0e08e45))
+
 ## [2.4.2](https://github.com/nentgroup/viaplay-cli/compare/v2.4.1...v2.4.2) (2026-01-12)
 
 
