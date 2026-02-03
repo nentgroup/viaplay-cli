@@ -2,7 +2,7 @@ module github.com/nentgroup/viaplay-cli
 
 go 1.24.2
 
-toolchain go1.24.12
+toolchain go1.25.6
 
 require (
 	github.com/briandowns/spinner v1.23.2
