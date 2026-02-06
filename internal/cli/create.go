@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/nentgroup/viaplay-cli/internal/git"
+
 	"github.com/nentgroup/viaplay-cli/internal/config"
 
 	"github.com/nentgroup/viaplay-cli/internal/gh"
@@ -150,17 +152,15 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 		return err
 	}
 
-	// Validate project directory if we're scaffolding
-	if withScaffolding {
-		projectDir, err := validateProjectDirectory(opts, repoParams.name, withScaffolding)
-		if err != nil {
-			output.FatalError(fmt.Sprintf("Project directory validation failed: %v", err))
-			return nil
-		}
-		// Make sure OutputDir is set for the project creation
-		if opts.OutputDir == "" {
-			opts.OutputDir = filepath.Dir(projectDir)
-		}
+	// Validate project directory
+	projectDir, err := validateProjectDirectory(opts, repoParams.name)
+	if err != nil {
+		output.FatalError(fmt.Sprintf("Project directory validation failed: %v", err))
+		return nil
+	}
+	// Make sure OutputDir is set for the project creation
+	if opts.OutputDir == "" {
+		opts.OutputDir = filepath.Dir(projectDir)
 	}
 
 	// Check if repository exists (if we're creating one)
@@ -194,6 +194,14 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 		if summary.CleanedUp && opts.CleanupOnError {
 			// Return nil to indicate success (resources were cleaned up properly)
 			return nil
+		}
+	}
+
+	// For repo-only creation (no scaffolding) we want to initialise a local git repo
+	// that points to the newly created GitHub repository.
+	if !withScaffolding && !opts.NoRepo {
+		if err := initLocalRepo(projectDir, repoParams); err != nil {
+			return err
 		}
 	}
 
@@ -301,7 +309,7 @@ func getSecretsData(opts *CreateCommandOptions) (string, error) {
 }
 
 // validateProjectDirectory checks if the project directory is valid
-func validateProjectDirectory(opts *CreateCommandOptions, repoName string, withScaffolding bool) (string, error) {
+func validateProjectDirectory(opts *CreateCommandOptions, repoName string) (string, error) {
 	projectDir := opts.OutputDir
 	if projectDir == "" {
 		currentDir, err := os.Getwd()
@@ -313,11 +321,9 @@ func validateProjectDirectory(opts *CreateCommandOptions, repoName string, withS
 		projectDir = filepath.Join(projectDir, repoName)
 	}
 
-	// Check if the project directory already exists when scaffolding
-	if withScaffolding {
-		if _, err := os.Stat(projectDir); err == nil {
-			return "", fmt.Errorf("project directory already exists: %s", projectDir)
-		}
+	// Always ensure the project directory does not already exist
+	if _, err := os.Stat(projectDir); err == nil {
+		return "", fmt.Errorf("project directory already exists: %s", projectDir)
 	}
 
 	return projectDir, nil
@@ -501,5 +507,21 @@ func setupScaffoldingOptions(opts *CreateCommandOptions) error {
 			return fmt.Errorf("no template found for %s/%s, please specify with --template-source", opts.Language, opts.ProjectType)
 		}
 	}
+	return nil
+}
+
+// initLocalRepo initialises a local git repository in projectDir and sets origin to the new GitHub repo.
+func initLocalRepo(projectDir string, params repoParameters) error {
+	// Initialise git repository (this will create the directory if needed)
+	if err := git.InitRepository(projectDir); err != nil {
+		return fmt.Errorf("failed to initialise local git repository at %s: %w", projectDir, err)
+	}
+
+	// Configure origin remote to point at the new GitHub repository using SSH URL
+	repoURL := fmt.Sprintf("git@github.com:%s/%s.git", params.owner, params.name)
+	if err := git.AddRemote(projectDir, "origin", repoURL); err != nil {
+		return fmt.Errorf("failed to configure origin remote for local repository at %s: %w", projectDir, err)
+	}
+
 	return nil
 }
