@@ -2,15 +2,13 @@ package project
 
 import (
 	"github.com/google/go-github/v74/github"
+)
 
-	"github.com/nentgroup/viaplay-cli/internal/output"
+type AccountType string
 
-	"github.com/nentgroup/viaplay-cli/internal/cache"
-	"github.com/nentgroup/viaplay-cli/internal/config"
-	"github.com/nentgroup/viaplay-cli/internal/gh"
-	"github.com/nentgroup/viaplay-cli/internal/registry"
-	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
-	"github.com/nentgroup/viaplay-cli/internal/template"
+const (
+	PersonalAccount     AccountType = "personal"
+	OrganizationAccount AccountType = "organization"
 )
 
 // Summary contains details about the created project to be displayed to the user
@@ -29,29 +27,6 @@ type Summary struct {
 	CleanupDetails  []string // Details about what was cleaned up
 }
 
-// Factory manages the project creation workflow
-type Factory struct {
-	// GitHub client for repository operations
-	GitHubClient *gh.GitHubClient
-
-	// Configuration
-	Config *config.Configuration
-
-	// Template registry for looking up templates
-	TemplateRegistry *registry.Registry
-
-	// Cache manager for template caching
-	CacheManager *cache.Manager
-
-	// Project scaffolder for applying templates
-	Scaffolder *scaffolding.ProjectScaffolder
-
-	// Progress reporter for tracking operation progress
-	Reporter output.Reporter
-
-	templateVars *template.Variables
-}
-
 // Options contains all options for creating a new project
 type Options struct {
 	// Repository options
@@ -59,9 +34,9 @@ type Options struct {
 	RepoDescription string
 	RepoOwner       string
 	IsPrivate       bool
-	IsOrg           bool   // Deprecated: use AccountType instead
-	AccountType     string // "personal" or "organization"
-	SkipRepo        bool   // Skip GitHub repository creation
+	IsOrg           bool        // Deprecated: use AccountType instead
+	AccountType     AccountType // "personal" or "organization"
+	SkipRepo        bool        // Skip GitHub repository creation
 
 	// Project options
 	Language    string
