@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.6.0](https://github.com/nentgroup/viaplay-cli/compare/v2.5.0...v2.6.0) (2026-02-09)
+
+
+### Features
+
+* add support for local repo ([#126](https://github.com/nentgroup/viaplay-cli/issues/126)) ([eddf09d](https://github.com/nentgroup/viaplay-cli/commit/eddf09dd7f575d0880ef9c73d75ed6804797847a))
+
+
+### Dependencies
+
+* **deps:** update dependency go to v1.25.6 ([#122](https://github.com/nentgroup/viaplay-cli/issues/122)) ([0000d5f](https://github.com/nentgroup/viaplay-cli/commit/0000d5f68b41950f6aa6a7bb21bf16e5dcde40d8))
+* **deps:** update dependency go to v1.25.7 ([#123](https://github.com/nentgroup/viaplay-cli/issues/123)) ([6128649](https://github.com/nentgroup/viaplay-cli/commit/61286493d4bc756b94d8478fc27aa39f48af1de1))
+* **deps:** update module github.com/charmbracelet/bubbles to v0.21.1 ([#121](https://github.com/nentgroup/viaplay-cli/issues/121)) ([19167b8](https://github.com/nentgroup/viaplay-cli/commit/19167b8a1d7c8d0221e0efb621ad390ecebd52cb))
+* **deps:** update module github.com/google/go-github/v74 to v82 ([#117](https://github.com/nentgroup/viaplay-cli/issues/117)) ([19ade1a](https://github.com/nentgroup/viaplay-cli/commit/19ade1af03de45445bc7e51510c4e624c99faff9))
+* **deps:** update module github.com/google/go-github/v81 to v82 ([#118](https://github.com/nentgroup/viaplay-cli/issues/118)) ([ac6dddd](https://github.com/nentgroup/viaplay-cli/commit/ac6ddddc5e383ae60af6f715322728bbdf662203))
+* **deps:** update module golang.org/x/crypto to v0.48.0 ([#127](https://github.com/nentgroup/viaplay-cli/issues/127)) ([51459bd](https://github.com/nentgroup/viaplay-cli/commit/51459bd490880b45d0a824a07aa5ae04282645e4))
+* **deps:** update module golang.org/x/oauth2 to v0.35.0 ([#124](https://github.com/nentgroup/viaplay-cli/issues/124)) ([b996bad](https://github.com/nentgroup/viaplay-cli/commit/b996bad5af64462d9aa2902bf857d9419e239049))
+* **deps:** update module golang.org/x/term to v0.40.0 ([#125](https://github.com/nentgroup/viaplay-cli/issues/125)) ([1ff8f51](https://github.com/nentgroup/viaplay-cli/commit/1ff8f51ff46a924e7189292f6e9e642f4a31bd3c))
+
 ## [2.5.0](https://github.com/nentgroup/viaplay-cli/compare/v2.4.2...v2.5.0) (2026-01-18)
 
 
