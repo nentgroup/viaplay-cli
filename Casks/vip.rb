@@ -6,7 +6,7 @@ cask "vip" do
   name "vip"
   desc "CLI tool for Gecko Generators."
   homepage "https://nentgroup.github.io/viaplay-cli"
-  version "2.5.0"
+  version "2.6.0"
 
   livecheck do
     skip "Auto-generated on release."
@@ -18,12 +18,12 @@ cask "vip" do
     on_intel do
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "04447e3190a7d59d0a86ec050c957941ab3cc76f2beaf3bd1df46cc123310329"
+      sha256 "d8a595db58e447024817245fcee83bcd2d73ccb9ba6f8a3ab4ee9077b84aa7bf"
     end
     on_arm do
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "d47d7b01f0ec1ded1686b0786003ef9c1378147a1ae9c3327b6ab421cf810a9b"
+      sha256 "3c554d47af247dc36840c1974c300040cee93af5bd09b9ad963cd0b733b62fbf"
     end
   end
 
@@ -31,12 +31,12 @@ cask "vip" do
     on_intel do
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "7e23b572062d24355bf50a6bcf42cc4ed8556dc22bf81d68979cee63c0a35e4d"
+      sha256 "4339789324456d18da01e5311edb87558467836acd759b33be1a683ad1f75687"
     end
     on_arm do
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "da78119cef8465c2224e2da2a57c35beaf31a0f663d190a2e7c1da16449ced65"
+      sha256 "7fdae7cda97d29ac7a5203844107cc8896b6c8a3ea7d24ed1fce8ead33907443"
     end
   end
 
