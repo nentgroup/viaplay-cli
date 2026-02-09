@@ -64,6 +64,8 @@ templates during development or in CI pipelines.
 
 Templates are output to a temporary directory that is automatically created.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
 			// Initialise result object for potential JSON output
 			result := TestResult{
 				TemplatePath: templatePath,
@@ -178,7 +180,7 @@ Templates are output to a temporary directory that is automatically created.`,
 			}
 
 			// Run the scaffolding
-			err = scaffolder.ScaffoldProject(absOutputPath, "", "", templatePath, vars, true, forceRefresh)
+			err = scaffolder.ScaffoldProject(ctx, absOutputPath, "", "", templatePath, vars, true, forceRefresh)
 			if err != nil {
 				result.Error = fmt.Sprintf("failed to scaffold template: %v", err)
 				if jsonOutput {

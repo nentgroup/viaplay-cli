@@ -438,8 +438,12 @@ func TestRenderer_RenderDirectoryPath(t *testing.T) {
 
 func TestRenderer_RenderFile_MockFS(t *testing.T) {
 	memFS := afero.NewMemMapFs()
-	_ = afero.WriteFile(memFS, "/tmp/template.txt", []byte("Hello, {{.Project.Name}}!"), 0o600)
-	_ = afero.WriteFile(memFS, "/tmp/plain.txt", []byte("Just plain text."), 0o600)
+	if err := afero.WriteFile(memFS, "/tmp/template.txt", []byte("Hello, {{.Project.Name}}!"), 0o600); err != nil {
+		t.Fatalf("WriteFile template.txt error: %v", err)
+	}
+	if err := afero.WriteFile(memFS, "/tmp/plain.txt", []byte("Just plain text."), 0o600); err != nil {
+		t.Fatalf("WriteFile plain.txt error: %v", err)
+	}
 	r := &Renderer{
 		Variables:  &Variables{Project: ProjectInfo{Name: "TestProject"}},
 		FileSystem: memFS,
@@ -451,7 +455,10 @@ func TestRenderer_RenderFile_MockFS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderFile error: %v", err)
 	}
-	data, _ := afero.ReadFile(memFS, destPath)
+	data, err := afero.ReadFile(memFS, destPath)
+	if err != nil {
+		t.Fatalf("ReadFile rendered template error: %v", err)
+	}
 	if string(data) != "Hello, TestProject!" {
 		t.Errorf("got %q, want %q", string(data), "Hello, TestProject!")
 	}
@@ -462,7 +469,10 @@ func TestRenderer_RenderFile_MockFS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderFile error: %v", err)
 	}
-	dataPlain, _ := afero.ReadFile(memFS, destPathPlain)
+	dataPlain, err := afero.ReadFile(memFS, destPathPlain)
+	if err != nil {
+		t.Fatalf("ReadFile rendered plain file error: %v", err)
+	}
 	if string(dataPlain) != "Just plain text." {
 		t.Errorf("got %q, want %q", string(dataPlain), "Just plain text.")
 	}

@@ -286,6 +286,8 @@ func GetCurrentIconType() IconType {
 }
 
 // String gets an icon string with a trailing space for easy formatting
+//
+//nolint:cyclop
 func (i Icons) String(name string) string {
 	var icon string
 

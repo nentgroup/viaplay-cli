@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -47,10 +48,11 @@ Use this when you need to create a repository structure but will add code
 manually or migrate existing code to a new repository.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
 			// Parse owner/repo format
 			parseOwnerRepoArg(args[0], opts)
 
-			return createProjectOrRepo(opts, false)
+			return createProjectOrRepo(ctx, opts, false)
 		},
 		Example: `  # Create a private repository with default settings
   vip repo create my-repo --team platform
@@ -66,7 +68,7 @@ manually or migrate existing code to a new repository.`,
 	}
 
 	// Add common flags without the name flag (as it's now a positional arg)
-	addCommonFlagsExceptName(cmd, opts)
+	addCommonFlags(cmd, opts)
 
 	return cmd
 }

@@ -6,6 +6,8 @@ on:
   push:
     branches:
       - "feature/*"
+      - "bugfix/*"
+      - "hotfix/*"
   pull_request:
     types: [opened, synchronize, reopened]
     branches:

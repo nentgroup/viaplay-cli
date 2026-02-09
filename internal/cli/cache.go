@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -45,7 +46,8 @@ var cacheCleanCmd = &cobra.Command{
 	Short: "Clean the entire template cache",
 	Long:  `Remove all template files from the cache.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cleanCache()
+		ctx := cmd.Context()
+		cleanCache(ctx)
 	},
 }
 
@@ -54,7 +56,8 @@ var cacheListCmd = &cobra.Command{
 	Short: "List all templates in the cache",
 	Long:  `List all templates currently stored in the cache.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		listCache()
+		ctx := cmd.Context()
+		listCache(ctx)
 	},
 }
 
@@ -63,7 +66,8 @@ var cacheInfoCmd = &cobra.Command{
 	Short: "Display information about the cache",
 	Long:  `Show detailed information about the template cache including size and statistics.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		showCacheInfo()
+		ctx := cmd.Context()
+		showCacheInfo(ctx)
 	},
 }
 
@@ -124,7 +128,7 @@ func pruneCache(days int) {
 }
 
 // cleanCache removes all templates from the cache
-func cleanCache() {
+func cleanCache(ctx context.Context) {
 	// Get the cache manager
 	manager, err := getCacheManager()
 	if err != nil {
@@ -133,7 +137,7 @@ func cleanCache() {
 	}
 
 	// Get current templates to show what will be removed
-	templates, err := manager.ListTemplates()
+	templates, err := manager.ListTemplates(ctx)
 	if err != nil {
 		output.ErrorMessage(fmt.Sprintf("Failed to list templates: %v", err))
 		return
@@ -215,7 +219,7 @@ func cleanCache() {
 }
 
 // listCache lists all templates in the cache
-func listCache() {
+func listCache(ctx context.Context) {
 	output.Section("Templates in Cache")
 
 	// Get the cache manager
@@ -226,7 +230,7 @@ func listCache() {
 	}
 
 	// Get the templates
-	templates, err := manager.ListTemplates()
+	templates, err := manager.ListTemplates(ctx)
 	if err != nil {
 		output.ErrorMessage(fmt.Sprintf("Failed to list templates: %v", err))
 		return
@@ -303,7 +307,7 @@ func listCache() {
 }
 
 // showCacheInfo displays detailed information about the cache
-func showCacheInfo() {
+func showCacheInfo(ctx context.Context) {
 	output.Section("Cache Information")
 
 	// Get the cache manager
@@ -371,7 +375,7 @@ func showCacheInfo() {
 	}
 
 	// Get and display template counts
-	templates, err := manager.ListTemplates()
+	templates, err := manager.ListTemplates(ctx)
 	if err != nil {
 		output.ErrorMessage(fmt.Sprintf("Failed to list templates: %v", err))
 		return

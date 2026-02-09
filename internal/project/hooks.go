@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -11,36 +12,10 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/template"
 )
 
-// InitGoProject initialises a Go project with proper module setup
-func (c *Factory) InitGoProject(projectPath string) error {
-	if _, err := os.Stat(filepath.Join(projectPath, "go.mod")); err == nil {
-		return nil
-	}
-	cmd := exec.Command("go", "mod", "tidy")
-	cmd.Dir = projectPath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-// InitNodeProject initialises a Node.js project
-func (c *Factory) InitNodeProject(projectPath string) error {
-	packageJSONPath := filepath.Join(projectPath, "package.json")
-	nodeModulesPath := filepath.Join(projectPath, "node_modules")
-	if _, err := os.Stat(packageJSONPath); err == nil {
-		if _, err := os.Stat(nodeModulesPath); os.IsNotExist(err) {
-			cmd := exec.Command("npm", "install")
-			cmd.Dir = projectPath
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			return cmd.Run()
-		}
-	}
-	return nil
-}
-
 // RunHooks runs the post-installation hooks for a project
-func (c *Factory) RunHooks(projectPath, language, projectType string, templateVars *template.Variables) error {
+func (c *Factory) RunHooks(ctx context.Context, projectPath, language, projectType string,
+	templateVars *template.Variables,
+) error {
 	// Create a function that will run the hooks and write output to provided writers
 	runHookFn := func(stdout, stderr io.Writer) error {
 		// Create command executors that use the provided writers
@@ -72,7 +47,7 @@ func (c *Factory) RunHooks(projectPath, language, projectType string, templateVa
 				}
 
 				// Create a command that will run in the project directory
-				execCmd := exec.Command("sh", "-c", renderedCmd)
+				execCmd := exec.CommandContext(ctx, "sh", "-c", renderedCmd)
 				execCmd.Dir = projectPath
 
 				// Run the command using our executor
@@ -101,7 +76,7 @@ func (c *Factory) RunHooks(projectPath, language, projectType string, templateVa
 				}
 
 				// Create a command to run the script
-				execCmd := exec.Command(fullScriptPath)
+				execCmd := exec.CommandContext(ctx, fullScriptPath)
 				execCmd.Dir = projectPath
 
 				// Run the script using our executor

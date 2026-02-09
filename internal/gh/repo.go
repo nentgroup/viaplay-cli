@@ -1,6 +1,7 @@
 package gh
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,7 +10,9 @@ import (
 )
 
 // CreateRepo creates a new GitHub repository under the given org (or user if org is empty)
-func (ghc *GitHubClient) CreateRepo(repoName, org string, private bool, description string) (string, error) {
+func (ghc *GitHubClient) CreateRepo(ctx context.Context, repoName, org string, private bool,
+	description string,
+) (string, error) {
 	repo := &github.Repository{
 		Name:        github.Ptr(repoName),
 		Private:     github.Ptr(private),
@@ -19,9 +22,9 @@ func (ghc *GitHubClient) CreateRepo(repoName, org string, private bool, descript
 	var resp *github.Response
 	var err error
 	if org != "" {
-		createdRepo, resp, err = ghc.client.Repositories.Create(ghc.ctx, org, repo)
+		createdRepo, resp, err = ghc.client.Repositories.Create(ctx, org, repo)
 	} else {
-		createdRepo, resp, err = ghc.client.Repositories.Create(ghc.ctx, "", repo)
+		createdRepo, resp, err = ghc.client.Repositories.Create(ctx, "", repo)
 	}
 	if err != nil {
 		return "", fmt.Errorf("failed to create repo: %w", err)
@@ -33,9 +36,9 @@ func (ghc *GitHubClient) CreateRepo(repoName, org string, private bool, descript
 }
 
 // RepositoryExists checks if a repository with the given name already exists
-func (ghc *GitHubClient) RepositoryExists(owner, repo string) (bool, error) {
+func (ghc *GitHubClient) RepositoryExists(ctx context.Context, owner, repo string) (bool, error) {
 	// Use the GitHub API to check if the repository exists
-	_, resp, err := ghc.client.Repositories.Get(ghc.ctx, owner, repo)
+	_, resp, err := ghc.client.Repositories.Get(ctx, owner, repo)
 
 	// If we got a 404, the repository doesn't exist
 	if resp != nil && resp.StatusCode == 404 {
@@ -73,8 +76,8 @@ func (ghc *GitHubClient) RepositoryExists(owner, repo string) (bool, error) {
 }
 
 // DeleteRepo deletes a GitHub repository
-func (ghc *GitHubClient) DeleteRepo(owner, repo string) error {
-	resp, err := ghc.client.Repositories.Delete(ghc.ctx, owner, repo)
+func (ghc *GitHubClient) DeleteRepo(ctx context.Context, owner, repo string) error {
+	resp, err := ghc.client.Repositories.Delete(ctx, owner, repo)
 	if err != nil {
 		if resp != nil && resp.StatusCode == 404 {
 			// Repository doesn't exist, which is fine for our deletion purpose
@@ -86,7 +89,7 @@ func (ghc *GitHubClient) DeleteRepo(owner, repo string) error {
 }
 
 // AddLabelsToRepo adds labels to a GitHub repository
-func (ghc *GitHubClient) AddLabelsToRepo(owner, repo string, labels []string) error {
+func (ghc *GitHubClient) AddLabelsToRepo(ctx context.Context, owner, repo string, labels []string) error {
 	for _, label := range labels {
 		// Create a new label with default colour (gray)
 		newLabel := &github.Label{
@@ -95,7 +98,7 @@ func (ghc *GitHubClient) AddLabelsToRepo(owner, repo string, labels []string) er
 		}
 
 		// Try to create the label
-		_, resp, err := ghc.client.Issues.CreateLabel(ghc.ctx, owner, repo, newLabel)
+		_, resp, err := ghc.client.Issues.CreateLabel(ctx, owner, repo, newLabel)
 
 		// If the label already exists (422 status code), that's fine, continue with the next one
 		if err != nil && (resp == nil || resp.StatusCode != http.StatusUnprocessableEntity) {
@@ -107,8 +110,8 @@ func (ghc *GitHubClient) AddLabelsToRepo(owner, repo string, labels []string) er
 }
 
 // AddTopicsToRepo adds topics to a GitHub repository
-func (ghc *GitHubClient) AddTopicsToRepo(owner, repo string, topics []string) error {
-	_, _, err := ghc.client.Repositories.ReplaceAllTopics(ghc.ctx, owner, repo, topics)
+func (ghc *GitHubClient) AddTopicsToRepo(ctx context.Context, owner, repo string, topics []string) error {
+	_, _, err := ghc.client.Repositories.ReplaceAllTopics(ctx, owner, repo, topics)
 	if err != nil {
 		return fmt.Errorf("failed to set topics for repository: %w", err)
 	}

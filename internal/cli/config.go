@@ -64,6 +64,8 @@ Examples:
   vip config init --team platform --org myorg
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+
 		// Check if the user is authenticated with GitHub
 		token, err := gh.GetToken()
 		if err != nil || token == "" {
@@ -89,7 +91,7 @@ Examples:
 		ghClient := gh.NewGitHubClient(token)
 
 		// Get authenticated user info
-		username, err := ghClient.GetAuthenticatedUser()
+		username, err := ghClient.GetAuthenticatedUser(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get authenticated user: %w", err)
 		}
@@ -98,7 +100,7 @@ Examples:
 		// Interactive organisation and team selection if neither team nor organisation flags are set
 		if !cmd.Flags().Changed("team") && !cmd.Flags().Changed("organization") {
 			// Interactive selection of organization
-			selectedOrg, err := SelectOrganizationWithBubbles(ghClient)
+			selectedOrg, err := SelectOrganizationWithBubbles(ctx, ghClient)
 			if err != nil {
 				fmt.Printf("Warning: %v\n", err)
 				// Continue without organization if there's an error
@@ -106,7 +108,7 @@ Examples:
 				organization = selectedOrg
 
 				// If we have an organization, also select a team
-				selectedTeam, err := SelectTeamWithBubbles(ghClient, organization)
+				selectedTeam, err := SelectTeamWithBubbles(ctx, ghClient, organization)
 				if err != nil {
 					fmt.Printf("Warning: %v\n", err)
 					// Continue without team if there's an error

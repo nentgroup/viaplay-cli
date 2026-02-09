@@ -30,7 +30,10 @@ type Spinner struct {
 func NewSpinner() *Spinner {
 	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 	s.Writer = os.Stderr
-	s.Color("red", "bold")
+	if err := s.Color("red", "bold"); err != nil {
+		// If colour can't be set, continue with default colour; ignore logging errors
+		_, _ = fmt.Fprintf(os.Stderr, "warning: failed to set spinner color: %v\n", err)
+	}
 
 	return &Spinner{
 		spinner:      s,
@@ -89,23 +92,23 @@ func (s *Spinner) Stop() {
 // Success stops the spinner and displays a success message
 func (s *Spinner) Success(message string) {
 	s.Stop()
-	fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Success, s.successStyle.Render(message))
+	_, _ = fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Success, s.successStyle.Render(message))
 }
 
 // Fail stops the spinner and displays an error message
 func (s *Spinner) Fail(message string) {
 	s.Stop()
-	fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Error, s.errorStyle.Render(message))
+	_, _ = fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Error, s.errorStyle.Render(message))
 }
 
 // Skip stops the spinner and displays a skipped message
 func (s *Spinner) Skip(message string) {
 	s.Stop()
-	fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Skip, s.skipStyle.Render(message))
+	_, _ = fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Skip, s.skipStyle.Render(message))
 }
 
 // Warn stops the spinner and displays a warning message
 func (s *Spinner) Warn(message string) {
 	s.Stop()
-	fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Warning, s.warningStyle.Render(message))
+	_, _ = fmt.Fprintf(s.output, "%s %s\n", ActiveIcons.Warning, s.warningStyle.Render(message))
 }

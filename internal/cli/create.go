@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/nentgroup/viaplay-cli/internal/git"
 
 	"github.com/nentgroup/viaplay-cli/internal/config"
 
@@ -50,8 +53,8 @@ type CreateCommandOptions struct {
 	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur
 }
 
-// addCommonFlagsExceptName adds common flags to a command, excluding the name flag
-func addCommonFlagsExceptName(cmd *cobra.Command, opts *CreateCommandOptions) {
+// addCommonFlags adds common flags to a command, excluding the name flag
+func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 	// Repository flags
 	cmd.Flags().StringVar(&opts.Description, "description", "", "Repository description")
 	cmd.Flags().BoolVar(&opts.Public, "public", false, "Create a public repository (overrides --private)")
@@ -92,7 +95,7 @@ func addCommonFlagsExceptName(cmd *cobra.Command, opts *CreateCommandOptions) {
 		// 1. --public flag (highest priority)
 		// 2. --private flag (second priority)
 		// 3. default_visibility from config (lowest priority)
-		isPrivateSet, _ := cmd.Flags().GetBool("private")
+		isPrivateSet, _ := cmd.Flags().GetBool("private") //nolint:errcheck
 
 		// If neither flag is explicitly set, use the default_visibility from config
 		if !cmd.Flags().Changed("public") && !cmd.Flags().Changed("private") {
@@ -128,7 +131,7 @@ func addCommonFlagsExceptName(cmd *cobra.Command, opts *CreateCommandOptions) {
 
 // createProjectOrRepo is a shared function that handles both project and repo creation
 // The withScaffolding parameter determines whether to include scaffolding
-func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error {
+func createProjectOrRepo(ctx context.Context, opts *CreateCommandOptions, withScaffolding bool) error {
 	// Start timing the operation
 	startTime := time.Now()
 	// Setup GitHub client and get config
@@ -150,21 +153,19 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 		return err
 	}
 
-	// Validate project directory if we're scaffolding
-	if withScaffolding {
-		projectDir, err := validateProjectDirectory(opts, repoParams.name, withScaffolding)
-		if err != nil {
-			output.FatalError(fmt.Sprintf("Project directory validation failed: %v", err))
-			return nil
-		}
-		// Make sure OutputDir is set for the project creation
-		if opts.OutputDir == "" {
-			opts.OutputDir = filepath.Dir(projectDir)
-		}
+	// Validate project directory
+	projectDir, err := validateProjectDirectory(opts, repoParams.name)
+	if err != nil {
+		output.FatalError(fmt.Sprintf("Project directory validation failed: %v", err))
+		return nil
+	}
+	// Make sure OutputDir is set for the project creation
+	if opts.OutputDir == "" {
+		opts.OutputDir = filepath.Dir(projectDir)
 	}
 
 	// Check if repository exists (if we're creating one)
-	if !opts.NoRepo && !validateRepositoryDoesNotExist(ghClient, repoParams.owner, repoParams.name) {
+	if !opts.NoRepo && !validateRepositoryDoesNotExist(ctx, ghClient, repoParams.owner, repoParams.name) {
 		output.FatalError(fmt.Sprintf("Repository already exists: %s/%s", repoParams.owner, repoParams.name))
 		return nil
 	}
@@ -179,7 +180,8 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 	}
 
 	// Create the project using the Factory
-	summary, createErr := executeProjectCreation(ghClient, configDir, repoParams, opts, secretsData, withScaffolding)
+	summary, createErr := executeProjectCreation(ctx, ghClient, configDir, repoParams, opts, secretsData,
+		withScaffolding)
 
 	// Calculate total execution time
 	executionTime := time.Since(startTime)
@@ -194,6 +196,14 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 		if summary.CleanedUp && opts.CleanupOnError {
 			// Return nil to indicate success (resources were cleaned up properly)
 			return nil
+		}
+	}
+
+	// For repo-only creation (no scaffolding) we want to initialise a local git repo
+	// that points to the newly created GitHub repository.
+	if !withScaffolding && !opts.NoRepo {
+		if err := initLocalRepo(ctx, projectDir, repoParams); err != nil {
+			return err
 		}
 	}
 
@@ -301,7 +311,7 @@ func getSecretsData(opts *CreateCommandOptions) (string, error) {
 }
 
 // validateProjectDirectory checks if the project directory is valid
-func validateProjectDirectory(opts *CreateCommandOptions, repoName string, withScaffolding bool) (string, error) {
+func validateProjectDirectory(opts *CreateCommandOptions, repoName string) (string, error) {
 	projectDir := opts.OutputDir
 	if projectDir == "" {
 		currentDir, err := os.Getwd()
@@ -313,19 +323,17 @@ func validateProjectDirectory(opts *CreateCommandOptions, repoName string, withS
 		projectDir = filepath.Join(projectDir, repoName)
 	}
 
-	// Check if the project directory already exists when scaffolding
-	if withScaffolding {
-		if _, err := os.Stat(projectDir); err == nil {
-			return "", fmt.Errorf("project directory already exists: %s", projectDir)
-		}
+	// Always ensure the project directory does not already exist
+	if _, err := os.Stat(projectDir); err == nil {
+		return "", fmt.Errorf("project directory already exists: %s", projectDir)
 	}
 
 	return projectDir, nil
 }
 
 // validateRepositoryDoesNotExist checks if the repository doesn't exist on GitHub
-func validateRepositoryDoesNotExist(ghClient *gh.GitHubClient, owner, repoName string) bool {
-	repoExists, err := ghClient.RepositoryExists(owner, repoName)
+func validateRepositoryDoesNotExist(ctx context.Context, ghClient *gh.GitHubClient, owner, repoName string) bool {
+	repoExists, err := ghClient.RepositoryExists(ctx, owner, repoName)
 	if err != nil {
 		output.VerboseMessage(fmt.Sprintf("Error checking if repository exists: %v", err))
 		return false
@@ -334,7 +342,9 @@ func validateRepositoryDoesNotExist(ghClient *gh.GitHubClient, owner, repoName s
 }
 
 // executeProjectCreation executes the project creation workflow
-func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params repoParameters, opts *CreateCommandOptions, secretsData string, withScaffolding bool) (*project.Summary, error) { // Create project creator with reporter
+func executeProjectCreation(ctx context.Context, ghClient *gh.GitHubClient, configDir string, params repoParameters,
+	opts *CreateCommandOptions, secretsData string, withScaffolding bool,
+) (*project.Summary, error) { // Create project creator with reporter
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
@@ -377,7 +387,7 @@ func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params 
 	}
 
 	// Execute the project creation workflow
-	return creator.Create(projectOpts)
+	return creator.Create(ctx, projectOpts)
 }
 
 // formatDuration formats a duration to be more human-readable
@@ -501,5 +511,21 @@ func setupScaffoldingOptions(opts *CreateCommandOptions) error {
 			return fmt.Errorf("no template found for %s/%s, please specify with --template-source", opts.Language, opts.ProjectType)
 		}
 	}
+	return nil
+}
+
+// initLocalRepo initialises a local git repository in projectDir and sets origin to the new GitHub repo.
+func initLocalRepo(ctx context.Context, projectDir string, params repoParameters) error {
+	// Initialise git repository (this will create the directory if needed)
+	if err := git.InitRepository(ctx, projectDir); err != nil {
+		return fmt.Errorf("failed to initialise local git repository at %s: %w", projectDir, err)
+	}
+
+	// Configure origin remote to point at the new GitHub repository using SSH URL
+	repoURL := fmt.Sprintf("git@github.com:%s/%s.git", params.owner, params.name)
+	if err := git.AddRemote(ctx, projectDir, "origin", repoURL); err != nil {
+		return fmt.Errorf("failed to configure origin remote for local repository at %s: %w", projectDir, err)
+	}
+
 	return nil
 }

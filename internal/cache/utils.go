@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const unknownVersion = "unknown"
+
 // FormatPruneResults returns a formatted string summarising the results of a prune operation
 func FormatPruneResults(prunedCount, totalTemplates int) string {
 	if prunedCount == 0 {
@@ -29,12 +31,12 @@ func FormatTemplateList(templates []Template) string {
 	for _, tmpl := range templates {
 		version := tmpl.Version
 		if version == "" {
-			version = "unknown"
+			version = unknownVersion
 		}
 
 		remote := tmpl.RemoteURL
 		if remote == "" {
-			remote = "unknown"
+			remote = unknownVersion
 		}
 
 		builder.WriteString(fmt.Sprintf("  %s/%s (version: %s, remote: %s)\n",

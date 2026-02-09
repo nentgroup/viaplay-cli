@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,80 +13,54 @@ import (
 
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/secrets"
+	"github.com/nentgroup/viaplay-cli/internal/template"
+)
+
+const (
+	secretTypeSecret   = "secret"
+	secretTypeVariable = "variable"
 )
 
 // applyConfigurations applies configurations to the GitHub repository
-func (c *Factory) applyConfigurations(opts Options) error {
+func (c *Factory) applyConfigurations(ctx context.Context, opts Options) error {
 	// Skip all GitHub configurations if NoRepo is true
 	if opts.SkipRepo {
 		return nil
 	}
 
 	// Get authenticated username for personal directory path
-	username, err := c.GitHubClient.GetAuthenticatedUser()
+	username, err := c.GitHubClient.GetAuthenticatedUser(ctx)
 	if err != nil {
 		c.Reporter.Warning("Auth", fmt.Sprintf("Failed to get authenticated username: %v", err))
 		username = "" // Default to empty if we can't get the username
 	}
 
-	// Determine the appropriate configuration directory based on account type
-	var configDir string
-
-	// For organisation repos with team specified, use org team directory
-	if opts.AccountType == "organization" && opts.Team != "" {
-		// For organisation repositories, use the organisation-specific team directory
-		configDir = c.Config.GetTeamDir(opts.Team, opts.RepoOwner)
-		c.Reporter.Debug(fmt.Sprintf("Using organization-specific team directory: %s", configDir))
-	} else if opts.AccountType == "user" && username != "" {
-		// For personal accounts, use the personal directory
-		configDir = c.Config.GetPersonalDir(username)
-		c.Reporter.Debug(fmt.Sprintf("Using personal directory: %s", configDir))
-
-		// Ensure the user directory exists
-		if _, err := os.Stat(configDir); os.IsNotExist(err) {
-			if err := os.MkdirAll(configDir, 0o755); err != nil {
-				return fmt.Errorf("failed to create personal config directory: %w", err)
-			}
-		}
-
-		// Check if config files exist
-		if _, err := os.Stat(filepath.Join(configDir, "envs")); os.IsNotExist(err) {
-			c.Reporter.Debug(fmt.Sprintf("Personal environment configs for user %s not found, skipping", username))
-		}
-	} else if opts.Team != "" {
-		// Fallback: For personal repositories with a team specified, use the global team directory (legacy support)
-		configDir = filepath.Join(opts.ConfigDir, "teams", opts.Team)
-		c.Reporter.Debug(fmt.Sprintf("Using global team directory: %s", configDir))
-	} else {
-		c.Reporter.Debug("No team or personal account specified, skipping configurations")
-		return nil // No team or personal account specified, nothing to apply
+	configDir, err := c.determineConfigDir(opts, username)
+	if err != nil {
+		// No team or personal account specified, or failure creating dir; nothing to apply
+		return err
 	}
 
-	// 1. Apply environments if requested
 	if opts.ApplyEnvs {
-		err := c.applyEnvs(opts.RepoOwner, opts.RepoName, configDir)
-		if err != nil {
+		if err := c.applyEnvs(ctx, opts.RepoOwner, opts.RepoName, configDir); err != nil {
 			return fmt.Errorf("failed to apply environments: %w", err)
 		}
 	}
 
-	// 2. Apply rulesets if requested
 	if opts.ApplyRulesets {
-		if err := c.applyRulesets(opts.RepoOwner, opts.RepoName, configDir); err != nil {
+		if err := c.applyRulesets(ctx, opts.RepoOwner, opts.RepoName, configDir); err != nil {
 			return fmt.Errorf("failed to apply rulesets: %w", err)
 		}
 	}
 
-	// 3. Apply secrets if requested
 	if opts.ApplySecrets {
-		if err := c.applySecrets(opts.RepoOwner, opts.RepoName, configDir); err != nil {
+		if err := c.applySecrets(ctx, opts.RepoOwner, opts.RepoName, configDir); err != nil {
 			return fmt.Errorf("failed to apply secrets: %w", err)
 		}
 	}
 
-	// 4. Apply repository-specific secrets if provided
 	if opts.RepoSecrets != "" {
-		if err := c.applyRepoSecrets(opts.RepoOwner, opts.RepoName, opts.RepoSecrets); err != nil {
+		if err := c.applyRepoSecrets(ctx, opts.RepoOwner, opts.RepoName, opts.RepoSecrets); err != nil {
 			return fmt.Errorf("failed to apply repository-specific secrets: %w", err)
 		}
 	}
@@ -93,151 +68,84 @@ func (c *Factory) applyConfigurations(opts Options) error {
 	return nil
 }
 
-// applyEnvs applies environments defined in the team directory
-func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
-	mainOperation := "Applying environments"
+// determineConfigDir decides which configuration directory to use based on account type and team.
+func (c *Factory) determineConfigDir(opts Options, username string) (string, error) {
+	if opts.AccountType == OrganizationAccount && opts.Team != "" {
+		configDir := c.Config.GetTeamDir(opts.Team, opts.RepoOwner)
+		c.Reporter.Debug(fmt.Sprintf("Using organization-specific team directory: %s", configDir))
+		return configDir, nil
+	}
 
-	// Start the overall operation
+	if opts.AccountType == PersonalAccount && username != "" {
+		configDir := c.Config.GetPersonalDir(username)
+		c.Reporter.Debug(fmt.Sprintf("Using personal directory: %s", configDir))
+
+		if err := ensureDirExists(configDir); err != nil {
+			return "", err
+		}
+
+		if _, err := os.Stat(filepath.Join(configDir, "envs")); os.IsNotExist(err) {
+			c.Reporter.Debug(fmt.Sprintf("Personal environment configs for user %s not found, skipping", username))
+		}
+
+		return configDir, nil
+	}
+
+	if opts.Team != "" {
+		configDir := filepath.Join(opts.ConfigDir, "teams", opts.Team)
+		c.Reporter.Debug(fmt.Sprintf("Using global team directory: %s", configDir))
+		return configDir, nil
+	}
+
+	c.Reporter.Debug("No team or personal account specified, skipping configurations")
+	return "", nil
+}
+
+func ensureDirExists(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			return fmt.Errorf("failed to create personal config directory: %w", err)
+		}
+	}
+	return nil
+}
+
+// applyEnvs applies environments defined in the team directory
+func (c *Factory) applyEnvs(ctx context.Context, owner, repo, teamDir string) error {
+	mainOperation := "Applying environments"
 	c.Reporter.Start(mainOperation, "")
 
-	// Expand tilde in path if it exists
-	if strings.HasPrefix(teamDir, "~") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			c.Reporter.Failed(mainOperation, err, "Failed to get user home directory")
-			return fmt.Errorf("failed to get user home directory: %w", err)
-		}
-		teamDir = filepath.Join(home, teamDir[1:])
-	}
-
-	envsDir := filepath.Join(teamDir, "envs")
-	c.Reporter.Debug(fmt.Sprintf("Looking for environment configs in %s", envsDir))
-
-	// Check if the directory exists first
-	if _, err := os.Stat(envsDir); os.IsNotExist(err) {
-		errMsg := fmt.Sprintf("Environments directory does not exist: %s", envsDir)
-		c.Reporter.Skip(mainOperation, errMsg)
-		return fmt.Errorf("environments directory does not exist: %s", envsDir)
-	}
-
-	entries, err := os.ReadDir(envsDir)
+	teamDirExpanded, err := c.expandTeamDir(mainOperation, teamDir)
 	if err != nil {
-		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to read envs directory: %s", envsDir))
-		return fmt.Errorf("failed to read environments directory: %w", err)
+		return err
 	}
 
-	if len(entries) == 0 {
-		c.Reporter.Skip(mainOperation, "No environment configurations found")
-		return nil
+	envsDir, entries, err := c.prepareEnvsDir(mainOperation, teamDirExpanded)
+	if err != nil {
+		return err
 	}
 
+	renderer := c.getTemplateRenderer()
 	appliedCount := 0
 	failedEnvs := []string{}
 
-	// Create a renderer with the template variables
-	renderer := c.getTemplateRenderer()
-
 	for _, entry := range entries {
-		if entry.IsDir() {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
 		}
 
-		// Only process yaml files
-		if !strings.HasSuffix(entry.Name(), ".yaml") {
+		if err := c.processEnvFile(ctx, owner, repo, envsDir, entry.Name(), renderer, mainOperation, &appliedCount, &failedEnvs); err != nil {
+			// Errors are already logged; continue with other environments
 			continue
 		}
-
-		filePath := filepath.Join(envsDir, entry.Name())
-		c.Reporter.Debug(fmt.Sprintf("Processing environment file: %s", filePath))
-
-		data, err := os.ReadFile(filePath)
-		if err != nil {
-			errMsg := fmt.Sprintf("Failed to read env file %s: %v", entry.Name(), err)
-			c.Reporter.Warning("Environment processing", errMsg)
-			failedEnvs = append(failedEnvs, errMsg)
-			continue
-		}
-
-		// First, render the template variables in the raw content - this is critical for YAML processing
-		c.Reporter.Debug(fmt.Sprintf("Rendering ruleset %s with template variables", entry.Name()))
-		renderedData, err := renderer.RenderString(string(data))
-		if err != nil {
-			errMsg := fmt.Sprintf("Failed to render ruleset %s with template variables: %v", entry.Name(), err)
-			c.Reporter.Warning("Ruleset rendering", errMsg)
-			failedEnvs = append(failedEnvs, errMsg)
-			continue
-		}
-
-		// Parse the environment configuration
-		var envConfig EnvConf
-
-		// Parse JSON
-		if err := yaml.Unmarshal([]byte(renderedData), &envConfig); err != nil {
-			errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", entry.Name(), err)
-			c.Reporter.Warning("Environment processing", errMsg)
-			failedEnvs = append(failedEnvs, errMsg)
-			continue
-		}
-
-		if envConfig.Name == "" {
-			c.Reporter.Skip("Environment processing", fmt.Sprintf("Environment in %s is missing a name", entry.Name()))
-			continue
-		}
-
-		// Update the main operation with current environment being processed
-		c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Creating environment: %s", envConfig.Name))
-
-		// Create the basic environment first
-		if err := c.GitHubClient.CreateEnvironment(owner, repo, envConfig.Name, envConfig.ToGitHubEnv()); err != nil {
-			if !strings.Contains(err.Error(), "already exists") {
-				errMsg := fmt.Sprintf("Failed to create environment %s: %v", envConfig.Name, err)
-				c.Reporter.Warning("Environment creation", errMsg)
-				failedEnvs = append(failedEnvs, errMsg)
-				continue
-			}
-		}
-
-		// Then apply deployment branch policy separately if present
-		if envConfig.DeploymentBranchPolicy != nil {
-			c.Reporter.Progress(mainOperation, 50, fmt.Sprintf("Applying branch patterns for %s", envConfig.Name))
-
-			// In v74, we can't directly set protected vs custom branch policies
-			// Instead, we'll focus on adding the branch patterns if they're provided
-
-			// If we have branch patterns defined, add them directly to the environment
-			if len(envConfig.DeploymentBranchPolicy.BranchPatterns) > 0 {
-				for _, pattern := range envConfig.DeploymentBranchPolicy.BranchPatterns {
-					// Extract the actual pattern string from the DeploymentBranchPolicyRequest object
-					patternStr := pattern.GetName()
-
-					c.Reporter.Progress(mainOperation, 75, fmt.Sprintf("Adding branch pattern '%s' to %s", patternStr, envConfig.Name))
-
-					// Apply the branch pattern
-					if err := c.GitHubClient.CreateCustomBranchPolicy(owner, repo, envConfig.Name, pattern); err != nil {
-						errMsg := fmt.Sprintf("Failed to add branch pattern '%s' for %s: %v", patternStr, envConfig.Name, err)
-						c.Reporter.Warning("Branch pattern", errMsg)
-						// Don't fail the entire operation because of one pattern
-					} else {
-						c.Reporter.Debug(fmt.Sprintf("Added branch pattern '%s' to %s", patternStr, envConfig.Name))
-					}
-				}
-			} else {
-				c.Reporter.Debug(fmt.Sprintf("No branch patterns specified for %s", envConfig.Name))
-			}
-		}
-
-		c.Reporter.Debug(fmt.Sprintf("Successfully created environment: %s", envConfig.Name))
-		appliedCount++
 	}
 
-	// Return a summary error if any environments failed
 	if len(failedEnvs) > 0 {
 		summaryMessage := fmt.Sprintf("Applied %d environments, %d failed", appliedCount, len(failedEnvs))
 		c.Reporter.Complete(mainOperation, summaryMessage)
 		return fmt.Errorf("some environments could not be applied: %s", strings.Join(failedEnvs[:1], ", "))
 	}
 
-	// Finalise the overall operation
 	if appliedCount > 0 {
 		c.Reporter.Complete(mainOperation, fmt.Sprintf("Successfully applied %d environments", appliedCount))
 	} else {
@@ -247,8 +155,144 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 	return nil
 }
 
+func (c *Factory) expandTeamDir(mainOperation, teamDir string) (string, error) {
+	if !strings.HasPrefix(teamDir, "~") {
+		return teamDir, nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		c.Reporter.Failed(mainOperation, err, "Failed to get user home directory")
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	return filepath.Join(home, teamDir[1:]), nil
+}
+
+func (c *Factory) prepareEnvsDir(mainOperation, teamDir string) (string, []os.DirEntry, error) {
+	envsDir := filepath.Join(teamDir, "envs")
+	c.Reporter.Debug(fmt.Sprintf("Looking for environment configs in %s", envsDir))
+
+	if _, err := os.Stat(envsDir); os.IsNotExist(err) {
+		errMsg := fmt.Sprintf("Environments directory does not exist: %s", envsDir)
+		c.Reporter.Skip(mainOperation, errMsg)
+		return "", nil, fmt.Errorf("environments directory does not exist: %s", envsDir)
+	}
+
+	entries, err := os.ReadDir(envsDir)
+	if err != nil {
+		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to read envs directory: %s", envsDir))
+		return "", nil, fmt.Errorf("failed to read environments directory: %w", err)
+	}
+
+	if len(entries) == 0 {
+		c.Reporter.Skip(mainOperation, "No environment configurations found")
+		return envsDir, nil, nil
+	}
+
+	return envsDir, entries, nil
+}
+
+func (c *Factory) processEnvFile(
+	ctx context.Context,
+	owner, repo, envsDir, fileName string,
+	renderer *template.Renderer,
+	mainOperation string,
+	appliedCount *int,
+	failedEnvs *[]string,
+) error {
+	filePath := filepath.Join(envsDir, fileName)
+	c.Reporter.Debug(fmt.Sprintf("Processing environment file: %s", filePath))
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to read env file %s: %v", fileName, err)
+		c.Reporter.Warning("Environment processing", errMsg)
+		*failedEnvs = append(*failedEnvs, errMsg)
+		return err
+	}
+
+	c.Reporter.Debug(fmt.Sprintf("Rendering ruleset %s with template variables", fileName))
+	// Render the template variables in the raw content - this is critical for YAML processing
+	renderedData, err := renderer.RenderString(string(data))
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to render ruleset %s with template variables: %v", fileName, err)
+		c.Reporter.Warning("Ruleset rendering", errMsg)
+		*failedEnvs = append(*failedEnvs, errMsg)
+		return err
+	}
+
+	var envConfig EnvConf
+	if err := yaml.Unmarshal([]byte(renderedData), &envConfig); err != nil {
+		errMsg := fmt.Sprintf("Failed to parse JSON in %s: %v", fileName, err)
+		c.Reporter.Warning("Environment processing", errMsg)
+		*failedEnvs = append(*failedEnvs, errMsg)
+		return err
+	}
+
+	if envConfig.Name == "" {
+		c.Reporter.Skip("Environment processing", fmt.Sprintf("Environment in %s is missing a name", fileName))
+		return nil
+	}
+
+	c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Creating environment: %s", envConfig.Name))
+
+	if err := c.GitHubClient.CreateEnvironment(ctx, owner, repo, envConfig.Name, envConfig.ToGitHubEnv()); err != nil {
+		if !strings.Contains(err.Error(), "already exists") {
+			errMsg := fmt.Sprintf("Failed to create environment %s: %v", envConfig.Name, err)
+			c.Reporter.Warning("Environment creation", errMsg)
+			*failedEnvs = append(*failedEnvs, errMsg)
+			return err
+		}
+	}
+
+	if err := c.applyDeploymentBranchPolicy(ctx, owner, repo, envConfig, mainOperation, failedEnvs); err != nil {
+		c.Reporter.Debug(fmt.Sprintf("Failed to apply deployment branch policy: %v", err))
+	}
+
+	c.Reporter.Debug(fmt.Sprintf("Successfully created environment: %s", envConfig.Name))
+	*appliedCount++
+
+	return nil
+}
+
+func (c *Factory) applyDeploymentBranchPolicy(
+	ctx context.Context,
+	owner, repo string,
+	envConfig EnvConf,
+	mainOperation string,
+	failedEnvs *[]string,
+) error {
+	if envConfig.DeploymentBranchPolicy == nil {
+		return nil
+	}
+
+	c.Reporter.Progress(mainOperation, 50, fmt.Sprintf("Applying branch patterns for %s", envConfig.Name))
+
+	if len(envConfig.DeploymentBranchPolicy.BranchPatterns) == 0 {
+		c.Reporter.Debug(fmt.Sprintf("No branch patterns specified for %s", envConfig.Name))
+		return nil
+	}
+
+	for _, pattern := range envConfig.DeploymentBranchPolicy.BranchPatterns {
+		patternStr := pattern.GetName()
+
+		c.Reporter.Progress(mainOperation, 75, fmt.Sprintf("Adding branch pattern '%s' to %s", patternStr, envConfig.Name))
+
+		if err := c.GitHubClient.CreateCustomBranchPolicy(ctx, owner, repo, envConfig.Name, pattern); err != nil {
+			errMsg := fmt.Sprintf("Failed to add branch pattern '%s' for %s: %v", patternStr, envConfig.Name, err)
+			c.Reporter.Warning("Branch pattern", errMsg)
+			*failedEnvs = append(*failedEnvs, errMsg)
+		} else {
+			c.Reporter.Debug(fmt.Sprintf("Added branch pattern '%s' to %s", patternStr, envConfig.Name))
+		}
+	}
+
+	return nil
+}
+
 // applyRulesets applies rulesets defined in the team directory
-func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
+func (c *Factory) applyRulesets(ctx context.Context, owner, repo, teamDir string) error {
 	mainOperation := "Applying rulesets"
 	// Start the overall operation
 	c.Reporter.Start(mainOperation, "")
@@ -354,7 +398,7 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 		c.Reporter.Debug(fmt.Sprintf("Applying ruleset: %s (target: %s)", ruleset.Name, *ruleset.Target))
 
 		// Apply the ruleset
-		if err := c.GitHubClient.CreateRuleset(owner, repo, ruleset); err != nil {
+		if err := c.GitHubClient.CreateRuleset(ctx, owner, repo, ruleset); err != nil {
 			errMsg := fmt.Sprintf("Failed to apply ruleset %s: %v", f.Name(), err)
 			c.Reporter.Warning("Ruleset application", errMsg)
 			failedRulesets = append(failedRulesets, errMsg)
@@ -381,7 +425,7 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 }
 
 // applySecrets applies secrets defined in the team directory
-func (c *Factory) applySecrets(owner, repo, teamDir string) error {
+func (c *Factory) applySecrets(ctx context.Context, owner, repo, teamDir string) error {
 	mainOperation := "Applying secrets"
 	c.Reporter.Start(mainOperation, "")
 
@@ -470,13 +514,14 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 			continue
 		}
 
-		isVariable := secret.Type == "variable"
-		if err := c.applySecretOrVariable(isVariable, owner, repo, secret.Name, secretValue, secret.Env, valueSource); err != nil {
+		isVariable := secret.Type == secretTypeVariable
+		if err := c.applySecretOrVariable(ctx, isVariable, owner, repo, secret.Name, secretValue, secret.Env,
+			valueSource); err != nil {
 			c.Reporter.Warning("Secret application", fmt.Sprintf("Failed to apply %s '%s': %v",
 				secret.Type, secret.Name, err))
 		} else {
 			c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Applied %s: %s (env: %s, source: %s)",
-				valueOrEmpty(secret.Type, "secret"), secret.Name, valueOrEmpty(secret.Env, "repo"), valueSource))
+				valueOrEmpty(secret.Type, secretTypeSecret), secret.Name, valueOrEmpty(secret.Env, "repo"), valueSource))
 			appliedCount++
 		}
 	}
@@ -491,7 +536,7 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 }
 
 // applyRepoSecrets applies repository-specific secrets from a JSON string
-func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
+func (c *Factory) applyRepoSecrets(ctx context.Context, owner, repo, secretsJSON string) error {
 	mainOperation := "Applying repository-specific secrets"
 	c.Reporter.Start(mainOperation, "")
 
@@ -553,11 +598,12 @@ func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
 			c.Reporter.Debug(fmt.Sprintf("Resolved '%s' from %s: '%s'", s.Name, sourceType, sourceKey))
 		}
 
-		isVariable := s.Type == "variable"
-		c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Setting %s: %s", valueOrEmpty(s.Type, "secret"), prefixedName))
+		isVariable := s.Type == secretTypeVariable
+		c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Setting %s: %s", valueOrEmpty(s.Type, secretTypeSecret), prefixedName))
 
-		if err := c.applySecretOrVariable(isVariable, owner, repo, prefixedName, secretValue, envScope, "repo-secrets"); err != nil {
-			errMsg := fmt.Sprintf("Failed to apply %s '%s': %v", valueOrEmpty(s.Type, "secret"), prefixedName, err)
+		if err := c.applySecretOrVariable(ctx, isVariable, owner, repo, prefixedName, secretValue, envScope,
+			"repo-secrets"); err != nil {
+			errMsg := fmt.Sprintf("Failed to apply %s '%s': %v", valueOrEmpty(s.Type, secretTypeSecret), prefixedName, err)
 			c.Reporter.Warning("Secret application", errMsg)
 			failedSecrets = append(failedSecrets, errMsg)
 		} else {
@@ -577,21 +623,23 @@ func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
 }
 
 // Helper to apply a secret or variable
-func (c *Factory) applySecretOrVariable(isVariable bool, owner, repo, name, value, env, valueSource string) error {
+func (c *Factory) applySecretOrVariable(ctx context.Context, isVariable bool, owner, repo, name, value, env,
+	valueSource string,
+) error {
 	operation := "Setting variable"
-	resourceType := "variable"
+	resourceType := secretTypeVariable
 	if !isVariable {
 		operation = "Setting secret"
-		resourceType = "secret"
+		resourceType = secretTypeSecret
 	}
 
 	c.Reporter.Progress(operation, 0, name)
 
 	var err error
 	if isVariable {
-		err = c.GitHubClient.SetVariable(owner, repo, name, value, env)
+		err = c.GitHubClient.SetVariable(ctx, owner, repo, name, value, env)
 	} else {
-		err = c.GitHubClient.ApplySecret(owner, repo, name, value, env)
+		err = c.GitHubClient.ApplySecret(ctx, owner, repo, name, value, env)
 	}
 
 	if err != nil {
@@ -605,21 +653,21 @@ func (c *Factory) applySecretOrVariable(isVariable bool, owner, repo, name, valu
 }
 
 // createRepository creates a GitHub repository and adds appropriate topics and labels
-func (c *Factory) createRepository(opts Options) (string, error) {
+func (c *Factory) createRepository(ctx context.Context, opts Options) (string, error) {
 	// Only print errors if needed, not process/info messages
 	var org string
-	if opts.AccountType == "organization" {
+	if opts.AccountType == OrganizationAccount {
 		org = opts.RepoOwner
 	}
-	repoURL, err := c.GitHubClient.CreateRepo(opts.RepoName, org, opts.IsPrivate, opts.RepoDescription)
+	repoURL, err := c.GitHubClient.CreateRepo(ctx, opts.RepoName, org, opts.IsPrivate, opts.RepoDescription)
 	if err != nil {
 		return "", err
 	}
 
 	// If this is an organization repository and we have a team, add it as admin to the repository
-	if opts.AccountType == "organization" && opts.Team != "" {
+	if opts.AccountType == OrganizationAccount && opts.Team != "" {
 		c.Reporter.Progress("Repository Setup", 50, fmt.Sprintf("Adding team '%s' as admin to repository", opts.Team))
-		err := c.GitHubClient.AddTeamToRepository(org, opts.RepoName, opts.Team, gh.TeamPermissionAdmin)
+		err := c.GitHubClient.AddTeamToRepository(ctx, org, opts.RepoName, opts.Team, gh.TeamPermissionAdmin)
 		if err != nil {
 			c.Reporter.Warning("Team Permission", fmt.Sprintf("Failed to add team '%s' as admin: %v", opts.Team, err))
 			// Don't fail the entire operation - this is a non-critical enhancement
@@ -650,7 +698,7 @@ func (c *Factory) createRepository(opts Options) (string, error) {
 	topics = append(topics, "viaplay-cli")
 
 	// Add the topics to the repository
-	if err := c.GitHubClient.AddTopicsToRepo(opts.RepoOwner, opts.RepoName, topics); err != nil {
+	if err := c.GitHubClient.AddTopicsToRepo(ctx, opts.RepoOwner, opts.RepoName, topics); err != nil {
 		c.Reporter.Warning("Topic Creation", fmt.Sprintf("Failed to add topics to repository: %v", err))
 		// Don't return an error here as topic creation is not critical to the repository creation
 	} else {

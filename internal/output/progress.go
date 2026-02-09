@@ -204,6 +204,8 @@ func DefaultCB(operation string, status Status, details string, err error) {
 
 // NewDefaultReporter creates a new reporter with the default callback
 // and automatically sets debug mode based on the output package's verbose setting
+//
+//nolint:ireturn // Factory intentionally returns Reporter interface for dependency inversion.
 func NewDefaultReporter() Reporter {
 	// Get verbose status from output package
 	isVerbose := IsVerboseEnabled()

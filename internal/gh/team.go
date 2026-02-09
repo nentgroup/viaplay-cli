@@ -2,6 +2,7 @@
 package gh
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -25,7 +26,9 @@ const (
 )
 
 // AddTeamToRepository adds a team to a repository with the specified permission
-func (ghc *GitHubClient) AddTeamToRepository(org, repo, team string, permission TeamPermission) error {
+func (ghc *GitHubClient) AddTeamToRepository(ctx context.Context, org, repo, team string,
+	permission TeamPermission,
+) error {
 	// Parameter validation
 	if org == "" {
 		return fmt.Errorf("organization name is required")
@@ -42,7 +45,7 @@ func (ghc *GitHubClient) AddTeamToRepository(org, repo, team string, permission 
 	teamSlug := strings.ToLower(strings.ReplaceAll(team, " ", "-"))
 
 	// Add team to the repository
-	_, err := ghc.client.Teams.AddTeamRepoBySlug(ghc.ctx, org, teamSlug, org, repo, &github.TeamAddTeamRepoOptions{
+	_, err := ghc.client.Teams.AddTeamRepoBySlug(ctx, org, teamSlug, org, repo, &github.TeamAddTeamRepoOptions{
 		Permission: string(permission),
 	})
 	if err != nil {
@@ -53,7 +56,7 @@ func (ghc *GitHubClient) AddTeamToRepository(org, repo, team string, permission 
 }
 
 // GetTeamID fetches the ID for a team by its name within an organization
-func (ghc *GitHubClient) GetTeamID(org, teamName string) (int64, error) {
+func (ghc *GitHubClient) GetTeamID(ctx context.Context, org, teamName string) (int64, error) {
 	// Parameter validation
 	if org == "" {
 		return 0, fmt.Errorf("organization name is required")
@@ -67,7 +70,7 @@ func (ghc *GitHubClient) GetTeamID(org, teamName string) (int64, error) {
 	teamSlug := strings.ToLower(strings.ReplaceAll(teamName, " ", "-"))
 
 	// Try to fetch the team information
-	team, _, err := ghc.client.Teams.GetTeamBySlug(ghc.ctx, org, teamSlug)
+	team, _, err := ghc.client.Teams.GetTeamBySlug(ctx, org, teamSlug)
 	if err != nil {
 		// Check if this is a 404 error and provide a more user-friendly message
 		if strings.Contains(err.Error(), "404") {
@@ -89,7 +92,7 @@ type TeamInfo struct {
 }
 
 // ListTeams returns a list of teams in the given organization
-func (ghc *GitHubClient) ListTeams(org string) ([]*TeamInfo, error) {
+func (ghc *GitHubClient) ListTeams(ctx context.Context, org string) ([]*TeamInfo, error) {
 	// Parameter validation
 	if org == "" {
 		return nil, fmt.Errorf("organization name is required")
@@ -102,7 +105,7 @@ func (ghc *GitHubClient) ListTeams(org string) ([]*TeamInfo, error) {
 	}
 
 	for {
-		teams, resp, err := ghc.client.Teams.ListTeams(ghc.ctx, org, opts)
+		teams, resp, err := ghc.client.Teams.ListTeams(ctx, org, opts)
 		if err != nil {
 			// Check if this is a 404 error and provide a more user-friendly message
 			if strings.Contains(err.Error(), "404") {
