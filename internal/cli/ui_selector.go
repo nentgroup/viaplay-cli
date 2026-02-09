@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -220,9 +221,9 @@ func slugify(input string) string {
 }
 
 // SelectOrganizationWithBubbles presents a bubbletea list of organizations to select from
-func SelectOrganizationWithBubbles(ghClient *gh.GitHubClient) (string, error) {
+func SelectOrganizationWithBubbles(ctx context.Context, ghClient *gh.GitHubClient) (string, error) {
 	// Fetch organizations the user belongs to
-	orgs, err := ghClient.GetUserOrganizations()
+	orgs, err := ghClient.GetUserOrganizations(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch organizations: %w", err)
 	}
@@ -260,13 +261,13 @@ func SelectOrganizationWithBubbles(ghClient *gh.GitHubClient) (string, error) {
 }
 
 // SelectTeamWithBubbles presents a bubbletea list of teams in an organization
-func SelectTeamWithBubbles(ghClient *gh.GitHubClient, orgName string) (string, error) {
+func SelectTeamWithBubbles(ctx context.Context, ghClient *gh.GitHubClient, orgName string) (string, error) {
 	if orgName == "" {
 		return "", fmt.Errorf("organization name is required")
 	}
 
 	// Fetch teams in the organization
-	teams, err := ghClient.ListTeams(orgName)
+	teams, err := ghClient.ListTeams(ctx, orgName)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch teams: %w", err)
 	}

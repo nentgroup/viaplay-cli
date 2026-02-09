@@ -48,9 +48,10 @@ This command:
 Use this for a complete project setup experience.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 			// Parse owner/repo format
 			parseOwnerRepoArg(args[0], opts)
-			return createProjectOrRepo(opts, true)
+			return createProjectOrRepo(ctx, opts, true)
 		},
 		Example: `  # Create a Go service with default settings
   vip project create my-service --language go --type service --team platform

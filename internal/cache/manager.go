@@ -2,6 +2,7 @@
 package cache
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -194,7 +195,9 @@ func (m *Manager) GetTemplatePath(language, templateType string) string {
 }
 
 // EnsureTemplate ensures a template is available in the cache
-func (m *Manager) EnsureTemplate(language, templateType, sourceStr string, forceUpdate bool) (string, error) {
+func (m *Manager) EnsureTemplate(ctx context.Context, language, templateType, sourceStr string,
+	forceUpdate bool,
+) (string, error) {
 	output.VerboseMessage(fmt.Sprintf("Ensuring template for %s/%s from source: %s", language, templateType, sourceStr))
 
 	// Parse the template source
@@ -233,7 +236,7 @@ func (m *Manager) EnsureTemplate(language, templateType, sourceStr string, force
 	}
 
 	// At this point, either the template doesn't exist or we removed it for a force update
-	return handleNewTemplate(cachePath, source)
+	return handleNewTemplate(ctx, cachePath, source)
 }
 
 // handleLocalTemplate verifies and returns the path for a local template
@@ -258,7 +261,7 @@ func shouldForceUpdate(exists bool, forceUpdate ...bool) bool {
 }
 
 // handleExistingTemplate handles logic for an existing template in the cache
-func handleExistingTemplate(cachePath string, source Source, forceUpdate ...bool) (string, error) {
+func handleExistingTemplate(ctx context.Context, cachePath string, source Source, forceUpdate ...bool) (string, error) {
 	output.VerboseMessage(fmt.Sprintf("Template already exists in cache at: %s", cachePath))
 
 	// Check if the force update is requested
@@ -281,7 +284,7 @@ func handleExistingTemplate(cachePath string, source Source, forceUpdate ...bool
 
 	if forcedUpdate || forcedCheck {
 		// Check if the template needs to be updated
-		needsUpdate, err = checkIfTemplateNeedsUpdate(cachePath)
+		needsUpdate, err = checkIfTemplateNeedsUpdate(ctx, cachePath)
 		if err != nil {
 			// If there's an error checking updates, use cached version anyway
 			output.VerboseMessage(fmt.Sprintf("Error checking updates: %v, using cached template", err))
@@ -294,7 +297,7 @@ func handleExistingTemplate(cachePath string, source Source, forceUpdate ...bool
 
 	if needsUpdate || forcedCheck || forcedUpdate {
 		output.VerboseMessage("Updating template...")
-		if err := updateExistingTemplate(cachePath, source); err != nil {
+		if err := updateExistingTemplate(ctx, cachePath, source); err != nil {
 			// If update fails, use cached version anyway
 			output.VerboseMessage(fmt.Sprintf("Failed to update template: %v", err))
 			output.VerboseMessage("Using cached template despite update failure")
@@ -309,16 +312,16 @@ func handleExistingTemplate(cachePath string, source Source, forceUpdate ...bool
 }
 
 // checkIfTemplateNeedsUpdate checks if a template needs to be updated
-func checkIfTemplateNeedsUpdate(cachePath string) (bool, error) {
+func checkIfTemplateNeedsUpdate(ctx context.Context, cachePath string) (bool, error) {
 	// Try to determine if the repository needs an update by checking Git
-	repoInfo, err := git.GetRepositoryInfo(cachePath)
+	repoInfo, err := git.GetRepositoryInfo(ctx, cachePath)
 	if err != nil {
 		return false, fmt.Errorf("error getting repository info: %w", err)
 	}
 
 	// Check if the local repository is behind the remote
 	// Use "origin" as the default remote name since RepositoryInfo doesn't have RemoteName field
-	isBehind, err := git.IsBehindRemote(cachePath, "origin", repoInfo.Branch)
+	isBehind, err := git.IsBehindRemote(ctx, cachePath, "origin", repoInfo.Branch)
 	if err != nil {
 		return false, fmt.Errorf("error checking if repository is behind remote: %w", err)
 	}
@@ -327,8 +330,8 @@ func checkIfTemplateNeedsUpdate(cachePath string) (bool, error) {
 }
 
 // updateExistingTemplate updates an existing template in the cache
-func updateExistingTemplate(cachePath string, source Source) error {
-	return git.Update(git.UpdateOptions{
+func updateExistingTemplate(ctx context.Context, cachePath string, source Source) error {
+	return git.Update(ctx, git.UpdateOptions{
 		Directory: cachePath,
 		Branch:    source.Reference,
 		Force:     false,
@@ -336,7 +339,7 @@ func updateExistingTemplate(cachePath string, source Source) error {
 }
 
 // handleNewTemplate handles cloning a new template
-func handleNewTemplate(cachePath string, source Source) (string, error) {
+func handleNewTemplate(ctx context.Context, cachePath string, source Source) (string, error) {
 	output.VerboseMessage(fmt.Sprintf("Template not found in cache, cloning to: %s", cachePath))
 
 	// Prepare git URL based on source type
@@ -346,7 +349,7 @@ func handleNewTemplate(cachePath string, source Source) (string, error) {
 	}
 
 	// Clone the repository
-	if err := git.Clone(git.CloneOptions{
+	if err := git.Clone(ctx, git.CloneOptions{
 		URL:       gitURL,
 		Branch:    source.Reference,
 		Directory: cachePath,
@@ -374,7 +377,7 @@ func getGitURLFromSource(source Source) (string, error) {
 }
 
 // ListTemplates lists all templates in the cache
-func (m *Manager) ListTemplates() ([]Template, error) {
+func (m *Manager) ListTemplates(ctx context.Context) ([]Template, error) {
 	templates := []Template{}
 
 	// Walk through the cache directory to find templates
@@ -400,7 +403,7 @@ func (m *Manager) ListTemplates() ([]Template, error) {
 			// Check if it's a git repository
 			if git.IsGitRepository(path) {
 				// Try to get the source information from the git repository
-				source, err := getTemplateSourceFromGit(path)
+				source, err := getTemplateSourceFromGit(ctx, path)
 				if err != nil {
 					// If we can't determine the source, use a default
 					source = Source{
@@ -410,13 +413,13 @@ func (m *Manager) ListTemplates() ([]Template, error) {
 				}
 
 				// Derive version information from git
-				version, err := git.DescribeVersion(path)
+				version, err := git.DescribeVersion(ctx, path)
 				if err != nil {
 					version = "unknown"
 				}
 
 				// Get repository info to extract remote URL
-				repoInfo, err := git.GetRepositoryInfo(path)
+				repoInfo, err := git.GetRepositoryInfo(ctx, path)
 				remoteURL := "unknown"
 				if err == nil && repoInfo != nil && repoInfo.RemoteURL != "" {
 					remoteURL = repoInfo.RemoteURL
@@ -538,8 +541,8 @@ func (m *Manager) CleanCache() error {
 }
 
 // UpdateAllTemplates updates all templates in the cache
-func (m *Manager) UpdateAllTemplates() (int, int, error) {
-	templates, err := m.ListTemplates()
+func (m *Manager) UpdateAllTemplates(ctx context.Context) (int, int, error) {
+	templates, err := m.ListTemplates(ctx)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to list templates: %w", err)
 	}
@@ -584,7 +587,8 @@ func (m *Manager) UpdateAllTemplates() (int, int, error) {
 			fmt.Printf("Updating template: %s/%s from %s\n", t.Language, t.Type, sourceStr)
 
 			// Use EnsureTemplate to update the template
-			_, err := m.EnsureTemplate(t.Language, t.Type, sourceStr, true) // Force update when explicitly updating templates
+			_, err := m.EnsureTemplate(ctx, t.Language, t.Type, sourceStr,
+				true) // Force update when explicitly updating templates
 			if err != nil {
 				fmt.Printf("Error updating template %s/%s: %v\n", t.Language, t.Type, err)
 				mu.Lock()
@@ -611,9 +615,9 @@ func (m *Manager) GetCacheDir() string {
 }
 
 // getTemplateSourceFromGit attempts to determine the template source from a git repository
-func getTemplateSourceFromGit(repoPath string) (Source, error) {
+func getTemplateSourceFromGit(ctx context.Context, repoPath string) (Source, error) {
 	// Get repository info
-	repoInfo, err := git.GetRepositoryInfo(repoPath)
+	repoInfo, err := git.GetRepositoryInfo(ctx, repoPath)
 	if err != nil {
 		return Source{}, err
 	}

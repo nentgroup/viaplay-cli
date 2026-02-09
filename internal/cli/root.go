@@ -3,8 +3,11 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
@@ -31,6 +34,13 @@ team or organization standards such as rulesets, secrets, and environments.
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	// Root context canceled on SIGINT/SIGTERM.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Attach the context to Cobra so cmd.Context() uses this.
+	rootCmd.SetContext(ctx)
+
 	// Define help template function for showing banner
 	cobra.AddTemplateFunc("ShowBanner", func() string {
 		printBanner()

@@ -3,6 +3,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -41,7 +42,7 @@ type CommitInfo struct {
 }
 
 // Clone clones a Git repository to the specified directory
-func Clone(opts CloneOptions) error {
+func Clone(ctx context.Context, opts CloneOptions) error {
 	// Ensure the parent directory exists
 	if err := os.MkdirAll(filepath.Dir(opts.Directory), 0o755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
@@ -64,7 +65,7 @@ func Clone(opts CloneOptions) error {
 	args = append(args, opts.URL, opts.Directory)
 
 	// Execute the git clone command - capture output instead of sending to terminal
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to clone repository: %w, output: %s", err, string(output))
@@ -94,7 +95,7 @@ func validateGitBranch(branch string) bool {
 }
 
 // Update updates a Git repository to the latest changes
-func Update(opts UpdateOptions) error {
+func Update(ctx context.Context, opts UpdateOptions) error {
 	// Verify the directory exists and is a git repository
 	if !IsGitRepository(opts.Directory) {
 		return fmt.Errorf("not a git repository: %s", opts.Directory)
@@ -117,7 +118,7 @@ func Update(opts UpdateOptions) error {
 	}
 
 	// Fetch latest updates - capture output instead of sending to terminal
-	fetchCmd := exec.Command("git", "fetch")
+	fetchCmd := exec.CommandContext(ctx, "git", "fetch")
 	fetchOutput, err := fetchCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to fetch updates: %w, output: %s", err, string(fetchOutput))
@@ -131,21 +132,21 @@ func Update(opts UpdateOptions) error {
 		}
 
 		// Checkout the branch - capture output instead of sending to terminal
-		checkoutCmd := exec.Command("git", "checkout", opts.Branch)
+		checkoutCmd := exec.CommandContext(ctx, "git", "checkout", opts.Branch)
 		checkoutOutput, err := checkoutCmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("failed to checkout branch '%s': %w, output: %s", opts.Branch, err, string(checkoutOutput))
 		}
 
 		// Pull the latest changes - capture output instead of sending to terminal
-		pullCmd := exec.Command("git", "pull", "origin", opts.Branch)
+		pullCmd := exec.CommandContext(ctx, "git", "pull", "origin", opts.Branch)
 		pullOutput, err := pullCmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("failed to pull updates from '%s': %w, output: %s", opts.Branch, err, string(pullOutput))
 		}
 	} else {
 		// Pull the latest changes from the current branch - capture output instead of sending to terminal
-		pullCmd := exec.Command("git", "pull")
+		pullCmd := exec.CommandContext(ctx, "git", "pull")
 		pullOutput, err := pullCmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("failed to pull updates: %w, output: %s", err, string(pullOutput))
@@ -156,7 +157,7 @@ func Update(opts UpdateOptions) error {
 }
 
 // GetRepositoryInfo retrieves information about a Git repository
-func GetRepositoryInfo(directory string) (*RepositoryInfo, error) {
+func GetRepositoryInfo(ctx context.Context, directory string) (*RepositoryInfo, error) {
 	// Verify the directory exists and is a git repository
 	gitDir := filepath.Join(directory, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
@@ -180,7 +181,7 @@ func GetRepositoryInfo(directory string) (*RepositoryInfo, error) {
 	}
 
 	// Get remote URL
-	remoteCmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	remoteCmd := exec.CommandContext(ctx, "git", "config", "--get", "remote.origin.url")
 	remoteOutput, err := remoteCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get remote URL: %w", err)
@@ -188,7 +189,7 @@ func GetRepositoryInfo(directory string) (*RepositoryInfo, error) {
 	remoteURL := strings.TrimSpace(string(remoteOutput))
 
 	// Get current branch
-	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	branchCmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 	branchOutput, err := branchCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current branch: %w", err)
@@ -196,7 +197,7 @@ func GetRepositoryInfo(directory string) (*RepositoryInfo, error) {
 	branch := strings.TrimSpace(string(branchOutput))
 
 	// Get last commit information
-	logCmd := exec.Command("git", "log", "-1", "--pretty=format:%H|%an|%ad|%s")
+	logCmd := exec.CommandContext(ctx, "git", "log", "-1", "--pretty=format:%H|%an|%ad|%s")
 	logOutput, err := logCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit information: %w", err)
@@ -228,7 +229,7 @@ func IsGitRepository(directory string) bool {
 }
 
 // InitRepository initialises a new Git repository
-func InitRepository(directory string) error {
+func InitRepository(ctx context.Context, directory string) error {
 	// Create the directory if it doesn't exist
 	if err := os.MkdirAll(directory, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
@@ -251,7 +252,7 @@ func InitRepository(directory string) error {
 	}
 
 	// Initialise the repository
-	initCmd := exec.Command("git", "init")
+	initCmd := exec.CommandContext(ctx, "git", "init")
 	if err := initCmd.Run(); err != nil {
 		return fmt.Errorf("failed to initialize git repository: %w", err)
 	}
@@ -260,7 +261,7 @@ func InitRepository(directory string) error {
 }
 
 // AddRemote adds a remote to a Git repository
-func AddRemote(directory, name, url string) error {
+func AddRemote(ctx context.Context, directory, name, url string) error {
 	// Verify the directory exists and is a git repository
 	if !IsGitRepository(directory) {
 		return fmt.Errorf("not a git repository: %s", directory)
@@ -283,7 +284,7 @@ func AddRemote(directory, name, url string) error {
 	}
 
 	// Add the remote
-	remoteCmd := exec.Command("git", "remote", "add", name, url)
+	remoteCmd := exec.CommandContext(ctx, "git", "remote", "add", name, url)
 	if err := remoteCmd.Run(); err != nil {
 		return fmt.Errorf("failed to add remote: %w", err)
 	}
@@ -292,7 +293,7 @@ func AddRemote(directory, name, url string) error {
 }
 
 // CommitAll commits all changes in a Git repository
-func CommitAll(directory, message string) error {
+func CommitAll(ctx context.Context, directory, message string) error {
 	// Verify the directory exists and is a git repository
 	if !IsGitRepository(directory) {
 		return fmt.Errorf("not a git repository: %s", directory)
@@ -315,13 +316,13 @@ func CommitAll(directory, message string) error {
 	}
 
 	// Add all files
-	addCmd := exec.Command("git", "add", ".")
+	addCmd := exec.CommandContext(ctx, "git", "add", ".")
 	if err := addCmd.Run(); err != nil {
 		return fmt.Errorf("failed to add files: %w", err)
 	}
 
 	// Commit
-	commitCmd := exec.Command("git", "commit", "-m", message)
+	commitCmd := exec.CommandContext(ctx, "git", "commit", "-m", message)
 	if err := commitCmd.Run(); err != nil {
 		// Check if there's nothing to commit
 		if strings.Contains(err.Error(), "nothing to commit") {
@@ -334,7 +335,7 @@ func CommitAll(directory, message string) error {
 }
 
 // Push pushes changes to a remote branch
-func Push(directory, remote, branch string) error {
+func Push(ctx context.Context, directory, remote, branch string) error {
 	// Verify the directory exists and is a git repository
 	if !IsGitRepository(directory) {
 		return fmt.Errorf("not a git repository: %s", directory)
@@ -357,7 +358,7 @@ func Push(directory, remote, branch string) error {
 	}
 
 	// Push to the remote
-	pushCmd := exec.Command("git", "push", "-u", remote, branch)
+	pushCmd := exec.CommandContext(ctx, "git", "push", "-u", remote, branch)
 	pushCmd.Stdout = os.Stdout
 	pushCmd.Stderr = os.Stderr
 	if err := pushCmd.Run(); err != nil {
@@ -369,7 +370,7 @@ func Push(directory, remote, branch string) error {
 
 // IsBehindRemote checks if the local repository is behind the remote branch.
 // Returns true if the local repo is behind the remote, false otherwise, and any error encountered.
-func IsBehindRemote(repoPath, remoteName, branch string) (bool, error) {
+func IsBehindRemote(ctx context.Context, repoPath, remoteName, branch string) (bool, error) {
 	// Validate the input parameters for security
 	if !validateGitBranch(branch) {
 		return false, fmt.Errorf("invalid branch name: %s", branch)
@@ -380,7 +381,7 @@ func IsBehindRemote(repoPath, remoteName, branch string) (bool, error) {
 	}
 
 	// Fetch latest from remote - capture output instead of sending to terminal
-	fetchCmd := exec.Command("git", "fetch", remoteName)
+	fetchCmd := exec.CommandContext(ctx, "git", "fetch", remoteName)
 	fetchCmd.Dir = repoPath
 	fetchOutput, err := fetchCmd.CombinedOutput()
 	if err != nil {
@@ -389,7 +390,7 @@ func IsBehindRemote(repoPath, remoteName, branch string) (bool, error) {
 
 	// Get number of commits the local branch is behind remote
 	revListArg := fmt.Sprintf("HEAD..%s/%s", remoteName, branch)
-	behindCmd := exec.Command("git", "rev-list", "--count", revListArg)
+	behindCmd := exec.CommandContext(ctx, "git", "rev-list", "--count", revListArg)
 	behindCmd.Dir = repoPath
 	behindOutput, err := behindCmd.Output()
 	if err != nil {
@@ -451,13 +452,13 @@ func ConvertToSSHURL(url string) string {
 // It prefers the latest tag reachable from HEAD; if none is found, it falls back to a
 // short commit hash. On failure it returns an error so callers can decide how to
 // represent unknown versions.
-func DescribeVersion(repoPath string) (string, error) {
+func DescribeVersion(ctx context.Context, repoPath string) (string, error) {
 	if !IsGitRepository(repoPath) {
 		return "", fmt.Errorf("not a git repository: %s", repoPath)
 	}
 
 	// Try to get the latest tag reachable from HEAD (similar to `git describe --tags --abbrev=0`).
-	describeTagCmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
+	describeTagCmd := exec.CommandContext(ctx, "git", "describe", "--tags", "--abbrev=0")
 	describeTagCmd.Dir = repoPath
 	tagOutput, err := describeTagCmd.Output()
 	if err == nil {
@@ -468,7 +469,7 @@ func DescribeVersion(repoPath string) (string, error) {
 	}
 
 	// Fallback: use short commit hash of HEAD.
-	shaCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	shaCmd := exec.CommandContext(ctx, "git", "rev-parse", "--short", "HEAD")
 	shaCmd.Dir = repoPath
 	shaOutput, err := shaCmd.Output()
 	if err != nil {

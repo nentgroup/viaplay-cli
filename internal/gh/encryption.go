@@ -1,6 +1,7 @@
 package gh
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -36,9 +37,11 @@ func EncryptSecret(publicKey *github.PublicKey, secretValue string) (string, str
 
 // ApplySecret is a helper that gets the public key, encrypts the secret, and sets it
 // This simplifies the process of adding a secret to a repository or environment
-func (ghc *GitHubClient) ApplySecret(owner, repo, secretName, secretValue string, env ...string) error {
+func (ghc *GitHubClient) ApplySecret(ctx context.Context, owner, repo, secretName, secretValue string,
+	env ...string,
+) error {
 	// Get the public key
-	publicKey, err := ghc.GetPublicKey(owner, repo, env...)
+	publicKey, err := ghc.GetPublicKey(ctx, owner, repo, env...)
 	if err != nil {
 		return fmt.Errorf("failed to get public key: %w", err)
 	}
@@ -50,5 +53,5 @@ func (ghc *GitHubClient) ApplySecret(owner, repo, secretName, secretValue string
 	}
 
 	// Set the secret
-	return ghc.SetSecret(ghc.ctx, owner, repo, secretName, encryptedValue, keyID, env...)
+	return ghc.SetSecret(ctx, owner, repo, secretName, encryptedValue, keyID, env...)
 }

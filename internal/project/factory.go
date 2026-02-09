@@ -3,6 +3,7 @@
 package project
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -82,39 +83,39 @@ func NewFactory(ghClient *gh.GitHubClient, reporter output.Reporter, cfg *config
 }
 
 // Create handles the full project creation workflow
-func (c *Factory) Create(opts Options) (*Summary, error) {
-	ctx, err := c.newCreationContext(opts)
+func (c *Factory) Create(ctx context.Context, opts Options) (*Summary, error) {
+	cctx, err := c.newCreationContext(ctx, opts)
 	if err != nil {
 		// Context initialisation failed; we cannot guarantee a valid summary here.
 		return nil, err
 	}
 
-	c.populateAuthenticatedUser(ctx)
-	c.prepareTemplateVars(ctx)
+	c.populateAuthenticatedUser(ctx, cctx)
+	c.prepareTemplateVars(ctx, cctx)
 
-	if err := c.scaffoldIfNeeded(ctx); err != nil {
-		return ctx.Summary, err
+	if err := c.scaffoldIfNeeded(ctx, cctx); err != nil {
+		return cctx.Summary, err
 	}
 
-	if err := c.ensureRepoIfNeeded(ctx); err != nil {
-		return ctx.Summary, err
+	if err := c.ensureRepoIfNeeded(ctx, cctx); err != nil {
+		return cctx.Summary, err
 	}
 
-	if err := c.configureGitHub(ctx); err != nil {
-		return ctx.Summary, err
+	if err := c.configureGitHub(ctx, cctx); err != nil {
+		return cctx.Summary, err
 	}
 
-	c.runHooksAndPublish(ctx)
+	c.runHooksAndPublish(ctx, cctx)
 
 	c.Reporter.Complete("Project creation", "Workflow completed successfully")
-	return ctx.Summary, nil
+	return cctx.Summary, nil
 }
 
 // newCreationContext initialises the creation context: account type, summary, cleanup, names and paths.
-func (c *Factory) newCreationContext(opts Options) (*creationContext, error) {
+func (c *Factory) newCreationContext(ctx context.Context, opts Options) (*creationContext, error) {
 	c.Reporter.Debug(fmt.Sprintf("Starting project creation with options: %+v", opts))
 
-	u, err := c.GitHubClient.GetUser(opts.RepoOwner)
+	u, err := c.GitHubClient.GetUser(ctx, opts.RepoOwner)
 	if err != nil {
 		return &creationContext{Summary: &Summary{}}, fmt.Errorf("failed to get user %s: %w", opts.RepoOwner, err)
 	}
@@ -135,44 +136,44 @@ func (c *Factory) newCreationContext(opts Options) (*creationContext, error) {
 		Errors:          []string{},
 	}
 
-	ctx := &creationContext{
+	cctx := &creationContext{
 		opts:    opts,
 		Summary: summary,
 	}
 
 	// Track resources for potential cleanup
-	ctx.CreatedProjectDir = ""
-	ctx.CreatedRepo = false
+	cctx.CreatedProjectDir = ""
+	cctx.CreatedRepo = false
 
-	ctx.Cleanup = func() {
-		if !ctx.opts.CleanupOnError {
+	cctx.Cleanup = func() {
+		if !cctx.opts.CleanupOnError {
 			return
 		}
 
-		ctx.Summary.CleanedUp = true
+		cctx.Summary.CleanedUp = true
 		c.Reporter.Start("Cleaning up resources due to error", "")
 
 		// 1. Delete project directory if it was created
-		if ctx.CreatedProjectDir != "" && ctx.opts.Scaffold {
-			c.Reporter.Progress("Cleanup", 0, fmt.Sprintf("Deleting project directory: %s", ctx.CreatedProjectDir))
-			if err := os.RemoveAll(ctx.CreatedProjectDir); err != nil {
+		if cctx.CreatedProjectDir != "" && cctx.opts.Scaffold {
+			c.Reporter.Progress("Cleanup", 0, fmt.Sprintf("Deleting project directory: %s", cctx.CreatedProjectDir))
+			if err := os.RemoveAll(cctx.CreatedProjectDir); err != nil {
 				c.Reporter.Warning("Cleanup", fmt.Sprintf("Failed to delete project directory: %v", err))
-				ctx.Summary.CleanupDetails = append(ctx.Summary.CleanupDetails, fmt.Sprintf("Failed to delete project directory: %v", err))
+				cctx.Summary.CleanupDetails = append(cctx.Summary.CleanupDetails, fmt.Sprintf("Failed to delete project directory: %v", err))
 			} else {
 				c.Reporter.Progress("Cleanup", 50, "Project directory deleted")
-				ctx.Summary.CleanupDetails = append(ctx.Summary.CleanupDetails, fmt.Sprintf("Project directory deleted: %s", ctx.CreatedProjectDir))
+				cctx.Summary.CleanupDetails = append(cctx.Summary.CleanupDetails, fmt.Sprintf("Project directory deleted: %s", cctx.CreatedProjectDir))
 			}
 		}
 
 		// 2. Delete GitHub repository if it was created
-		if ctx.CreatedRepo && !ctx.opts.SkipRepo {
-			c.Reporter.Progress("Cleanup", 50, fmt.Sprintf("Deleting GitHub repository: %s/%s", ctx.opts.RepoOwner, ctx.opts.RepoName))
-			if err := c.GitHubClient.DeleteRepo(ctx.opts.RepoOwner, ctx.opts.RepoName); err != nil {
+		if cctx.CreatedRepo && !cctx.opts.SkipRepo {
+			c.Reporter.Progress("Cleanup", 50, fmt.Sprintf("Deleting GitHub repository: %s/%s", cctx.opts.RepoOwner, cctx.opts.RepoName))
+			if err := c.GitHubClient.DeleteRepo(ctx, cctx.opts.RepoOwner, cctx.opts.RepoName); err != nil {
 				c.Reporter.Warning("Cleanup", fmt.Sprintf("Failed to delete GitHub repository: %v", err))
-				ctx.Summary.CleanupDetails = append(ctx.Summary.CleanupDetails, fmt.Sprintf("Failed to delete GitHub repository: %v", err))
+				cctx.Summary.CleanupDetails = append(cctx.Summary.CleanupDetails, fmt.Sprintf("Failed to delete GitHub repository: %v", err))
 			} else {
 				c.Reporter.Progress("Cleanup", 100, "GitHub repository deleted")
-				ctx.Summary.CleanupDetails = append(ctx.Summary.CleanupDetails, fmt.Sprintf("GitHub repository deleted: %s/%s", ctx.opts.RepoOwner, ctx.opts.RepoName))
+				cctx.Summary.CleanupDetails = append(cctx.Summary.CleanupDetails, fmt.Sprintf("GitHub repository deleted: %s/%s", cctx.opts.RepoOwner, cctx.opts.RepoName))
 			}
 		}
 
@@ -180,87 +181,87 @@ func (c *Factory) newCreationContext(opts Options) (*creationContext, error) {
 	}
 
 	// Convert project name to kebab-case for directory name
-	ctx.KebabName = tmpl.ToKebabCase(opts.RepoName)
+	cctx.KebabName = tmpl.ToKebabCase(opts.RepoName)
 
 	// Determine the project path using kebab-case
 	projectPath := opts.OutputDir
 	if projectPath == "" {
 		currentDir, err := os.Getwd()
 		if err != nil {
-			return ctx, fmt.Errorf("failed to get current directory: %w", err)
+			return cctx, fmt.Errorf("failed to get current directory: %w", err)
 		}
-		projectPath = filepath.Join(currentDir, ctx.KebabName)
+		projectPath = filepath.Join(currentDir, cctx.KebabName)
 	} else {
-		projectPath = filepath.Join(projectPath, ctx.KebabName)
+		projectPath = filepath.Join(projectPath, cctx.KebabName)
 	}
-	ctx.ProjectPath = projectPath
-	ctx.Summary.ProjectPath = projectPath
+	cctx.ProjectPath = projectPath
+	cctx.Summary.ProjectPath = projectPath
 
-	return ctx, nil
+	return cctx, nil
 }
 
 // populateAuthenticatedUser fetches the authenticated username and updates the context and summary.
-func (c *Factory) populateAuthenticatedUser(ctx *creationContext) {
+func (c *Factory) populateAuthenticatedUser(ctx context.Context, cctx *creationContext) {
 	c.Reporter.Start("Getting authenticated user", "")
-	username, err := c.GitHubClient.GetAuthenticatedUser()
+	username, err := c.GitHubClient.GetAuthenticatedUser(ctx)
 	if err != nil {
 		c.Reporter.Failed("Getting authenticated user", err, "")
-		ctx.Summary.Errors = append(ctx.Summary.Errors, fmt.Sprintf("Failed to get authenticated username: %v", err))
+		cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to get authenticated username: %v", err))
 		return
 	}
 	c.Reporter.Complete("Getting authenticated user", "")
-	ctx.AuthenticatedUser = username
+	cctx.AuthenticatedUser = username
 }
 
 // prepareTemplateVars initialises template variables and attaches them to the context and factory.
-func (c *Factory) prepareTemplateVars(ctx *creationContext) {
-	templateVars := c.optsToTemplateVars(ctx.opts)
-	ctx.TemplateVars = templateVars
+func (c *Factory) prepareTemplateVars(ctx context.Context, cctx *creationContext) {
+	templateVars := c.optsToTemplateVars(ctx, cctx.opts)
+	cctx.TemplateVars = templateVars
 	c.templateVars = templateVars
 
-	if ctx.AuthenticatedUser != "" {
-		ctx.TemplateVars.Meta.CreatedBy = ctx.AuthenticatedUser
-		c.Reporter.Debug(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", ctx.AuthenticatedUser))
+	if cctx.AuthenticatedUser != "" {
+		cctx.TemplateVars.Meta.CreatedBy = cctx.AuthenticatedUser
+		c.Reporter.Debug(fmt.Sprintf("Setting CreatedBy to authenticated user: %s", cctx.AuthenticatedUser))
 	}
 }
 
 // scaffoldIfNeeded performs project scaffolding when requested and updates tracking variables.
-func (c *Factory) scaffoldIfNeeded(ctx *creationContext) error {
-	if !ctx.opts.Scaffold {
+func (c *Factory) scaffoldIfNeeded(ctx context.Context, cctx *creationContext) error {
+	if !cctx.opts.Scaffold {
 		return nil
 	}
 
 	c.Reporter.Start("Scaffolding project", "")
-	if err := c.setUp(ctx.opts, ctx.TemplateVars); err != nil {
-		if ctx.opts.CleanupOnError {
-			ctx.Cleanup()
-			ctx.Summary.Errors = append(ctx.Summary.Errors, fmt.Sprintf("Failed to scaffold project: %v", err))
+	if err := c.setUp(ctx, cctx.opts, cctx.TemplateVars); err != nil {
+		if cctx.opts.CleanupOnError {
+			cctx.Cleanup()
+			cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to scaffold project: %v", err))
 			return fmt.Errorf("failed to scaffold project: %w", err)
 		}
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
-	ctx.CreatedProjectDir = ctx.ProjectPath
+	cctx.CreatedProjectDir = cctx.ProjectPath
 	c.Reporter.Complete("Scaffolding project", "complete!")
 	return nil
 }
 
 // ensureRepoIfNeeded creates the GitHub repository if required and updates the context and summary.
-func (c *Factory) ensureRepoIfNeeded(ctx *creationContext) error {
-	if ctx.opts.SkipRepo {
+func (c *Factory) ensureRepoIfNeeded(ctx context.Context, cctx *creationContext) error {
+	if cctx.opts.SkipRepo {
 		c.Reporter.Skip("Creating GitHub repository", "Skipped as per user request")
 		return nil
 	}
 
 	c.Reporter.Start("Creating GitHub repository", "")
-	_, err := c.createRepository(ctx.opts)
+	_, err := c.createRepository(ctx, cctx.opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "name already exists on this account") {
 			c.Reporter.Skip("Creating GitHub repository", "Repository already exists")
 		} else {
 			c.Reporter.Failed("Creating GitHub repository", err, "")
-			if ctx.opts.CleanupOnError {
-				ctx.Cleanup()
-				ctx.Summary.Errors = append(ctx.Summary.Errors, fmt.Sprintf("Failed to create repository: %v", err))
+			if cctx.opts.CleanupOnError {
+				cctx.Cleanup()
+				cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to create repository: %v", err))
 				return fmt.Errorf("failed to create repository: %w", err)
 			}
 			return fmt.Errorf("failed to create repository: %w", err)
@@ -268,24 +269,24 @@ func (c *Factory) ensureRepoIfNeeded(ctx *creationContext) error {
 		return nil
 	}
 
-	ctx.CreatedRepo = true
+	cctx.CreatedRepo = true
 	c.Reporter.Complete("Creating GitHub repository", "")
 
 	// Set the repository URL in the summary
-	ctx.Summary.RepoURL = fmt.Sprintf("https://github.com/%s/%s", ctx.opts.RepoOwner, ctx.KebabName)
+	cctx.Summary.RepoURL = fmt.Sprintf("https://github.com/%s/%s", cctx.opts.RepoOwner, cctx.KebabName)
 	return nil
 }
 
 // configureGitHub applies GitHub configurations with appropriate reporting and cleanup.
-func (c *Factory) configureGitHub(ctx *creationContext) error {
+func (c *Factory) configureGitHub(ctx context.Context, cctx *creationContext) error {
 	c.Reporter.Start("Applying GitHub configurations", "")
-	if err := c.applyConfigurations(ctx.opts); err != nil {
-		if ctx.opts.CleanupOnError {
-			ctx.Cleanup()
-			ctx.Summary.Errors = append(ctx.Summary.Errors, fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
+	if err := c.applyConfigurations(ctx, cctx.opts); err != nil {
+		if cctx.opts.CleanupOnError {
+			cctx.Cleanup()
+			cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
 			return fmt.Errorf("failed to apply GitHub configurations: %w", err)
 		}
-		ctx.Summary.Errors = append(ctx.Summary.Errors, fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
+		cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to apply GitHub configurations: %v", err))
 	} else {
 		c.Reporter.Complete("Applying GitHub configurations", "")
 	}
@@ -293,54 +294,55 @@ func (c *Factory) configureGitHub(ctx *creationContext) error {
 }
 
 // runHooksAndPublish executes post-installation hooks and performs git publish when applicable.
-func (c *Factory) runHooksAndPublish(ctx *creationContext) {
+func (c *Factory) runHooksAndPublish(ctx context.Context, cctx *creationContext) {
 	// Run post-installation hooks if scaffolding was done and hooks aren't skipped
-	if ctx.opts.Scaffold && !ctx.opts.SkipHooks { //nolint:nestif
+	if cctx.opts.Scaffold && !cctx.opts.SkipHooks { //nolint:nestif
 		c.Reporter.Start("Running post-installation hooks \n", "")
-		if err := c.RunHooks(ctx.ProjectPath, ctx.opts.Language, ctx.opts.ProjectType, ctx.TemplateVars); err != nil {
-			ctx.Summary.Errors = append(ctx.Summary.Errors, fmt.Sprintf("Failed to run post-installation hooks: %v", err))
+		if err := c.RunHooks(ctx, cctx.ProjectPath, cctx.opts.Language, cctx.opts.ProjectType,
+			cctx.TemplateVars); err != nil {
+			cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to run post-installation hooks: %v", err))
 		} else {
 			c.Reporter.Complete("Running post-installation hooks", "complete!")
 		}
-	} else if ctx.opts.SkipHooks {
+	} else if cctx.opts.SkipHooks {
 		c.Reporter.Skip("Running post-installation hooks", "Skipped as per user request")
 	}
 
 	// Initialise and push to GitHub repository if both scaffolding is done and repo was created
-	if ctx.opts.Scaffold && !ctx.opts.SkipRepo && ctx.CreatedRepo {
+	if cctx.opts.Scaffold && !cctx.opts.SkipRepo && cctx.CreatedRepo {
 		c.Reporter.Start("Initializing Git repository and pushing to GitHub", "")
 
-		sshURL := fmt.Sprintf("git@github.com:%s/%s.git", ctx.opts.RepoOwner, ctx.KebabName)
+		sshURL := fmt.Sprintf("git@github.com:%s/%s.git", cctx.opts.RepoOwner, cctx.KebabName)
 		c.Reporter.Debug(fmt.Sprintf("Using SSH URL for Git operations: %s", sshURL))
 
-		if err := c.Publish(ctx.ProjectPath, sshURL); err != nil {
+		if err := c.Publish(ctx, cctx.ProjectPath, sshURL); err != nil {
 			c.Reporter.Failed("Git repository initialization", err, "")
-			ctx.Summary.Errors = append(ctx.Summary.Errors, fmt.Sprintf("Failed to initialize and push to Git repository: %v", err))
+			cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to initialize and push to Git repository: %v", err))
 		} else {
 			c.Reporter.Complete("Git repository initialization", "Successfully pushed project to GitHub")
 		}
-	} else if ctx.opts.SkipRepo {
+	} else if cctx.opts.SkipRepo {
 		c.Reporter.Skip("Git repository initialization", "Skipped as no GitHub repository was created")
-	} else if !ctx.opts.Scaffold {
+	} else if !cctx.opts.Scaffold {
 		c.Reporter.Skip("Git repository initialization", "Skipped as no local project was scaffolded")
 	}
 }
 
 // Publish initialises a git repository in the project directory and pushes it to the remote
-func (c *Factory) Publish(projectPath, repoURL string) error {
-	if err := git.InitRepository(projectPath); err != nil {
+func (c *Factory) Publish(ctx context.Context, projectPath, repoURL string) error {
+	if err := git.InitRepository(ctx, projectPath); err != nil {
 		return fmt.Errorf("failed to initialize git repository: %w", err)
 	}
-	if err := git.CommitAll(projectPath, "chore: initial commit"); err != nil {
+	if err := git.CommitAll(ctx, projectPath, "chore: initial commit"); err != nil {
 		return fmt.Errorf("failed to commit files: %w", err)
 	}
-	if err := git.AddRemote(projectPath, "origin", repoURL); err != nil {
+	if err := git.AddRemote(ctx, projectPath, "origin", repoURL); err != nil {
 		return fmt.Errorf("failed to add remote: %w", err)
 	}
 	branch := "main"
-	if err := git.Push(projectPath, "origin", branch); err != nil {
+	if err := git.Push(ctx, projectPath, "origin", branch); err != nil {
 		fmt.Println("Push to 'main' failed, trying 'master' branch...")
-		if err := git.Push(projectPath, "origin", "master"); err != nil {
+		if err := git.Push(ctx, projectPath, "origin", "master"); err != nil {
 			return fmt.Errorf("failed to push to remote: %w", err)
 		}
 	}
@@ -348,7 +350,7 @@ func (c *Factory) Publish(projectPath, repoURL string) error {
 }
 
 // setUp scaffolds a project locally with pre-populated template variables
-func (c *Factory) setUp(opts Options, templateVars *template.Variables) error {
+func (c *Factory) setUp(ctx context.Context, opts Options, templateVars *template.Variables) error {
 	// Convert project name to kebab-case for directory name
 	kebabName := tmpl.ToKebabCase(opts.RepoName)
 
@@ -382,7 +384,8 @@ func (c *Factory) setUp(opts Options, templateVars *template.Variables) error {
 		templateSource = templatef.Source
 	}
 
-	if err := c.Scaffolder.ScaffoldProject(outputDir, opts.Language, opts.ProjectType, templateSource, templateVars, opts.SkipHooks, opts.NoCache); err != nil {
+	if err := c.Scaffolder.ScaffoldProject(ctx, outputDir, opts.Language, opts.ProjectType, templateSource, templateVars,
+		opts.SkipHooks, opts.NoCache); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 
@@ -390,7 +393,7 @@ func (c *Factory) setUp(opts Options, templateVars *template.Variables) error {
 }
 
 // optsToTemplateVars converts project creation options to template variables
-func (c *Factory) optsToTemplateVars(opts Options) *template.Variables {
+func (c *Factory) optsToTemplateVars(ctx context.Context, opts Options) *template.Variables {
 	vars := template.NewTemplateVariables()
 
 	// Keep original input name
@@ -426,7 +429,7 @@ func (c *Factory) optsToTemplateVars(opts Options) *template.Variables {
 
 		// Try to fetch the team ID
 		c.Reporter.Debug(fmt.Sprintf("Attempting to fetch team ID for '%s' in org '%s'", opts.Team, opts.RepoOwner))
-		teamID, err := c.GitHubClient.GetTeamID(opts.RepoOwner, opts.Team)
+		teamID, err := c.GitHubClient.GetTeamID(ctx, opts.RepoOwner, opts.Team)
 		if err != nil {
 			c.Reporter.Warning("Team ID", fmt.Sprintf("Could not fetch team ID: %v", err))
 		} else {

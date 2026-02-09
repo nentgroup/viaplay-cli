@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -130,7 +131,7 @@ func addCommonFlagsExceptName(cmd *cobra.Command, opts *CreateCommandOptions) {
 
 // createProjectOrRepo is a shared function that handles both project and repo creation
 // The withScaffolding parameter determines whether to include scaffolding
-func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error {
+func createProjectOrRepo(ctx context.Context, opts *CreateCommandOptions, withScaffolding bool) error {
 	// Start timing the operation
 	startTime := time.Now()
 	// Setup GitHub client and get config
@@ -164,7 +165,7 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 	}
 
 	// Check if repository exists (if we're creating one)
-	if !opts.NoRepo && !validateRepositoryDoesNotExist(ghClient, repoParams.owner, repoParams.name) {
+	if !opts.NoRepo && !validateRepositoryDoesNotExist(ctx, ghClient, repoParams.owner, repoParams.name) {
 		output.FatalError(fmt.Sprintf("Repository already exists: %s/%s", repoParams.owner, repoParams.name))
 		return nil
 	}
@@ -179,7 +180,8 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 	}
 
 	// Create the project using the Factory
-	summary, createErr := executeProjectCreation(ghClient, configDir, repoParams, opts, secretsData, withScaffolding)
+	summary, createErr := executeProjectCreation(ctx, ghClient, configDir, repoParams, opts, secretsData,
+		withScaffolding)
 
 	// Calculate total execution time
 	executionTime := time.Since(startTime)
@@ -200,7 +202,7 @@ func createProjectOrRepo(opts *CreateCommandOptions, withScaffolding bool) error
 	// For repo-only creation (no scaffolding) we want to initialise a local git repo
 	// that points to the newly created GitHub repository.
 	if !withScaffolding && !opts.NoRepo {
-		if err := initLocalRepo(projectDir, repoParams); err != nil {
+		if err := initLocalRepo(ctx, projectDir, repoParams); err != nil {
 			return err
 		}
 	}
@@ -330,8 +332,8 @@ func validateProjectDirectory(opts *CreateCommandOptions, repoName string) (stri
 }
 
 // validateRepositoryDoesNotExist checks if the repository doesn't exist on GitHub
-func validateRepositoryDoesNotExist(ghClient *gh.GitHubClient, owner, repoName string) bool {
-	repoExists, err := ghClient.RepositoryExists(owner, repoName)
+func validateRepositoryDoesNotExist(ctx context.Context, ghClient *gh.GitHubClient, owner, repoName string) bool {
+	repoExists, err := ghClient.RepositoryExists(ctx, owner, repoName)
 	if err != nil {
 		output.VerboseMessage(fmt.Sprintf("Error checking if repository exists: %v", err))
 		return false
@@ -340,7 +342,9 @@ func validateRepositoryDoesNotExist(ghClient *gh.GitHubClient, owner, repoName s
 }
 
 // executeProjectCreation executes the project creation workflow
-func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params repoParameters, opts *CreateCommandOptions, secretsData string, withScaffolding bool) (*project.Summary, error) { // Create project creator with reporter
+func executeProjectCreation(ctx context.Context, ghClient *gh.GitHubClient, configDir string, params repoParameters,
+	opts *CreateCommandOptions, secretsData string, withScaffolding bool,
+) (*project.Summary, error) { // Create project creator with reporter
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
@@ -383,7 +387,7 @@ func executeProjectCreation(ghClient *gh.GitHubClient, configDir string, params 
 	}
 
 	// Execute the project creation workflow
-	return creator.Create(projectOpts)
+	return creator.Create(ctx, projectOpts)
 }
 
 // formatDuration formats a duration to be more human-readable
@@ -511,15 +515,15 @@ func setupScaffoldingOptions(opts *CreateCommandOptions) error {
 }
 
 // initLocalRepo initialises a local git repository in projectDir and sets origin to the new GitHub repo.
-func initLocalRepo(projectDir string, params repoParameters) error {
+func initLocalRepo(ctx context.Context, projectDir string, params repoParameters) error {
 	// Initialise git repository (this will create the directory if needed)
-	if err := git.InitRepository(projectDir); err != nil {
+	if err := git.InitRepository(ctx, projectDir); err != nil {
 		return fmt.Errorf("failed to initialise local git repository at %s: %w", projectDir, err)
 	}
 
 	// Configure origin remote to point at the new GitHub repository using SSH URL
 	repoURL := fmt.Sprintf("git@github.com:%s/%s.git", params.owner, params.name)
-	if err := git.AddRemote(projectDir, "origin", repoURL); err != nil {
+	if err := git.AddRemote(ctx, projectDir, "origin", repoURL); err != nil {
 		return fmt.Errorf("failed to configure origin remote for local repository at %s: %w", projectDir, err)
 	}
 

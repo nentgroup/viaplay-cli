@@ -23,7 +23,6 @@ const (
 )
 
 type GitHubClient struct {
-	ctx    context.Context
 	client *github.Client
 }
 
@@ -33,14 +32,13 @@ func NewGitHubClient(token string) *GitHubClient {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	client := github.NewClient(oauth2.NewClient(ctx, ts))
 	return &GitHubClient{
-		ctx:    ctx,
 		client: client,
 	}
 }
 
 // GetAuthenticatedUser returns the username of the authenticated GitHub user
-func (ghc *GitHubClient) GetAuthenticatedUser() (string, error) {
-	user, _, err := ghc.client.Users.Get(ghc.ctx, "")
+func (ghc *GitHubClient) GetAuthenticatedUser(ctx context.Context) (string, error) {
+	user, _, err := ghc.client.Users.Get(ctx, "")
 	if err != nil {
 		return "", err
 	}
@@ -48,8 +46,8 @@ func (ghc *GitHubClient) GetAuthenticatedUser() (string, error) {
 }
 
 // GetAccountType returns whether the authenticated account is a personal account or an organization
-func (ghc *GitHubClient) GetAccountType() (string, error) {
-	user, _, err := ghc.client.Users.Get(ghc.ctx, "")
+func (ghc *GitHubClient) GetAccountType(ctx context.Context) (string, error) {
+	user, _, err := ghc.client.Users.Get(ctx, "")
 	if err != nil {
 		return "", err
 	}

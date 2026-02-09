@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,14 +16,14 @@ import (
 )
 
 // applyConfigurations applies configurations to the GitHub repository
-func (c *Factory) applyConfigurations(opts Options) error {
+func (c *Factory) applyConfigurations(ctx context.Context, opts Options) error {
 	// Skip all GitHub configurations if NoRepo is true
 	if opts.SkipRepo {
 		return nil
 	}
 
 	// Get authenticated username for personal directory path
-	username, err := c.GitHubClient.GetAuthenticatedUser()
+	username, err := c.GitHubClient.GetAuthenticatedUser(ctx)
 	if err != nil {
 		c.Reporter.Warning("Auth", fmt.Sprintf("Failed to get authenticated username: %v", err))
 		username = "" // Default to empty if we can't get the username
@@ -63,7 +64,7 @@ func (c *Factory) applyConfigurations(opts Options) error {
 
 	// 1. Apply environments if requested
 	if opts.ApplyEnvs {
-		err := c.applyEnvs(opts.RepoOwner, opts.RepoName, configDir)
+		err := c.applyEnvs(ctx, opts.RepoOwner, opts.RepoName, configDir)
 		if err != nil {
 			return fmt.Errorf("failed to apply environments: %w", err)
 		}
@@ -71,21 +72,21 @@ func (c *Factory) applyConfigurations(opts Options) error {
 
 	// 2. Apply rulesets if requested
 	if opts.ApplyRulesets {
-		if err := c.applyRulesets(opts.RepoOwner, opts.RepoName, configDir); err != nil {
+		if err := c.applyRulesets(ctx, opts.RepoOwner, opts.RepoName, configDir); err != nil {
 			return fmt.Errorf("failed to apply rulesets: %w", err)
 		}
 	}
 
 	// 3. Apply secrets if requested
 	if opts.ApplySecrets {
-		if err := c.applySecrets(opts.RepoOwner, opts.RepoName, configDir); err != nil {
+		if err := c.applySecrets(ctx, opts.RepoOwner, opts.RepoName, configDir); err != nil {
 			return fmt.Errorf("failed to apply secrets: %w", err)
 		}
 	}
 
 	// 4. Apply repository-specific secrets if provided
 	if opts.RepoSecrets != "" {
-		if err := c.applyRepoSecrets(opts.RepoOwner, opts.RepoName, opts.RepoSecrets); err != nil {
+		if err := c.applyRepoSecrets(ctx, opts.RepoOwner, opts.RepoName, opts.RepoSecrets); err != nil {
 			return fmt.Errorf("failed to apply repository-specific secrets: %w", err)
 		}
 	}
@@ -94,7 +95,7 @@ func (c *Factory) applyConfigurations(opts Options) error {
 }
 
 // applyEnvs applies environments defined in the team directory
-func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
+func (c *Factory) applyEnvs(ctx context.Context, owner, repo, teamDir string) error {
 	mainOperation := "Applying environments"
 
 	// Start the overall operation
@@ -188,7 +189,8 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 		c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Creating environment: %s", envConfig.Name))
 
 		// Create the basic environment first
-		if err := c.GitHubClient.CreateEnvironment(owner, repo, envConfig.Name, envConfig.ToGitHubEnv()); err != nil {
+		if err := c.GitHubClient.CreateEnvironment(ctx, owner, repo, envConfig.Name,
+			envConfig.ToGitHubEnv()); err != nil {
 			if !strings.Contains(err.Error(), "already exists") {
 				errMsg := fmt.Sprintf("Failed to create environment %s: %v", envConfig.Name, err)
 				c.Reporter.Warning("Environment creation", errMsg)
@@ -213,7 +215,8 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 					c.Reporter.Progress(mainOperation, 75, fmt.Sprintf("Adding branch pattern '%s' to %s", patternStr, envConfig.Name))
 
 					// Apply the branch pattern
-					if err := c.GitHubClient.CreateCustomBranchPolicy(owner, repo, envConfig.Name, pattern); err != nil {
+					if err := c.GitHubClient.CreateCustomBranchPolicy(ctx, owner, repo, envConfig.Name,
+						pattern); err != nil {
 						errMsg := fmt.Sprintf("Failed to add branch pattern '%s' for %s: %v", patternStr, envConfig.Name, err)
 						c.Reporter.Warning("Branch pattern", errMsg)
 						// Don't fail the entire operation because of one pattern
@@ -248,7 +251,7 @@ func (c *Factory) applyEnvs(owner, repo, teamDir string) error {
 }
 
 // applyRulesets applies rulesets defined in the team directory
-func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
+func (c *Factory) applyRulesets(ctx context.Context, owner, repo, teamDir string) error {
 	mainOperation := "Applying rulesets"
 	// Start the overall operation
 	c.Reporter.Start(mainOperation, "")
@@ -354,7 +357,7 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 		c.Reporter.Debug(fmt.Sprintf("Applying ruleset: %s (target: %s)", ruleset.Name, *ruleset.Target))
 
 		// Apply the ruleset
-		if err := c.GitHubClient.CreateRuleset(owner, repo, ruleset); err != nil {
+		if err := c.GitHubClient.CreateRuleset(ctx, owner, repo, ruleset); err != nil {
 			errMsg := fmt.Sprintf("Failed to apply ruleset %s: %v", f.Name(), err)
 			c.Reporter.Warning("Ruleset application", errMsg)
 			failedRulesets = append(failedRulesets, errMsg)
@@ -381,7 +384,7 @@ func (c *Factory) applyRulesets(owner, repo, teamDir string) error {
 }
 
 // applySecrets applies secrets defined in the team directory
-func (c *Factory) applySecrets(owner, repo, teamDir string) error {
+func (c *Factory) applySecrets(ctx context.Context, owner, repo, teamDir string) error {
 	mainOperation := "Applying secrets"
 	c.Reporter.Start(mainOperation, "")
 
@@ -471,7 +474,8 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 		}
 
 		isVariable := secret.Type == "variable"
-		if err := c.applySecretOrVariable(isVariable, owner, repo, secret.Name, secretValue, secret.Env, valueSource); err != nil {
+		if err := c.applySecretOrVariable(ctx, isVariable, owner, repo, secret.Name, secretValue, secret.Env,
+			valueSource); err != nil {
 			c.Reporter.Warning("Secret application", fmt.Sprintf("Failed to apply %s '%s': %v",
 				secret.Type, secret.Name, err))
 		} else {
@@ -491,7 +495,7 @@ func (c *Factory) applySecrets(owner, repo, teamDir string) error {
 }
 
 // applyRepoSecrets applies repository-specific secrets from a JSON string
-func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
+func (c *Factory) applyRepoSecrets(ctx context.Context, owner, repo, secretsJSON string) error {
 	mainOperation := "Applying repository-specific secrets"
 	c.Reporter.Start(mainOperation, "")
 
@@ -556,7 +560,8 @@ func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
 		isVariable := s.Type == "variable"
 		c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Setting %s: %s", valueOrEmpty(s.Type, "secret"), prefixedName))
 
-		if err := c.applySecretOrVariable(isVariable, owner, repo, prefixedName, secretValue, envScope, "repo-secrets"); err != nil {
+		if err := c.applySecretOrVariable(ctx, isVariable, owner, repo, prefixedName, secretValue, envScope,
+			"repo-secrets"); err != nil {
 			errMsg := fmt.Sprintf("Failed to apply %s '%s': %v", valueOrEmpty(s.Type, "secret"), prefixedName, err)
 			c.Reporter.Warning("Secret application", errMsg)
 			failedSecrets = append(failedSecrets, errMsg)
@@ -577,7 +582,9 @@ func (c *Factory) applyRepoSecrets(owner, repo, secretsJSON string) error {
 }
 
 // Helper to apply a secret or variable
-func (c *Factory) applySecretOrVariable(isVariable bool, owner, repo, name, value, env, valueSource string) error {
+func (c *Factory) applySecretOrVariable(ctx context.Context, isVariable bool, owner, repo, name, value, env,
+	valueSource string,
+) error {
 	operation := "Setting variable"
 	resourceType := "variable"
 	if !isVariable {
@@ -589,9 +596,9 @@ func (c *Factory) applySecretOrVariable(isVariable bool, owner, repo, name, valu
 
 	var err error
 	if isVariable {
-		err = c.GitHubClient.SetVariable(owner, repo, name, value, env)
+		err = c.GitHubClient.SetVariable(ctx, owner, repo, name, value, env)
 	} else {
-		err = c.GitHubClient.ApplySecret(owner, repo, name, value, env)
+		err = c.GitHubClient.ApplySecret(ctx, owner, repo, name, value, env)
 	}
 
 	if err != nil {
@@ -605,13 +612,13 @@ func (c *Factory) applySecretOrVariable(isVariable bool, owner, repo, name, valu
 }
 
 // createRepository creates a GitHub repository and adds appropriate topics and labels
-func (c *Factory) createRepository(opts Options) (string, error) {
+func (c *Factory) createRepository(ctx context.Context, opts Options) (string, error) {
 	// Only print errors if needed, not process/info messages
 	var org string
 	if opts.AccountType == "organization" {
 		org = opts.RepoOwner
 	}
-	repoURL, err := c.GitHubClient.CreateRepo(opts.RepoName, org, opts.IsPrivate, opts.RepoDescription)
+	repoURL, err := c.GitHubClient.CreateRepo(ctx, opts.RepoName, org, opts.IsPrivate, opts.RepoDescription)
 	if err != nil {
 		return "", err
 	}
@@ -619,7 +626,7 @@ func (c *Factory) createRepository(opts Options) (string, error) {
 	// If this is an organization repository and we have a team, add it as admin to the repository
 	if opts.AccountType == "organization" && opts.Team != "" {
 		c.Reporter.Progress("Repository Setup", 50, fmt.Sprintf("Adding team '%s' as admin to repository", opts.Team))
-		err := c.GitHubClient.AddTeamToRepository(org, opts.RepoName, opts.Team, gh.TeamPermissionAdmin)
+		err := c.GitHubClient.AddTeamToRepository(ctx, org, opts.RepoName, opts.Team, gh.TeamPermissionAdmin)
 		if err != nil {
 			c.Reporter.Warning("Team Permission", fmt.Sprintf("Failed to add team '%s' as admin: %v", opts.Team, err))
 			// Don't fail the entire operation - this is a non-critical enhancement
@@ -650,7 +657,7 @@ func (c *Factory) createRepository(opts Options) (string, error) {
 	topics = append(topics, "viaplay-cli")
 
 	// Add the topics to the repository
-	if err := c.GitHubClient.AddTopicsToRepo(opts.RepoOwner, opts.RepoName, topics); err != nil {
+	if err := c.GitHubClient.AddTopicsToRepo(ctx, opts.RepoOwner, opts.RepoName, topics); err != nil {
 		c.Reporter.Warning("Topic Creation", fmt.Sprintf("Failed to add topics to repository: %v", err))
 		// Don't return an error here as topic creation is not critical to the repository creation
 	} else {

@@ -32,34 +32,36 @@ func (ghc *GitHubClient) SetSecret(ctx context.Context, owner, repo, secretName,
 }
 
 // GetPublicKey retrieves the public key for a repository, used for encrypting secrets
-func (ghc *GitHubClient) GetPublicKey(owner, repo string, env ...string) (*github.PublicKey, error) {
+func (ghc *GitHubClient) GetPublicKey(ctx context.Context, owner, repo string, env ...string) (*github.PublicKey,
+	error,
+) {
 	if len(env) > 0 && env[0] != "" {
 		// Get environment public key
-		repox, _, err := ghc.client.Repositories.Get(ghc.ctx, owner, repo)
+		repox, _, err := ghc.client.Repositories.Get(ctx, owner, repo)
 		if err != nil {
 			return nil, err
 		}
 		repoID := repox.GetID()
-		key, _, err := ghc.client.Actions.GetEnvPublicKey(ghc.ctx, int(repoID), env[0])
+		key, _, err := ghc.client.Actions.GetEnvPublicKey(ctx, int(repoID), env[0])
 		return key, err
 	}
 
 	// Get repository public key
-	key, _, err := ghc.client.Actions.GetRepoPublicKey(ghc.ctx, owner, repo)
+	key, _, err := ghc.client.Actions.GetRepoPublicKey(ctx, owner, repo)
 	return key, err
 }
 
 // ListSecrets returns all secrets for a repository or environment
-func (ghc *GitHubClient) ListSecrets(owner, repo string, env ...string) ([]*github.Secret, error) {
+func (ghc *GitHubClient) ListSecrets(ctx context.Context, owner, repo string, env ...string) ([]*github.Secret, error) {
 	if len(env) > 0 && env[0] != "" {
 		// List environment secrets
-		repox, _, err := ghc.client.Repositories.Get(ghc.ctx, owner, repo)
+		repox, _, err := ghc.client.Repositories.Get(ctx, owner, repo)
 		if err != nil {
 			return nil, err
 		}
 		repoID := repox.GetID()
 
-		secrets, _, err := ghc.client.Actions.ListEnvSecrets(ghc.ctx, int(repoID), env[0], nil)
+		secrets, _, err := ghc.client.Actions.ListEnvSecrets(ctx, int(repoID), env[0], nil)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +69,7 @@ func (ghc *GitHubClient) ListSecrets(owner, repo string, env ...string) ([]*gith
 	}
 
 	// List repository secrets
-	secrets, _, err := ghc.client.Actions.ListRepoSecrets(ghc.ctx, owner, repo, nil)
+	secrets, _, err := ghc.client.Actions.ListRepoSecrets(ctx, owner, repo, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -75,26 +77,26 @@ func (ghc *GitHubClient) ListSecrets(owner, repo string, env ...string) ([]*gith
 }
 
 // DeleteSecret deletes a secret from a repository or environment
-func (ghc *GitHubClient) DeleteSecret(owner, repo, secretName string, env ...string) error {
+func (ghc *GitHubClient) DeleteSecret(ctx context.Context, owner, repo, secretName string, env ...string) error {
 	if len(env) > 0 && env[0] != "" {
 		// Delete environment secret
-		repox, _, err := ghc.client.Repositories.Get(ghc.ctx, owner, repo)
+		repox, _, err := ghc.client.Repositories.Get(ctx, owner, repo)
 		if err != nil {
 			return err
 		}
 		repoID := repox.GetID()
 
-		_, err = ghc.client.Actions.DeleteEnvSecret(ghc.ctx, int(repoID), env[0], secretName)
+		_, err = ghc.client.Actions.DeleteEnvSecret(ctx, int(repoID), env[0], secretName)
 		return err
 	}
 
 	// Delete repository secret
-	_, err := ghc.client.Actions.DeleteRepoSecret(ghc.ctx, owner, repo, secretName)
+	_, err := ghc.client.Actions.DeleteRepoSecret(ctx, owner, repo, secretName)
 	return err
 }
 
 // SetVariable sets a repository or environment variable
-func (ghc *GitHubClient) SetVariable(owner, repo, name, value string, env ...string) error {
+func (ghc *GitHubClient) SetVariable(ctx context.Context, owner, repo, name, value string, env ...string) error {
 	variable := &github.ActionsVariable{
 		Name:  name,
 		Value: value,
@@ -102,20 +104,22 @@ func (ghc *GitHubClient) SetVariable(owner, repo, name, value string, env ...str
 
 	if len(env) > 0 && env[0] != "" {
 		// Set environment variable
-		_, err := ghc.client.Actions.CreateEnvVariable(ghc.ctx, owner, repo, env[0], variable)
+		_, err := ghc.client.Actions.CreateEnvVariable(ctx, owner, repo, env[0], variable)
 		return err
 	}
 
 	// Set repository variable
-	_, err := ghc.client.Actions.CreateRepoVariable(ghc.ctx, owner, repo, variable)
+	_, err := ghc.client.Actions.CreateRepoVariable(ctx, owner, repo, variable)
 	return err
 }
 
 // ListVariables returns all variables for a repository or environment
-func (ghc *GitHubClient) ListVariables(owner, repo string, env ...string) ([]*github.ActionsVariable, error) {
+func (ghc *GitHubClient) ListVariables(ctx context.Context, owner, repo string,
+	env ...string,
+) ([]*github.ActionsVariable, error) {
 	if len(env) > 0 && env[0] != "" {
 		// List environment variables
-		vars, _, err := ghc.client.Actions.ListEnvVariables(ghc.ctx, owner, repo, env[0], nil)
+		vars, _, err := ghc.client.Actions.ListEnvVariables(ctx, owner, repo, env[0], nil)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +127,7 @@ func (ghc *GitHubClient) ListVariables(owner, repo string, env ...string) ([]*gi
 	}
 
 	// List repository variables
-	vars, _, err := ghc.client.Actions.ListRepoVariables(ghc.ctx, owner, repo, nil)
+	vars, _, err := ghc.client.Actions.ListRepoVariables(ctx, owner, repo, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -131,14 +135,14 @@ func (ghc *GitHubClient) ListVariables(owner, repo string, env ...string) ([]*gi
 }
 
 // DeleteVariable deletes a variable from a repository or environment
-func (ghc *GitHubClient) DeleteVariable(owner, repo, name string, env ...string) error {
+func (ghc *GitHubClient) DeleteVariable(ctx context.Context, owner, repo, name string, env ...string) error {
 	if len(env) > 0 && env[0] != "" {
 		// Delete environment variable
-		_, err := ghc.client.Actions.DeleteEnvVariable(ghc.ctx, owner, repo, env[0], name)
+		_, err := ghc.client.Actions.DeleteEnvVariable(ctx, owner, repo, env[0], name)
 		return err
 	}
 
 	// Delete repository variable
-	_, err := ghc.client.Actions.DeleteRepoVariable(ghc.ctx, owner, repo, name)
+	_, err := ghc.client.Actions.DeleteRepoVariable(ctx, owner, repo, name)
 	return err
 }

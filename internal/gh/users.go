@@ -1,11 +1,13 @@
 package gh
 
 import (
+	"context"
+
 	"github.com/google/go-github/v74/github"
 )
 
-func (ghc *GitHubClient) GetUser(username string) (*github.User, error) {
-	user, _, err := ghc.client.Users.Get(ghc.ctx, username)
+func (ghc *GitHubClient) GetUser(ctx context.Context, username string) (*github.User, error) {
+	user, _, err := ghc.client.Users.Get(ctx, username)
 	if err != nil {
 		return nil, err
 	}
@@ -14,10 +16,10 @@ func (ghc *GitHubClient) GetUser(username string) (*github.User, error) {
 }
 
 // GetUserOrganizations returns the list of organizations the authenticated user belongs to
-func (ghc *GitHubClient) GetUserOrganizations() ([]*github.Organization, error) {
+func (ghc *GitHubClient) GetUserOrganizations(ctx context.Context) ([]*github.Organization, error) {
 	// Use ListOrgMemberships to get all organizations the user belongs to (even private ones)
 	// with any role (member or admin)
-	orgMemberships, _, err := ghc.client.Organizations.ListOrgMemberships(ghc.ctx, &github.ListOrgMembershipsOptions{
+	orgMemberships, _, err := ghc.client.Organizations.ListOrgMemberships(ctx, &github.ListOrgMembershipsOptions{
 		State: "active",
 		ListOptions: github.ListOptions{
 			PerPage: 100, // Set a reasonable page size
