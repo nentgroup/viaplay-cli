@@ -64,7 +64,7 @@ Use this for a complete project setup experience.`,
 	}
 
 	// Add common flags without the name flag (as it's now a positional arg)
-	addCommonFlagsExceptName(cmd, opts)
+	addCommonFlags(cmd, opts)
 
 	// Add project-specific flags
 	cmd.Flags().StringVar(&opts.Language, "language", "", "Programming language (go, typescript, etc.)")

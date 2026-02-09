@@ -53,8 +53,8 @@ type CreateCommandOptions struct {
 	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur
 }
 
-// addCommonFlagsExceptName adds common flags to a command, excluding the name flag
-func addCommonFlagsExceptName(cmd *cobra.Command, opts *CreateCommandOptions) {
+// addCommonFlags adds common flags to a command, excluding the name flag
+func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 	// Repository flags
 	cmd.Flags().StringVar(&opts.Description, "description", "", "Repository description")
 	cmd.Flags().BoolVar(&opts.Public, "public", false, "Create a public repository (overrides --private)")
@@ -95,7 +95,7 @@ func addCommonFlagsExceptName(cmd *cobra.Command, opts *CreateCommandOptions) {
 		// 1. --public flag (highest priority)
 		// 2. --private flag (second priority)
 		// 3. default_visibility from config (lowest priority)
-		isPrivateSet, _ := cmd.Flags().GetBool("private")
+		isPrivateSet, _ := cmd.Flags().GetBool("private") //nolint:errcheck
 
 		// If neither flag is explicitly set, use the default_visibility from config
 		if !cmd.Flags().Changed("public") && !cmd.Flags().Changed("private") {

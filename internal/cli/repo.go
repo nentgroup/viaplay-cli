@@ -68,7 +68,7 @@ manually or migrate existing code to a new repository.`,
 	}
 
 	// Add common flags without the name flag (as it's now a positional arg)
-	addCommonFlagsExceptName(cmd, opts)
+	addCommonFlags(cmd, opts)
 
 	return cmd
 }

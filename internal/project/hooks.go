@@ -12,34 +12,6 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/template"
 )
 
-// InitGoProject initialises a Go project with proper module setup
-func (c *Factory) InitGoProject(ctx context.Context, projectPath string) error {
-	if _, err := os.Stat(filepath.Join(projectPath, "go.mod")); err == nil {
-		return nil
-	}
-	cmd := exec.CommandContext(ctx, "go", "mod", "tidy")
-	cmd.Dir = projectPath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-// InitNodeProject initialises a Node.js project
-func (c *Factory) InitNodeProject(ctx context.Context, projectPath string) error {
-	packageJSONPath := filepath.Join(projectPath, "package.json")
-	nodeModulesPath := filepath.Join(projectPath, "node_modules")
-	if _, err := os.Stat(packageJSONPath); err == nil {
-		if _, err := os.Stat(nodeModulesPath); os.IsNotExist(err) {
-			cmd := exec.CommandContext(ctx, "npm", "install")
-			cmd.Dir = projectPath
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			return cmd.Run()
-		}
-	}
-	return nil
-}
-
 // RunHooks runs the post-installation hooks for a project
 func (c *Factory) RunHooks(ctx context.Context, projectPath, language, projectType string,
 	templateVars *template.Variables,

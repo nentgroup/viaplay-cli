@@ -124,33 +124,39 @@ func Update(ctx context.Context, opts UpdateOptions) error {
 		return fmt.Errorf("failed to fetch updates: %w, output: %s", err, string(fetchOutput))
 	}
 
-	// If a branch is specified, check it out
 	if opts.Branch != "" {
-		// Validate the branch name for security
-		if !validateGitBranch(opts.Branch) {
-			return fmt.Errorf("invalid branch name: %s", opts.Branch)
-		}
+		return updateSpecificBranch(ctx, opts.Branch)
+	}
 
-		// Checkout the branch - capture output instead of sending to terminal
-		checkoutCmd := exec.CommandContext(ctx, "git", "checkout", opts.Branch)
-		checkoutOutput, err := checkoutCmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to checkout branch '%s': %w, output: %s", opts.Branch, err, string(checkoutOutput))
-		}
+	// Pull the latest changes from the current branch - capture output instead of sending to terminal
+	pullCmd := exec.CommandContext(ctx, "git", "pull")
+	pullOutput, err := pullCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to pull updates: %w, output: %s", err, string(pullOutput))
+	}
 
-		// Pull the latest changes - capture output instead of sending to terminal
-		pullCmd := exec.CommandContext(ctx, "git", "pull", "origin", opts.Branch)
-		pullOutput, err := pullCmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to pull updates from '%s': %w, output: %s", opts.Branch, err, string(pullOutput))
-		}
-	} else {
-		// Pull the latest changes from the current branch - capture output instead of sending to terminal
-		pullCmd := exec.CommandContext(ctx, "git", "pull")
-		pullOutput, err := pullCmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to pull updates: %w, output: %s", err, string(pullOutput))
-		}
+	return nil
+}
+
+// updateSpecificBranch validates and checks out a branch, then pulls latest changes.
+func updateSpecificBranch(ctx context.Context, branch string) error {
+	// Validate the branch name for security
+	if !validateGitBranch(branch) {
+		return fmt.Errorf("invalid branch name: %s", branch)
+	}
+
+	// Checkout the branch - capture output instead of sending to terminal
+	checkoutCmd := exec.CommandContext(ctx, "git", "checkout", branch)
+	checkoutOutput, err := checkoutCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to checkout branch '%s': %w, output: %s", branch, err, string(checkoutOutput))
+	}
+
+	// Pull the latest changes - capture output instead of sending to terminal
+	pullCmd := exec.CommandContext(ctx, "git", "pull", "origin", branch)
+	pullOutput, err := pullCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to pull updates from '%s': %w, output: %s", branch, err, string(pullOutput))
 	}
 
 	return nil
@@ -410,10 +416,10 @@ func validateGitRemote(remote string) bool {
 	allowedSpecialChars := "-._"
 
 	for _, c := range remote {
-		if !((c >= 'a' && c <= 'z') ||
-			(c >= 'A' && c <= 'Z') ||
-			(c >= '0' && c <= '9') ||
-			strings.ContainsRune(allowedSpecialChars, c)) {
+		if (c < 'a' || c > 'z') &&
+			(c < 'A' || c > 'Z') &&
+			(c < '0' || c > '9') &&
+			!strings.ContainsRune(allowedSpecialChars, c) {
 			return false
 		}
 	}

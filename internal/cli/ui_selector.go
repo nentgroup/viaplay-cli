@@ -48,7 +48,6 @@ type SelectModel struct {
 	selectedItem *Item
 	done         bool
 	title        string
-	err          error
 	width        int
 	height       int
 }
@@ -98,6 +97,8 @@ func (m SelectModel) Init() tea.Cmd {
 }
 
 // Update handles UI events
+//
+//nolint:ireturn // Bubble Tea Update must return tea.Model; required by the framework interface.
 func (m SelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:

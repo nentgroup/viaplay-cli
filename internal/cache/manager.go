@@ -227,12 +227,11 @@ func (m *Manager) EnsureTemplate(ctx context.Context, language, templateType, so
 	}
 
 	// If force update is requested and template exists, remove it first
-	if exists && forceUpdate {
+	if forceUpdate {
 		output.VerboseMessage(fmt.Sprintf("Force update requested, removing existing template at: %s", cachePath))
 		if err := os.RemoveAll(cachePath); err != nil {
 			return "", fmt.Errorf("failed to remove existing template for force update: %w", err)
 		}
-		exists = false
 	}
 
 	// At this point, either the template doesn't exist or we removed it for a force update
@@ -248,94 +247,6 @@ func handleLocalTemplate(source Source) (string, error) {
 	}
 	// Use the local path directly
 	return source.Location, nil
-}
-
-// shouldForceUpdate checks if a force update is requested via environment variable or flag
-func shouldForceUpdate(exists bool, forceUpdate ...bool) bool {
-	// Check if forceUpdate parameter is provided and true
-	if len(forceUpdate) > 0 && forceUpdate[0] {
-		return exists
-	}
-	// Otherwise check environment variable
-	return os.Getenv("VIAPLAY_CLI_FORCE_UPDATE") == "true" && exists
-}
-
-// handleExistingTemplate handles logic for an existing template in the cache
-func handleExistingTemplate(ctx context.Context, cachePath string, source Source, forceUpdate ...bool) (string, error) {
-	output.VerboseMessage(fmt.Sprintf("Template already exists in cache at: %s", cachePath))
-
-	// Check if the force update is requested
-	forcedUpdate := false
-	if len(forceUpdate) > 0 && forceUpdate[0] {
-		output.VerboseMessage("Force update requested via --no-cache flag")
-		forcedUpdate = true
-	}
-
-	// Check if the template is too old (older than 24 hours)
-	// If it is, we'll force an update check
-	forcedCheck := isTemplateTooOld(cachePath)
-	if forcedCheck {
-		output.VerboseMessage("Template is older than 24 hours, checking for updates")
-	}
-
-	// Only check for updates if we're forcing an update or the template is too old
-	needsUpdate := false
-	var err error
-
-	if forcedUpdate || forcedCheck {
-		// Check if the template needs to be updated
-		needsUpdate, err = checkIfTemplateNeedsUpdate(ctx, cachePath)
-		if err != nil {
-			// If there's an error checking updates, use cached version anyway
-			output.VerboseMessage(fmt.Sprintf("Error checking updates: %v, using cached template", err))
-			return cachePath, nil
-		}
-	} else {
-		// When not forcing an update and template is recent, skip the remote check entirely
-		output.VerboseMessage("Using cached template without checking remote (use --no-cache to force check)")
-	}
-
-	if needsUpdate || forcedCheck || forcedUpdate {
-		output.VerboseMessage("Updating template...")
-		if err := updateExistingTemplate(ctx, cachePath, source); err != nil {
-			// If update fails, use cached version anyway
-			output.VerboseMessage(fmt.Sprintf("Failed to update template: %v", err))
-			output.VerboseMessage("Using cached template despite update failure")
-		} else {
-			output.VerboseMessage("Template updated successfully")
-		}
-	} else {
-		output.VerboseMessage("Template is up to date, using cached version")
-	}
-
-	return cachePath, nil
-}
-
-// checkIfTemplateNeedsUpdate checks if a template needs to be updated
-func checkIfTemplateNeedsUpdate(ctx context.Context, cachePath string) (bool, error) {
-	// Try to determine if the repository needs an update by checking Git
-	repoInfo, err := git.GetRepositoryInfo(ctx, cachePath)
-	if err != nil {
-		return false, fmt.Errorf("error getting repository info: %w", err)
-	}
-
-	// Check if the local repository is behind the remote
-	// Use "origin" as the default remote name since RepositoryInfo doesn't have RemoteName field
-	isBehind, err := git.IsBehindRemote(ctx, cachePath, "origin", repoInfo.Branch)
-	if err != nil {
-		return false, fmt.Errorf("error checking if repository is behind remote: %w", err)
-	}
-
-	return isBehind, nil
-}
-
-// updateExistingTemplate updates an existing template in the cache
-func updateExistingTemplate(ctx context.Context, cachePath string, source Source) error {
-	return git.Update(ctx, git.UpdateOptions{
-		Directory: cachePath,
-		Branch:    source.Reference,
-		Force:     false,
-	})
 }
 
 // handleNewTemplate handles cloning a new template
@@ -400,48 +311,8 @@ func (m *Manager) ListTemplates(ctx context.Context) ([]Template, error) {
 		// We want to list only language/template_type directories
 		parts := strings.Split(rel, string(os.PathSeparator))
 		if len(parts) == 2 && info.IsDir() {
-			// Check if it's a git repository
-			if git.IsGitRepository(path) {
-				// Try to get the source information from the git repository
-				source, err := getTemplateSourceFromGit(ctx, path)
-				if err != nil {
-					// If we can't determine the source, use a default
-					source = Source{
-						Type:     SourceTypeGitHub,
-						Location: "unknown",
-					}
-				}
-
-				// Derive version information from git
-				version, err := git.DescribeVersion(ctx, path)
-				if err != nil {
-					version = "unknown"
-				}
-
-				// Get repository info to extract remote URL
-				repoInfo, err := git.GetRepositoryInfo(ctx, path)
-				remoteURL := "unknown"
-				if err == nil && repoInfo != nil && repoInfo.RemoteURL != "" {
-					remoteURL = repoInfo.RemoteURL
-
-					// Normalise GitHub SSH URLs (git@github.com:org/repo.git) to HTTPS
-					if strings.HasPrefix(remoteURL, "git@github.com:") {
-						// Strip git@github.com: and optional .git suffix
-						repoPath := strings.TrimPrefix(remoteURL, "git@github.com:")
-						repoPath = strings.TrimSuffix(repoPath, ".git")
-						remoteURL = "https://github.com/" + repoPath
-					}
-				}
-
-				templates = append(templates, Template{
-					Language:     parts[0],
-					Type:         parts[1],
-					Path:         path,
-					LastModified: info.ModTime(),
-					Source:       source,
-					Version:      version,
-					RemoteURL:    remoteURL,
-				})
+			if tmpl, ok := m.buildTemplateFromDir(ctx, path, info, parts); ok {
+				templates = append(templates, tmpl)
 			}
 		}
 
@@ -452,6 +323,60 @@ func (m *Manager) ListTemplates(ctx context.Context) ([]Template, error) {
 	}
 
 	return templates, nil
+}
+
+// buildTemplateFromDir constructs a Template from a given directory path if it is a valid git repo.
+func (m *Manager) buildTemplateFromDir(ctx context.Context, path string, info os.FileInfo, parts []string) (Template, bool) {
+	// Expect parts to be [language, type]
+	if len(parts) != 2 || !info.IsDir() {
+		return Template{}, false
+	}
+
+	// Check if it's a git repository
+	if !git.IsGitRepository(path) {
+		return Template{}, false
+	}
+
+	// Try to get the source information from the git repository
+	source, err := getTemplateSourceFromGit(ctx, path)
+	if err != nil {
+		// If we can't determine the source, use a default
+		source = Source{
+			Type:     SourceTypeGitHub,
+			Location: "unknown",
+		}
+	}
+
+	// Derive version information from git
+	version, err := git.DescribeVersion(ctx, path)
+	if err != nil {
+		version = "unknown"
+	}
+
+	// Get repository info to extract remote URL
+	repoInfo, err := git.GetRepositoryInfo(ctx, path)
+	remoteURL := "unknown"
+	if err == nil && repoInfo != nil && repoInfo.RemoteURL != "" {
+		remoteURL = repoInfo.RemoteURL
+
+		// Normalise GitHub SSH URLs (git@github.com:org/repo.git) to HTTPS
+		if strings.HasPrefix(remoteURL, "git@github.com:") {
+			// Strip git@github.com: and optional .git suffix
+			repoPath := strings.TrimPrefix(remoteURL, "git@github.com:")
+			repoPath = strings.TrimSuffix(repoPath, ".git")
+			remoteURL = "https://github.com/" + repoPath
+		}
+	}
+
+	return Template{
+		Language:     parts[0],
+		Type:         parts[1],
+		Path:         path,
+		LastModified: info.ModTime(),
+		Source:       source,
+		Version:      version,
+		RemoteURL:    remoteURL,
+	}, true
 }
 
 // PruneCache removes templates from the cache that are older than the specified days
@@ -485,34 +410,9 @@ func (m *Manager) PruneCache(days int) (int, int, error) {
 			return fmt.Errorf("could not determine relative path for %s: %w", path, err)
 		}
 
-		// If it's a directory and the modification time is older than the cutoff
 		if info.IsDir() && !strings.Contains(rel, string(os.PathSeparator)) {
-			// Check each template type within this language directory
-			languagePath := path
-			templateTypes, err := os.ReadDir(languagePath)
-			if err != nil {
-				return fmt.Errorf("could not read directory %s: %w", languagePath, err)
-			}
-
-			for _, templateType := range templateTypes {
-				if !templateType.IsDir() {
-					continue
-				}
-
-				totalTemplates++
-				templatePath := filepath.Join(languagePath, templateType.Name())
-				templateInfo, err := os.Stat(templatePath)
-				if err != nil {
-					continue
-				}
-
-				// If the template is older than the cutoff, remove it
-				if templateInfo.ModTime().Before(cutoffTime) {
-					if err := os.RemoveAll(templatePath); err != nil {
-						return fmt.Errorf("error removing template %s: %w", templatePath, err)
-					}
-					prunedCount++
-				}
+			if err := pruneTemplatesInLanguageDir(path, cutoffTime, &totalTemplates, &prunedCount); err != nil {
+				return err
 			}
 		}
 
@@ -523,6 +423,38 @@ func (m *Manager) PruneCache(days int) (int, int, error) {
 	}
 
 	return prunedCount, totalTemplates, nil
+}
+
+// pruneTemplatesInLanguageDir inspects template-type subdirectories under a language directory
+// and removes those older than cutoffTime, updating the provided counters.
+func pruneTemplatesInLanguageDir(languagePath string, cutoffTime time.Time, totalTemplates, prunedCount *int) error {
+	templateTypes, err := os.ReadDir(languagePath)
+	if err != nil {
+		return fmt.Errorf("could not read directory %s: %w", languagePath, err)
+	}
+
+	for _, templateType := range templateTypes {
+		if !templateType.IsDir() {
+			continue
+		}
+
+		*totalTemplates++
+		templatePath := filepath.Join(languagePath, templateType.Name())
+		templateInfo, err := os.Stat(templatePath)
+		if err != nil {
+			continue
+		}
+
+		// If the template is older than the cutoff, remove it
+		if templateInfo.ModTime().Before(cutoffTime) {
+			if err := os.RemoveAll(templatePath); err != nil {
+				return fmt.Errorf("error removing template %s: %w", templatePath, err)
+			}
+			*prunedCount++
+		}
+	}
+
+	return nil
 }
 
 // CleanCache removes all templates from the cache
@@ -561,8 +493,10 @@ func (m *Manager) UpdateAllTemplates(ctx context.Context) (int, int, error) {
 			defer wg.Done()
 
 			// Force update by setting environment variable
-			os.Setenv("VIAPLAY_CLI_FORCE_UPDATE", "true")
-			defer os.Unsetenv("VIAPLAY_CLI_FORCE_UPDATE")
+			_ = os.Setenv("VIAPLAY_CLI_FORCE_UPDATE", "true")
+			defer func() {
+				_ = os.Unsetenv("VIAPLAY_CLI_FORCE_UPDATE")
+			}()
 
 			// Generate source string
 			var sourceStr string
@@ -660,24 +594,4 @@ func getTemplateSourceFromGit(ctx context.Context, repoPath string) (Source, err
 		Type:     SourceTypeSSH,
 		Location: remoteURL,
 	}, nil
-}
-
-// isTemplateTooOld checks if a template's age exceeds the freshness threshold
-// It returns true if the template is older than 24 hours
-func isTemplateTooOld(templatePath string) bool {
-	// Check if the template path exists
-	info, err := os.Stat(templatePath)
-	if os.IsNotExist(err) {
-		// Template path doesn't exist, consider it too old
-		return true
-	} else if err != nil {
-		// Error checking template path, treat as old
-		return true
-	}
-
-	// Calculate the age of the template
-	age := time.Since(info.ModTime())
-
-	// Check if the age exceeds 24 hours
-	return age > 24*time.Hour
 }
