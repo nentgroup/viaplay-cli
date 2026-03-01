@@ -31,7 +31,7 @@ jobs:
           go test -v ./... -covermode=atomic -coverpkg=./... -race -coverprofile coverage.out
           go tool cover -func=coverage.out -o=coverage.out
       - name: temporary save the coverage badge
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage.out
