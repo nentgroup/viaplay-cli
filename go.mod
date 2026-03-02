@@ -1,6 +1,6 @@
 module github.com/nentgroup/viaplay-cli
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/briandowns/spinner v1.23.2
@@ -10,6 +10,7 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/go-github/v83 v83.0.0
+	github.com/google/go-github/v84 v84.0.0
 	github.com/invopop/yaml v0.3.1
 	github.com/muesli/termenv v0.16.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
