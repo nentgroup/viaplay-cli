@@ -12,34 +12,16 @@ Welcome to the documentation for **viaplay-cli**! This documentation covers inst
 
 ## Table of Contents
 
-- [Getting Started](getting-started/quickstart.md)
-- [Installation](getting-started/installation.md)
-- [CLI Commands](cli/index.md)
-- [Configuration](configuration.md)
-- [Project Creation](project-creation.md)
-- [Secrets Management](secrets.md)
-- [Templates](templates.md)
-- [Rulesets](rulesets.md)
-
----
-
-## Quick Links
-
 - [Quick Start](getting-started/quickstart.md)
-- [Available Template Variables](../TEMPLATE_VARS.md)
-- [How to Configure Templates](templates.md)
-- [Rulesets and Config](rulesets.md)
-
----
-
-## Features
-
-- Project scaffolding from templates
-- GitHub repository creation and configuration
-- Secret management
-- Template caching for remote repositories
-- Hooks for pre/post project creation
-- Rich template variables and functions
+- [Installation](getting-started/installation.md)
+- [Configuration](configuration.md)
+- [Project & Repo Creation](project-creation.md)
+- [Templates](templates.md)
+- [Secrets Management](secrets.md)
+- [Environments](envs.md)
+- [Rulesets](rulesets.md)
+- [CLI Reference](cli/index.md)
+- [FAQ](faq.md)
 
 ---
 

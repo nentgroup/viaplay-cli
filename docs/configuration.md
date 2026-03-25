@@ -1,6 +1,6 @@
 # Configuration
 
-This section explains how configuration works in viaplay-cli, including global, team, and project-specific settings. Real examples from the internal/config/blueprints directory are provided to illustrate best practices.
+This page covers how configuration works in viaplay-cli, including global, team, and project-specific settings.
 
 ---
 
@@ -17,7 +17,7 @@ rulesets, secrets, and more. There are three main types of configuration:
 
 ## Global Config Example (config.yaml)
 
-This file controls the default behavior of viaplay-cli:
+This file controls the default behaviour of viaplay-cli:
 
 ```yaml
 # viaplay-cli Configuration
@@ -94,12 +94,6 @@ no_cache: false
 templates:
   # Go templates
   go:
-    cli:
-      source: "git@github.com:nentgroup/go-cli-template.git"
-    lambda:
-      source: "git@github.com:nentgroup/go-lambda-template.git"
-    package:
-      source: "git@github.com:nentgroup/go-package-template.git"
     service:
       source: "git@github.com:nentgroup/go-service-template.git"
       hooks:
@@ -107,17 +101,17 @@ templates:
           install:
             cmd:
               - "echo 'Go service template installed successfully'"
-
-  # Rust templates
-  rust:
-    service:
-      source: git@github.com:nentgroup/rust-service-template.git
+    # Add more Go project types as needed (cli, lambda, package, etc.)
 
   # Node templates
   node:
     service:
       source: git@github.com:nentgroup/node-service-template.git
+
   # Add more language templates as needed
+  # rust:
+  #   service:
+  #     source: git@github.com:your-org/rust-service-template.git
 
 
 # -----------------------------------------------
@@ -253,9 +247,9 @@ To create a new hook script:
 
 - **Keep hooks idempotent**: Hooks should be safe to run multiple times
 - **Handle errors gracefully**: Include error checking in your scripts
-- **Provide progress feedback**: Output meaningful information during hook execution
+- **Log progress**: Output useful information during hook execution
 - **Keep hooks focused**: Each hook should serve a specific purpose
-- **Test hooks thoroughly**: Ensure hooks work across different environments
+- **Test hooks**: Make sure hooks work across different environments
 
 ---
 
@@ -271,7 +265,7 @@ To create a new hook script:
 - Use these examples as a starting point for your own configs.
 - Version team configs in your team repository.
 - Use project config for overrides and metadata.
-- Keep secrets and rulesets in secure, versioned locations.
+- Keep secrets in your OS keyring; version ruleset and environment configs in your team repository.
 - Use environment sections to manage per-environment secrets and settings.
 
 ---

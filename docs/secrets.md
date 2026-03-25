@@ -1,12 +1,10 @@
-# Secrets in viaplay-cli
-
-This page explains how secrets are managed, stored, and used in viaplay-cli for teams and repositories.
+# Secrets
 
 ---
 
 ## What are Secrets?
 
-Secrets are sensitive values (such as API keys, tokens, or passwords) that are required by your repositories or CI/CD pipelines. viaplay-cli allows you to securely manage secrets at the team level and inject them into repositories or environments during project creation.
+Secrets are sensitive values (such as API keys, tokens, or passwords) used by your repositories or CI/CD pipelines. viaplay-cli manages secrets at the team level and injects them into repositories or environments during project creation.
 
 ---
 
@@ -14,8 +12,7 @@ Secrets are sensitive values (such as API keys, tokens, or passwords) that are r
 
 - **Team secrets:**
   - Configured in `~/.config/viaplay/teams/<team>/secrets.yaml` (or the global secrets file)
-  - The actual secret values are always stored securely in your operating system's keyring (e.g., macOS Keychain, Windows Credential Manager, or Linux Secret Service), not in the config files themselves.
-  - The config files only reference the secret names and metadata, never the values.
+  - Secret values are stored in your OS keyring (e.g., macOS Keychain, Windows Credential Manager, or Linux Secret Service) — config files only reference names and metadata.
 
 ---
 
@@ -84,15 +81,15 @@ In this example:
 
 ---
 
-## Referencing Secrets: The Preferred Way
+## Referencing Secrets in Configuration
 
-The preferred and most secure way to reference a secret is using the `${{ secrets.SECRET_KEY }}` syntax. This ensures that the value is resolved securely from your OS keyring at the time of repository creation or configuration.
+Use the `${{ secrets.SECRET_KEY }}` syntax to reference a secret stored in your OS keyring. The value is resolved securely at the time of repository creation or configuration.
 
-- `${{ secrets.SECRET_KEY }}` can be used:
-  - In the `--repo-secrets` inline flag (as a value or reference)
-  - Inside the YAML secrets config (e.g., `secrets.yaml`)
+This syntax can be used:
+- In the `--repo-secrets` inline flag
+- Inside YAML secrets configs (e.g., `secrets.yaml`)
 
-Example usage in a secrets config:
+Example in a secrets config:
 ```yaml
 secrets:
   - name: API_KEY
@@ -100,16 +97,16 @@ secrets:
     type: secret
 ```
 
-Example usage with the CLI flag:
+Example with the CLI flag:
 ```bash
 vip project create nentgroup/myservice --language go --type service --repo-secrets '{"secrets":[{"name":"API_KEY","value":"${{ secrets.GH_TOKEN }}","type":"secret"}]}'
 ```
 
-> **Note:** When the `env` field is omitted or left empty for a secret, it will be created at the repository level, making it available to all workflows. When an environment name is specified, the secret will only be available within that specific environment.
+> **Note:** When the `env` field is omitted or left empty, the secret is created at the repository level (available to all workflows). When an environment name is specified, the secret is scoped to that environment only.
 
 ## Using Template Variables in Secrets
 
-You can reference template variables in your secret values using Go template syntax. This is particularly useful for creating dynamic values that incorporate project information:
+You can reference template variables in your secret values using Go template syntax:
 
 ```yaml
 secrets:
@@ -139,9 +136,9 @@ In the example above:
 
 ## Best Practices
 
-- Always use the `${{ secrets.SECRET_KEY }}` syntax to reference secrets for maximum security and portability.
+- Always use the `${{ secrets.SECRET_KEY }}` syntax to reference secrets in configuration files.
 - Never commit secret values to version control.
-- Use team or global secrets files to configure which secrets are needed, but store the actual values in your OS keyring.
+- Use team or global secrets files to define which secrets are needed, and store the actual values in your OS keyring.
 - Rotate secrets regularly and remove unused ones.
 
 ---

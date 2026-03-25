@@ -1,6 +1,5 @@
 # Project and Repository Creation
 
-This page explains the workflow and concepts behind project and repository creation with viaplay-cli.
 
 ---
 
@@ -63,6 +62,3 @@ The command takes one argument in the format `[owner/]<repo-name>`. For details 
 - For template details, see [Templates](templates.md).
 - For team/org configuration, see [Configuration](configuration.md).
 
----
-
-This page is a high-level overview. For exact CLI usage, always refer to the CLI Reference.

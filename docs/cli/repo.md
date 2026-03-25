@@ -1,6 +1,6 @@
 # repo Command
 
-The `vip repo` command is used to manage GitHub repositories without scaffolding code.
+The `vip repo` command manages GitHub repositories without scaffolding code.
 
 ---
 

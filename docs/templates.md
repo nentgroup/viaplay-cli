@@ -1,31 +1,71 @@
-# Template Variables
+# Templates
 
-viaplay-cli supports a set of template variables that can be used in your project templates. These variables are replaced with actual values during project scaffolding.
-
----
-
-## How to Reference Variables
-
-Use the syntax `{{ .Namespace.VarName }}` (double braces, leading dot) in your template files. For example:
-
-```
-# {{ .Project.Name }}
-Owner: {{ .Repo.Owner }}
-Service Port: {{ .Service.Port }}
-```
-
-Template variables can be used in:
-- File content (as shown above)
-- Filenames (e.g., `{{.Project.Name}}.md`, `{{.Service.Name}}-config.yaml`)
-- Folder names (e.g., `src/{{.Service.Name}}`, `{{kebab .Project.Name}}/lib`)
-
-This allows you to dynamically name files and folders based on the project attributes.
+viaplay-cli uses project templates to scaffold new repositories. Templates can be local directories or remote Git repositories. During project creation, template files are copied and variables are replaced with values you provide.
 
 ---
 
-## Supported Template Variables
+## Available Templates
 
-The following variables are organized into namespaces for easier reference and to prevent naming collisions:
+The following official templates are available out of the box:
+
+| Language | Type | Repository |
+|----------|------|------------|
+| Go | service | [go-service-template](https://github.com/nentgroup/go-service-template) |
+| Node | service | [node-service-template](https://github.com/nentgroup/node-service-template) |
+
+More templates are planned. You can also add your own templates in your `config.yaml` under the `templates` section — see [Configuration](configuration.md) for details.
+
+> **Built a template?** If you've created a reusable template that could benefit others, open a PR to add it to this list!
+
+---
+
+## Template Sources
+
+- **Remote Git:** Use a Git URL (e.g., `git@github.com:nentgroup/go-service-template.git`).
+- **Local Directory:** Use a local path for custom templates.
+
+### Using a Custom Template Source
+
+Specify the template source when creating a project:
+
+```bash
+# Remote template
+vip project create my-service --language go --type service --template-source git@github.com:your-org/your-template.git
+
+# Local template
+vip project create my-service --language go --type service --template-source ~/my-templates/go-service
+```
+
+---
+
+## Template Structure
+
+A template typically contains:
+- Project files (README, source code, configs)
+- Placeholders for variables using `{{ .Namespace.VarName }}` syntax
+
+### Raw Files (no rendering)
+
+Add the `.raw` suffix to any template file you want copied verbatim. The file is copied as-is and the `.raw` suffix is stripped in the generated project.
+
+Example: `template.go.tmpl.raw` is copied to `template.go.tmpl` without any rendering.
+
+---
+
+## Template Caching
+
+Remote templates are cached locally for faster reuse. Use `vip cache update` to refresh the cache, or pass `--no-cache` when creating a project to force a fresh download.
+
+---
+
+## Template Variables
+
+Template variables are replaced with actual values during project scaffolding. Use the syntax `{{ .Namespace.VarName }}` (double braces, leading dot) in your template files.
+
+Variables can be used in:
+- **File content** (e.g., `{{ .Project.Name }}`)
+- **Filenames** (e.g., `{{.Project.Name}}.md`, `{{.Service.Name}}-config.yaml`)
+- **Folder names** (e.g., `src/{{.Service.Name}}`, `{{kebab .Project.Name}}/lib`)
 
 ### Project Information
 - `{{ .Project.Name }}` — Name of the project/repository
@@ -106,11 +146,13 @@ The following variables are organized into namespaces for easier reference and t
 - `{{ .Meta.CreatedBy }}` — Username of project creator
 - `{{ .Meta.Year }}` — Current year (for license, copyright notices)
 
+> **Note:** Some variables are language or platform specific and will only be set if relevant to your project type (e.g., Go, Node.js, AWS, Docker).
+
 ---
 
 ## Example Usage in a Template
 
-### Markdown Example
+### Markdown
 
 ```
 # {{ .Project.Name }}
@@ -121,7 +163,7 @@ Maintained by: {{ .Service.Owner }}
 Service port: {{ .Service.Port }}
 ```
 
-### Go Example
+### Go
 
 ```go
 package main
@@ -133,15 +175,7 @@ func main() {
 }
 ```
 
-### Rust Example
-
-```rust
-fn main() {
-    println!("Service {{ .Service.Name }} ({{ .Service.Type }}) running on port {{ .Service.Port }}");
-}
-```
-
-### Node.js Example
+### Node.js
 
 ```js
 console.log(`Service {{ .Service.Name }} ({{ .Service.Type }}) running on port {{ .Service.Port }}`);
@@ -149,9 +183,9 @@ console.log(`Service {{ .Service.Name }} ({{ .Service.Type }}) running on port {
 
 ---
 
-## Advanced Go Template Features
+## Advanced Template Features
 
-The viaplay-cli template engine is based on Go's `text/template` package, which supports advanced features such as:
+The template engine is based on Go's `text/template` package, which supports:
 
 - **Conditionals:**
   ```
@@ -167,34 +201,22 @@ The viaplay-cli template engine is based on Go's `text/template` package, which 
   - {{.}}
   {{end}}
   ```
-- **Functions:**
-  You can use built-in functions like `upper`, `lower`, `title`, and more:
+- **Built-in Functions:**
   ```
   Project: {{upper .Project.Name}}
   Owner: {{title .Repo.Owner}}
   ```
 
 - **Custom Formatting Functions:**
-  viaplay-cli provides special formatting functions to help with naming conventions:
   ```
-  {{pascal .Project.Name}}    → Converts to PascalCase (e.g., "my-service" → "MyService")
-  {{kebab .Project.Name}}     → Converts to kebab-case (e.g., "MyService" → "my-service")
-  {{title .Project.Name}}     → Converts to Title Case (e.g., "my-service" → "My Service")
+  {{pascal .Project.Name}}    → PascalCase (e.g., "my-service" → "MyService")
+  {{kebab .Project.Name}}     → kebab-case (e.g., "MyService" → "my-service")
+  {{title .Project.Name}}     → Title Case (e.g., "my-service" → "My Service")
   ```
-  These are particularly useful for generating code, filenames, and configuration that requires
-  specific naming formats.
-
-- **Nested Variables:**
-  If your variables are structured, you can access nested fields:
-  ```
-  {{.Team.Name}}
-  {{.Team.Members}}
-  ```
+  These are useful for generating code, filenames, and configuration that requires specific naming formats.
 
 For a full list of available functions, see the [Go template documentation](https://pkg.go.dev/text/template) and [Sprig functions](https://masterminds.github.io/sprig/).
 
 ---
 
-> **Note:** Some variables are language or platform specific and will only be set if relevant to your project type (e.g., Go, Node.js, AWS, Docker).
-
-For more on templates and teams, see the [Configuration](configuration.md) and [Project & Repo Creation](project-creation.md) sections.
+For more on team configuration and project creation, see [Configuration](configuration.md) and [Project & Repo Creation](project-creation.md).

@@ -1,6 +1,6 @@
 # project Command
 
-The `vip project` command is used to manage projects with GitHub integration.
+The `vip project` command manages projects with GitHub integration.
 
 ---
 

@@ -90,15 +90,15 @@ Run `vip cache update` to refresh cached templates.
 
 **Why use viaplay-cli instead of tools like Yeoman, Cookiecutter, or Plop?**
 
-While tools like Yeoman, Cookiecutter, and Plop are excellent for generic project scaffolding, viaplay-cli is designed specifically for teams and organizations that need:
+While tools like Yeoman, Cookiecutter, and Plop are great for generic project scaffolding, viaplay-cli focuses on teams and organizations that also need:
 
-- **Deep GitHub integration:** Automated repository creation, configuration, and management (including rulesets, environments, and secrets) directly via the GitHub API.
+- **GitHub integration:** Automated repository creation, configuration, and management (rulesets, environments, secrets) via the GitHub API.
 - **Team and org standards:** Enforce team-specific rulesets, secrets, and environment configs out of the box.
 - **Secure secrets management:** Store and inject secrets using your OS keyring, not just in template files.
-- **Unified workflow:** Combine project scaffolding, repository setup, and configuration in a single CLI, reducing manual steps and errors.
-- **YAML/JSON-driven config:** Centralize and version your team/project settings for consistency and automation.
+- **Unified workflow:** Combine project scaffolding, repository setup, and configuration in a single CLI.
+- **YAML/JSON-driven config:** Centralise and version your team/project settings.
 
-If you only need to scaffold files, generic tools may be enough. If you want to automate the full lifecycle of repo creation, configuration, and team standards, viaplay-cli is purpose-built for that workflow.
+If you only need file scaffolding, generic tools may be enough. If you also want automated repo creation, configuration, and team standards, viaplay-cli covers that.
 
 ---
 

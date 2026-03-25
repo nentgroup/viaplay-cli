@@ -10,7 +10,7 @@
 
 - **Project Templates**: Scaffold new projects from templates (Go, TypeScript, Rust, and more) with best practices pre-configured
 - **GitHub Integration**: Create and configure repositories (personal or organization) directly from the CLI
-- **Team Configurations**: Apply standardized environments, rulesets, and secrets
+- **Team Configurations**: Apply standardised environments, rulesets, and secrets
 - **Secure Secrets Management**: Manage secrets securely using your system keyring
 - **Extensible Architecture**: Easy to add new templates and project types
 
@@ -47,6 +47,8 @@ vip repo create my-repo --team platform --description "My awesome repository"
 ```bash
 vip auth status
 ```
+
+> **Available templates:** [Go service](https://github.com/nentgroup/go-service-template) and [Node service](https://github.com/nentgroup/node-service-template). See [Templates](https://nentgroup.github.io/viaplay-cli/#/templates) for details on using custom templates.
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-install-dark.svg"><img src="./.github/assets/icon-install.svg" alt="Install" width="18" height="18" aria-label="Install"></picture> Installation
 
