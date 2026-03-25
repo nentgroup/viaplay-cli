@@ -163,7 +163,7 @@ github.com/subosito/gotenv
 # github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
 ## explicit; go 1.19
 github.com/xo/terminfo
-# github.com/zalando/go-keyring v0.2.7
+# github.com/zalando/go-keyring v0.2.8
 ## explicit; go 1.18
 github.com/zalando/go-keyring
 github.com/zalando/go-keyring/internal/shellescape
