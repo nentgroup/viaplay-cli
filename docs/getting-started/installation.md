@@ -1,6 +1,6 @@
 # Installation
 
-To install viaplay-cli, you need Go 1.20+ installed on your system.
+To install viaplay-cli, you need Go 1.25+ installed on your system.
 
 ---
 
@@ -59,7 +59,7 @@ vip --version
 
 ### Option 2: Build from Source
 
-If you have Go 1.20+ installed:
+If you have Go 1.25+ installed:
 
 ```powershell
 git clone https://github.com/nentgroup/viaplay-cli.git
@@ -72,7 +72,7 @@ Move `vip.exe` to a directory in your PATH.
 ---
 
 ## Requirements
-- Go 1.20 or newer
+- Go 1.25 or newer
 - Git (for template cloning)
 - macOS <i class="fa-brands fa-apple" style="color:#888;"></i>, Linux <i class="fa-brands fa-linux" style="color:#888;"></i>, or Windows <i class="fa-brands fa-windows" style="color:#888;"></i>
 

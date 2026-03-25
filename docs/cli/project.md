@@ -15,7 +15,7 @@ The `vip project` command is used to manage projects with GitHub integration.
 ### Usage
 
 ```bash
-vip project create <org/repo-name> [flags]
+vip project create [owner/]<repo-name> [flags]
 ```
 
 ### Flags
@@ -79,9 +79,9 @@ If both flags are specified, `--public` takes precedence.
 
 ## Repository Location
 
-The command takes one argument in the format `org/repo-name` or `username/repo-name`:
-- `org/repo-name` creates the project in the specified organization
-- `username/repo-name` creates the project in your personal GitHub account
+The command takes one argument in the format `[owner/]<repo-name>`:
+- `owner/repo-name` creates the project in the specified organization or user account
+- `repo-name` (without owner) uses the default organization from your config, or your personal GitHub account
 
 ---
 

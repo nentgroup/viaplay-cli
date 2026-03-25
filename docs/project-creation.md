@@ -53,9 +53,7 @@ vip project create nentgroup/repo-name --language typescript --type webapp --tea
 vip project create username/repo-name --language go --type library
 ```
 
-Note that the command takes one argument in the format `org/repo-name` or `username/repo-name`, where:
-- `org/repo-name` creates the project in the specified organization
-- `username/repo-name` creates the project in your personal GitHub account
+The command takes one argument in the format `[owner/]<repo-name>`. For details on how the owner is resolved, see the [project command reference](cli/project.md) or the [repo command reference](cli/repo.md).
 
 ---
 

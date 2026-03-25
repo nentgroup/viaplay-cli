@@ -6,6 +6,48 @@
   <img src="./.github/assets/vip.png" alt="viaplay-cli screenshot" width="600">
 </p>
 
+## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-features-dark.svg"><img src="./.github/assets/icon-features.svg" alt="Features" width="18" height="18" aria-label="Features"></picture> Features
+
+- **Project Templates**: Scaffold new projects from templates (Go, TypeScript, Rust, and more) with best practices pre-configured
+- **GitHub Integration**: Create and configure repositories (personal or organization) directly from the CLI
+- **Team Configurations**: Apply standardized environments, rulesets, and secrets
+- **Secure Secrets Management**: Manage secrets securely using your system keyring
+- **Extensible Architecture**: Easy to add new templates and project types
+
+## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-quickstart-dark.svg"><img src="./.github/assets/icon-quickstart.svg" alt="Quick Start" width="18" height="18" aria-label="Quick Start"></picture> Quick Start
+
+### Authentication
+
+First, authenticate with GitHub:
+
+```bash
+vip auth login
+```
+
+This will open your browser to authenticate with GitHub and store your token securely in your system keyring.
+
+### Create a New Project
+
+```bash
+# Create a new Go service
+vip project create my-service --language go --type service --team platform
+
+# Create a TypeScript service
+vip project create my-lib --language typescript --type service --team frontend
+```
+
+### Create a Repository Only
+
+```bash
+vip repo create my-repo --team platform --description "My awesome repository"
+```
+
+### Check Your Authentication Status
+
+```bash
+vip auth status
+```
+
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-install-dark.svg"><img src="./.github/assets/icon-install.svg" alt="Install" width="18" height="18" aria-label="Install"></picture> Installation
 
 ### Homebrew (macOS & Linux)
@@ -56,52 +98,14 @@ go build -o vip ./cmd/vip
 sudo mv vip /usr/local/bin/
 ```
 
-## What is viaplay-cli?
+## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-docs-dark.svg"><img src="./.github/assets/icon-docs.svg" alt="Documentation" width="18" height="18" aria-label="Documentation"></picture> Documentation
 
-viaplay-cli is a CLI tool for developers to:
-- Scaffold new projects from templates (Go, TypeScript, etc.)
-- Create and configure GitHub repositories (personal or organization)
-- Apply team/organization settings (rulesets, secrets, environments)
-- Manage secrets securely using your system keyring
-
-## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-quickstart-dark.svg"><img src="./.github/assets/icon-quickstart.svg" alt="Quick Start" width="18" height="18" aria-label="Quick Start"></picture> Quick Start
-
-### Authentication
-
-First, authenticate with GitHub:
-
-```bash
-vip auth login
-```
-
-This will open your browser to authenticate with GitHub and store your token securely in your system keyring.
-
-### Create a New Project
-
-```bash
-# Create a new Go API service
-vip create project --name my-service --language go --type api --team platform
-
-# Create a TypeScript library
-vip create project --name my-lib --language typescript --type library --team frontend
-```
-
-### Create a Repository Only
-
-```bash
-vip create repo --name my-repo --team platform --description "My awesome repository"
-```
-
-### Check Your Authentication Status
-
-```bash
-vip auth status
-```
+Full documentation is available at **[nentgroup.github.io/viaplay-cli](https://nentgroup.github.io/viaplay-cli)**
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-dev-dark.svg"><img src="./.github/assets/icon-dev.svg" alt="Development" width="18" height="18" aria-label="Development"></picture> Development
 
 ### Prerequisites
-- Go 1.21 or later
+- Go 1.25 or later
 - [Task](https://taskfile.dev/) (optional, for easier scripts)
 
 ### Build the CLI
@@ -128,28 +132,6 @@ golangci-lint run --fix
 go test ./...
 ```
 
-## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-docs-dark.svg"><img src="./.github/assets/icon-docs.svg" alt="Documentation" width="18" height="18" aria-label="Documentation"></picture> Documentation
-
-**Full documentation is available at: [https://nentgroup.github.io/viaplay-cli](https://nentgroup.github.io/viaplay-cli)**
-
-The documentation includes:
-
-- [Getting Started Guide](https://nentgroup.github.io/viaplay-cli/#/getting-started/quickstart)
-- [Installation Instructions](https://nentgroup.github.io/viaplay-cli/#/getting-started/installation)
-- [Full CLI Usage & Commands](https://nentgroup.github.io/viaplay-cli/#/cli/index)
-- [Project Creation Guide](https://nentgroup.github.io/viaplay-cli/#/project-creation)
-- [Configuration Reference](https://nentgroup.github.io/viaplay-cli/#/configuration)
-- [Templates & Teams](https://nentgroup.github.io/viaplay-cli/#/teams-and-templates)
-- [Environments & Rulesets](https://nentgroup.github.io/viaplay-cli/#/envs)
-- [Secrets Management](https://nentgroup.github.io/viaplay-cli/#/secrets)
-
-## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-features-dark.svg"><img src="./.github/assets/icon-features.svg" alt="Features" width="18" height="18" aria-label="Features"></picture> Features
-
-- **Project Templates**: Create new projects with best practices pre-configured
-- **GitHub Integration**: Create and configure repositories directly from the CLI
-- **Team Configurations**: Apply standardized environments, rulesets, and secrets
-- **Secure Authentication**: GitHub tokens stored securely in your system keyring
-- **Extensible Architecture**: Easy to add new templates and project types
 
 ## License
 

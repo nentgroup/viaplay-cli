@@ -43,12 +43,5 @@ Welcome to the documentation for **viaplay-cli**! This documentation covers inst
 
 ---
 
-## Raw Files (no rendering)
-
-To copy a template file verbatim, append the `.raw` suffix. The file will be copied as-is and the `.raw` suffix is removed in the generated project.
-
-Example: `template.go.tmpl.raw` is copied to `template.go.tmpl` with no rendering applied.
-
----
 
 For more details, use the sidebar or the links above.

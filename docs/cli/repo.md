@@ -13,7 +13,7 @@ The `vip repo` command is used to manage GitHub repositories without scaffolding
 ### Usage
 
 ```bash
-vip repo create <org/repo-name> [flags]
+vip repo create [owner/]<repo-name> [flags]
 ```
 
 ### Flags
@@ -63,15 +63,15 @@ By default, repositories are created with the visibility defined in your `defaul
 - `--public` to force a public repository
 - `--private` (or `-p`) to force a private repository 
 
-If both flags are specified, `--private` takes precedence.
+If both flags are specified, `--public` takes precedence.
 
 ---
 
 ## Repository Location
 
-The command takes one argument in the format `org/repo-name` or `username/repo-name`:
-- `org/repo-name` creates the repository in the specified organization
-- `username/repo-name` creates the repository in your personal GitHub account
+The command takes one argument in the format `[owner/]<repo-name>`:
+- `owner/repo-name` creates the repository in the specified organization or user account
+- `repo-name` (without owner) uses the default organization from your config, or your personal GitHub account
 
 ---
 
