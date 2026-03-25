@@ -45,7 +45,7 @@ This ensures you have the latest version of all templates.
 Remove all cached templates (if supported):
 
 ```
-vip cache clear
+vip cache clean
 ```
 
 This can help resolve issues with outdated or corrupted templates.
@@ -72,10 +72,10 @@ Caching improves performance and allows offline use of previously downloaded tem
 
 ### Project Creation
 
-When creating a project with `vip create project`, you can use the `--no-cache` flag to force an update of the template before scaffolding:
+When creating a project with `vip project create`, you can use the `--no-cache` flag to force an update of the template before scaffolding:
 
 ```bash
-vip create project --name myproject --language go --type service --no-cache
+vip project create myproject --language go --type service --no-cache
 ```
 
 This ensures you're using the latest version of a template, bypassing any cached version, but makes the scaffolding 

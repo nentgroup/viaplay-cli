@@ -54,7 +54,7 @@ For detailed information about configuration options, see the [Configuration doc
 ## 5. Create a New Project
 
 ```
-vip project create <org/repo-name> --language <lang> --type <type> [options]
+vip project create [owner/]<repo-name> --language <lang> --type <type> [options]
 ```
 
 Example:

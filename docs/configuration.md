@@ -150,70 +150,19 @@ debug: false
 
 ---
 
-## Environment Example (environment.yaml)
+## Environments
 
-Defines environment-specific settings, such as deployment policies and reviewers.
+Environments define deployment targets (such as staging, production) with their own protection rules, reviewers, and secrets. Environment files are placed in your team configuration directory under `envs/`.
 
-```yaml
-name: staging
-wait_timer: 0
-reviewers:
-  - type: Team
-    id: {{.Org.TeamID}}
-deployment_branch_policy:
-  protected_branches: false
-  custom_branch_policies: true
-  branch_patterns:
-    - name: main              # This represents a DeploymentBranchPolicyRequest
-      type: branch            # Values could be "branch" or "tag"
-    - name: "release/*"       # Another pattern example
-      type: branch
-    - name: "*"
-      type: tag
-
-```
+For a full example and detailed options, see [Environments Configuration](envs.md).
 
 ---
 
 ## Rulesets
 
-Rulesets define branch protection and repository rules for GitHub repositories. You can specify a ruleset file in your config and it will be applied automatically to new repositories. Example ruleset file:
+Rulesets define branch protection and repository rules for GitHub repositories. You can specify ruleset files in your team config directory and they will be applied automatically to new repositories.
 
-```yaml
-# Example GitHub branch ruleset
-# This file defines a ruleset for GitHub repositories
-# It supports template variables like {{.Org.TeamID}} for dynamic values
-
-name: branch-protection
-target: branch
-enforcement: active
-
-# You can use template variables for dynamic values
-bypass_actors:
-  - actor_id: {{.Org.TeamID}}
-    actor_type: Team
-    bypass_mode: always
-
-conditions:
-  ref_name:
-    include:
-      - refs/heads/main
-    exclude: []
-
-rules:
-  - type: require_pull_request
-    parameters:
-      required_approving_review_count: 1
-      require_code_owner_review: true
-      dismiss_stale_reviews_on_push: true
-      require_last_push_approval: false
-      allowed_merge_methods:
-        - squash
-        - rebase
-```
-
-- For more details on GitHub rulesets, see the [GitHub Ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets).
-- Reference your ruleset file in your config under the appropriate team or project section.
+For a full example and detailed options, see [Rulesets and Configuration](rulesets.md).
 
 ---
 
