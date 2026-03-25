@@ -1,17 +1,17 @@
 # Template Commands
 
-The `template` command group provides tools for working with templates in the Viaplay CLI. These commands are designed to help developers work with project templates more efficiently.
+The `template` command group provides tools for testing and validating templates.
 
 ## Template Test
 
-The `template test` command helps template developers validate and test their templates without needing to create GitHub repositories or authenticate with GitHub. This streamlines the template development process and enables automated testing of templates.
+Test and validate templates locally without creating GitHub repositories or authenticating with GitHub.
 
 ### Overview
 
 - **Purpose**: Test templates in isolation during development or CI pipelines
 - **Authentication**: No GitHub authentication required
 - **Configuration**: Works independently of your Viaplay CLI configuration
-- **Output**: Always outputs to a temporary directory for simple testing
+- **Output**: Always outputs to a temporary directory
 
 ### Usage
 
@@ -47,9 +47,7 @@ vip template test --template-path ./path/to/my-template
 
 The command will output the path to the temporary directory where your files are scaffolded.
 
-#### Using JSON Output for Scripts
-
-When you want to use the command in scripts and CI pipelines:
+#### JSON Output for Scripts
 
 ```bash
 vip template test \
@@ -63,9 +61,7 @@ This will output a JSON object containing:
 - `templatePath`: The path to the template source
 - `error`: Any error message (only present if there was an error)
 
-#### Customizing Template Variables
-
-This example shows how to set custom template variables:
+#### Custom Template Variables
 
 ```bash
 vip template test \
@@ -78,7 +74,6 @@ vip template test \
 
 #### Local Template Development
 
-When developing or modifying templates, you can use this command for quick testing:
 
 ```bash
 # Edit your template files
@@ -93,7 +88,6 @@ cat /tmp/vip-template-test-20250903-120145-a1b2c3/src/main.go
 
 #### CI/CD Pipeline Testing with JSON
 
-Include template validation in your CI/CD pipeline using JSON output:
 
 ```bash
 # Example CI step
@@ -111,7 +105,6 @@ fi
 
 #### Debugging Template Variables
 
-Test how different template variables affect the output:
 
 ```bash
 vip template test \

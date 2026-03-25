@@ -7,10 +7,10 @@ The `vip config` command manages global, team, and project-specific configuratio
 ## Subcommands & Flags
 
 ### `vip config init`
-Initializes the main config file and (optionally) team configs.
+Initialises the main config file and (optionally) team configs.
 
 **Flags:**
-- `--team <team>`: Initialize a config for the specified team (creates `~/.config/viaplay/teams/<team>/config.yaml`).
+- `--team <team>`: Initialise a config for the specified team (creates `~/.config/viaplay/teams/<team>/config.yaml`).
 
 ### `vip config get [key]`
 Get a config value (or all values if no key is provided).
@@ -41,15 +41,12 @@ default_private: true
 
 templates:
   go:
-    cli: github@github.com/nentgroup/go-cli-template.git
-    lambda: github@github.com/nentgroup/go-lambda-template.git
-    package: github@github.com/nentgroup/go-package-template.git
     service: github@github.com/nentgroup/go-service-template.git
-  rust:
-    http-service: local@/Users/alescole/.config/viaplay/templates_cache/rust/http-service
-  typescript:
-    service: github@github.com/nentgroup/ts-service-template.git
-    lambda: github@github.com/nentgroup/ts-lambda-template.git
+  node:
+    service: github@github.com/nentgroup/node-service-template.git
+  # Add more language/type templates as needed
+  # rust:
+  #   service: local@/path/to/your/rust-service-template
 
 config_dir: "~/.config/viaplay"
 teams_dir: "~/.config/viaplay/teams"

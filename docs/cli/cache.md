@@ -64,7 +64,7 @@ vip cache info
 
 ---
 
-Caching improves performance and allows offline use of previously downloaded templates.
+Cached templates are stored locally for faster reuse and offline access.
 
 ---
 

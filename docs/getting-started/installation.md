@@ -77,7 +77,7 @@ Move `vip.exe` to a directory in your PATH.
 - macOS <i class="fa-brands fa-apple" style="color:#888;"></i>, Linux <i class="fa-brands fa-linux" style="color:#888;"></i>, or Windows <i class="fa-brands fa-windows" style="color:#888;"></i>
 
 ### Optional
-- [Nerd Fonts](https://www.nerdfonts.com/) - For an enhanced CLI experience with proper icons and symbols. Without Nerd Fonts, some visual elements may display as placeholder characters.
+- [Nerd Fonts](https://www.nerdfonts.com/) - Required for CLI icons and symbols to display correctly. Without Nerd Fonts, some characters may show as placeholders.
 
 ---
 
