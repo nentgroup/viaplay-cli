@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/fatih/color v1.19.0
 	github.com/google/go-github/v74 v74.0.0
-	github.com/google/go-github/v86 v86.0.0
+	github.com/google/go-github/v87 v87.0.0
 	github.com/google/go-github/v87 v87.0.0
 	github.com/invopop/yaml v0.3.1
 	github.com/muesli/termenv v0.16.0
