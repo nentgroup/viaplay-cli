@@ -10,7 +10,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/go-github/v87 v87.0.0
-	github.com/google/go-github/v87 v87.0.0
+	github.com/google/go-github/v88 v88.0.0
 	github.com/invopop/yaml v0.3.1
 	github.com/muesli/termenv v0.16.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
