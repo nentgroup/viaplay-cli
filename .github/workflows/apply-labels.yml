@@ -20,4 +20,4 @@ jobs:
       issues: write   # <-- Add this line
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/labeler@v6
+      - uses: actions/labeler@v7
