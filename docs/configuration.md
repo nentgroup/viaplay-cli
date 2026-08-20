@@ -255,8 +255,13 @@ To create a new hook script:
 
 ## How to Edit Configuration
 
+- Use `vip config edit` to open the main config file in your configured editor.
+- Use `vip config edit team --team <name> --organization <org>` to jump straight into a team config directory.
 - Use `vip config get <key>` to view current values.
+- Use `vip config path <team|user|hooks|templates>` to print one resolved config path for scripts or quick navigation.
+- Use `vip config validate` to check the main config file and any selected team or user config directories before applying them.
 - Edit YAML files directly for advanced changes.
+- Use `vip config init team <name> --organization <org>` to scaffold a new team configuration folder with starter files.
 
 ---
 

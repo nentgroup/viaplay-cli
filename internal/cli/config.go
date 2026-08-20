@@ -5,13 +5,24 @@ package cli
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 
 	"github.com/nentgroup/viaplay-cli/internal/config"
 	"github.com/nentgroup/viaplay-cli/internal/gh"
 	"github.com/nentgroup/viaplay-cli/internal/output"
+	"github.com/nentgroup/viaplay-cli/internal/project"
+	secretspkg "github.com/nentgroup/viaplay-cli/internal/secrets"
+	templatepkg "github.com/nentgroup/viaplay-cli/internal/template"
 )
 
 // Use the default paths from the config package instead of maintaining duplicates
@@ -19,6 +30,11 @@ var (
 	defaultConfigDir  string
 	defaultConfigFile string
 	defaultTeamsDir   string
+)
+
+const (
+	configTargetMain = "main"
+	configTargetTeam = "team"
 )
 
 // configCmd represents the config command
@@ -141,6 +157,64 @@ Examples:
 	},
 }
 
+// initTeamCmd scaffolds a team configuration folder and starter files.
+var initTeamCmd = &cobra.Command{
+	Use:   "team <name>",
+	Short: "Scaffold a team configuration folder",
+	Long: `Scaffold a team configuration folder with starter secrets, environments,
+and rulesets files.
+
+This command creates the standard team layout under the viaplay config directory
+without requiring GitHub authentication.
+
+Examples:
+  vip config init team gecko --organization nentgroup
+  vip config init team platform --override
+`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		team := args[0]
+
+		override, err := cmd.Flags().GetBool("override")
+		if err != nil {
+			return fmt.Errorf("failed to get 'override' flag: %w", err)
+		}
+
+		organization, err := cmd.Flags().GetString("organization")
+		if err != nil {
+			return fmt.Errorf("failed to get 'organization' flag: %w", err)
+		}
+
+		if err := config.InitConfig(defaultConfigFile); err != nil {
+			return fmt.Errorf("failed to initialize config: %w", err)
+		}
+
+		if organization == "" {
+			organization = viper.GetString("default_organization")
+		}
+		if organization == "" {
+			return fmt.Errorf("organization is required (use --organization or configure default_organization)")
+		}
+
+		if err := scaffoldTeamConfig(organization, team, override); err != nil {
+			return err
+		}
+
+		teamDir := config.GetDefaultConfigDir()
+		teamPath := fmt.Sprintf("%s/orgs/%s/teams/%s", teamDir, organization, team)
+
+		fmt.Printf("\n%s %s\n\n", output.ActiveIcons.Success, output.SuccessBold("Team configuration scaffolded successfully!"))
+		fmt.Printf("Location: %s\n\n", output.Bold(teamPath))
+		fmt.Println("Next steps:")
+		fmt.Printf("  %s Review and edit %s\n", output.ActiveIcons.Bullet, output.Bold(teamPath))
+		fmt.Printf("  %s Set your default team with %s\n", output.ActiveIcons.Bullet, output.Bold("vip config init --team "+team+" --organization "+organization))
+		fmt.Printf("  %s Apply it to a repo with %s\n", output.ActiveIcons.Bullet, output.Bold("vip repo apply <owner/repo> --team "+team))
+		fmt.Println()
+
+		return nil
+	},
+}
+
 // getCmd gets a configuration value
 var getCmd = &cobra.Command{
 	Use:   "get [key]",
@@ -186,18 +260,196 @@ This includes:
 	},
 }
 
+// pathCmd resolves a specific configuration path for scripting and quick navigation.
+var pathCmd = &cobra.Command{
+	Use:   "path <team|user|hooks|templates>",
+	Short: "Print a single configuration path",
+	Long: `Print a single configuration path for scripting or quick navigation.
+
+Supported path types:
+- team: team configuration directory
+- user: personal user configuration directory
+- hooks: global hooks directory
+- templates: template cache directory
+
+Examples:
+  vip config path team --team gecko --organization nentgroup
+  vip config path user
+  vip config path hooks
+  vip config path templates
+`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := config.InitConfig(defaultConfigFile); err != nil {
+			return fmt.Errorf("failed to initialize config: %w", err)
+		}
+
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		pathType := strings.ToLower(args[0])
+		resolvedPath, err := resolveConfigPath(cmd, cfg, pathType)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(resolvedPath)
+		return nil
+	},
+}
+
+// editCmd opens a config file or directory in the user's editor.
+var editCmd = &cobra.Command{
+	Use:          "edit [main|team|user|hooks|templates]",
+	Short:        "Open configuration in your editor",
+	SilenceUsage: true,
+	Long: `Open a viaplay-cli configuration file or directory in your configured editor.
+
+When no target is provided, the main config file is opened.
+
+Supported targets:
+- main: main config.yaml file
+- team: resolved team configuration directory
+- user: resolved personal configuration directory
+- hooks: global hooks directory
+- templates: template cache directory
+
+Examples:
+  vip config edit
+  vip config edit team --team gecko --organization nentgroup
+  vip config edit hooks
+`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := config.InitConfig(configuredConfigFilePath()); err != nil {
+			return fmt.Errorf("failed to initialize config: %w", err)
+		}
+
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		target := configTargetMain
+		if len(args) == 1 {
+			target = strings.ToLower(args[0])
+		}
+
+		targetPath, err := resolveEditTargetPath(cmd, cfg, target)
+		if err != nil {
+			return err
+		}
+
+		if err := ensureEditableTarget(target, targetPath); err != nil {
+			return err
+		}
+
+		return openEditor(cmd, targetPath)
+	},
+}
+
+// validateCmd validates the main config file and optional team/user config directories.
+var validateCmd = &cobra.Command{
+	Use:          "validate",
+	Short:        "Validate configuration files",
+	SilenceUsage: true,
+	Long: `Validate the main viaplay-cli configuration and optionally team or personal
+configuration directories.
+
+By default, this validates the active config file. If a default team is configured,
+its team directory is validated too. Use flags to validate a specific team, user,
+or every discovered team config.
+
+Examples:
+  vip config validate
+  vip config validate --team gecko --organization nentgroup
+  vip config validate --all-teams
+  vip config validate --user alecoletti
+`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		report := &configValidationReport{}
+
+		configFile := configuredConfigFilePath()
+		if err := validateMainConfig(configFile, report); err != nil {
+			printConfigValidationReport(report)
+			return err
+		}
+
+		if err := config.InitConfig(configFile); err != nil {
+			report.addError(fmt.Sprintf("failed to initialize config: %v", err))
+			printConfigValidationReport(report)
+			return fmt.Errorf("configuration validation failed")
+		}
+
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			report.addError(fmt.Sprintf("failed to load configuration: %v", err))
+			printConfigValidationReport(report)
+			return fmt.Errorf("configuration validation failed")
+		}
+
+		targets, err := collectValidationTargets(cmd, cfg)
+		if err != nil {
+			return err
+		}
+
+		for _, target := range targets {
+			validateConfigDirectory(target, report)
+		}
+
+		printConfigValidationReport(report)
+		if report.hasErrors() {
+			return fmt.Errorf("configuration validation failed")
+		}
+
+		return nil
+	},
+}
+
 // Path handling functions
+
+type configValidationTarget struct {
+	label string
+	path  string
+	kind  string
+}
+
+type configValidationReport struct {
+	checked  []string
+	warnings []string
+	errors   []string
+}
+
+func (r *configValidationReport) addChecked(message string) {
+	r.checked = append(r.checked, message)
+}
+
+func (r *configValidationReport) addWarning(message string) {
+	r.warnings = append(r.warnings, message)
+}
+
+func (r *configValidationReport) addError(message string) {
+	r.errors = append(r.errors, message)
+}
+
+func (r *configValidationReport) hasErrors() bool {
+	return len(r.errors) > 0
+}
 
 // ensureConfigLoaded makes sure viper has loaded the config file
 func ensureConfigLoaded() error {
+	configFile := configuredConfigFilePath()
+
 	// Check if config file exists
-	if _, err := os.Stat(defaultConfigFile); os.IsNotExist(err) {
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		return fmt.Errorf("config file not found, run 'viaplay-cli config init' first")
 	}
 
 	// Use the config package's initialization function if viper hasn't loaded a config yet
 	if viper.ConfigFileUsed() == "" {
-		if err := config.InitConfig(defaultConfigFile); err != nil {
+		if err := config.InitConfig(configFile); err != nil {
 			return fmt.Errorf("failed to initialize config: %w", err)
 		}
 	}
@@ -205,10 +457,17 @@ func ensureConfigLoaded() error {
 	return nil
 }
 
+func configuredConfigFilePath() string {
+	if cfgFile != "" {
+		return cfgFile
+	}
+	return defaultConfigFile
+}
+
 // showConfigPaths displays all configuration paths
 func showConfigPaths() {
 	fmt.Println("Configuration paths:")
-	fmt.Printf("  Config file:    %s\n", defaultConfigFile)
+	fmt.Printf("  Config file:    %s\n", configuredConfigFilePath())
 	fmt.Printf("  Org dir:     %s\n", defaultConfigDir)
 	fmt.Printf("  Teams dir:      %s\n", defaultTeamsDir)
 
@@ -216,6 +475,594 @@ func showConfigPaths() {
 	if viper.ConfigFileUsed() != "" && viper.ConfigFileUsed() != defaultConfigFile {
 		fmt.Printf("  Active config:  %s\n", viper.ConfigFileUsed())
 	}
+}
+
+func resolveConfigPath(cmd *cobra.Command, cfg *config.Configuration, pathType string) (string, error) {
+	switch pathType {
+	case "team":
+		return resolveTeamConfigPath(cmd, cfg)
+	case "user":
+		return resolveUserConfigPath(cmd, cfg)
+	case "hooks":
+		return cfg.GetHooksDir(), nil
+	case "templates":
+		return cfg.CacheDir, nil
+	default:
+		return "", fmt.Errorf("unsupported path type %q (expected team, user, hooks, or templates)", pathType)
+	}
+}
+
+func resolveEditTargetPath(cmd *cobra.Command, cfg *config.Configuration, target string) (string, error) {
+	switch target {
+	case configTargetMain:
+		return configuredConfigFilePath(), nil
+	case configTargetTeam, "user", "hooks", "templates":
+		return resolveConfigPath(cmd, cfg, target)
+	default:
+		return "", fmt.Errorf("unsupported edit target %q (expected main, team, user, hooks, or templates)", target)
+	}
+}
+
+func resolveTeamConfigPath(cmd *cobra.Command, cfg *config.Configuration) (string, error) {
+	teamName, err := cmd.Flags().GetString("team")
+	if err != nil {
+		return "", fmt.Errorf("failed to get 'team' flag: %w", err)
+	}
+	if teamName == "" {
+		teamName = viper.GetString("default_team")
+	}
+	if teamName == "" {
+		return "", fmt.Errorf("team name is required (use --team or configure default_team)")
+	}
+
+	organization, err := cmd.Flags().GetString("organization")
+	if err != nil {
+		return "", fmt.Errorf("failed to get 'organization' flag: %w", err)
+	}
+	if organization == "" {
+		organization = viper.GetString("default_organization")
+	}
+
+	return cfg.GetTeamDir(teamName, organization), nil
+}
+
+func resolveUserConfigPath(cmd *cobra.Command, cfg *config.Configuration) (string, error) {
+	username, err := cmd.Flags().GetString("user")
+	if err != nil {
+		return "", fmt.Errorf("failed to get 'user' flag: %w", err)
+	}
+	if username == "" {
+		username = viper.GetString("github.username")
+	}
+	if username == "" {
+		currentUser, err := user.Current()
+		if err == nil {
+			username = currentUser.Username
+		}
+	}
+
+	return cfg.GetPersonalDir(username), nil
+}
+
+func ensureEditableTarget(target, targetPath string) error {
+	if target == configTargetMain {
+		return config.InitializeConfigFile(targetPath, false, "", "")
+	}
+
+	if err := os.MkdirAll(targetPath, 0o755); err != nil {
+		return fmt.Errorf("failed to create %s path %s: %w", target, targetPath, err)
+	}
+
+	return nil
+}
+
+func openEditor(cmd *cobra.Command, targetPath string) error {
+	editorCommand, args, err := editorCommandParts()
+	if err != nil {
+		return err
+	}
+
+	editorArgs := append(args, targetPath)
+	editorCmd := exec.CommandContext(cmd.Context(), editorCommand, editorArgs...)
+	editorCmd.Stdin = os.Stdin
+	editorCmd.Stdout = os.Stdout
+	editorCmd.Stderr = os.Stderr
+
+	if err := editorCmd.Run(); err != nil {
+		return fmt.Errorf("failed to open %s with %s: %w", targetPath, editorCommand, err)
+	}
+
+	return nil
+}
+
+func editorCommandParts() (string, []string, error) {
+	for _, envKey := range []string{"VISUAL", "EDITOR"} {
+		if raw := strings.TrimSpace(os.Getenv(envKey)); raw != "" {
+			parts := strings.Fields(raw)
+			if len(parts) == 0 {
+				continue
+			}
+			return parts[0], parts[1:], nil
+		}
+	}
+
+	switch runtime.GOOS {
+	case "darwin":
+		return "open", nil, nil
+	case "linux":
+		return "xdg-open", nil, nil
+	case "windows":
+		return "cmd", []string{"/c", "start", ""}, nil
+	default:
+		return "", nil, fmt.Errorf("no editor configured; set $VISUAL or $EDITOR")
+	}
+}
+
+func validateMainConfig(configFile string, report *configValidationReport) error {
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		report.addError(fmt.Sprintf("main config: failed to read %s: %v", configFile, err))
+		return fmt.Errorf("configuration validation failed")
+	}
+
+	var raw map[string]interface{}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		report.addError(fmt.Sprintf("main config: invalid YAML in %s: %v", configFile, err))
+		return fmt.Errorf("configuration validation failed")
+	}
+
+	report.addChecked(fmt.Sprintf("main config: %s", configFile))
+	validateMainConfigSettings(raw, report)
+
+	if report.hasErrors() {
+		return fmt.Errorf("configuration validation failed")
+	}
+
+	return nil
+}
+
+func validateMainConfigSettings(raw map[string]interface{}, report *configValidationReport) {
+	validateDefaultVisibility(raw["default_visibility"], report)
+
+	for _, issue := range collectTemplateValidationIssues(raw["templates"]) {
+		report.addError(issue)
+	}
+}
+
+func validateDefaultVisibility(value interface{}, report *configValidationReport) {
+	if value == nil {
+		return
+	}
+
+	visibility, ok := value.(string)
+	if !ok {
+		report.addError("main config: default_visibility must be a string")
+		return
+	}
+
+	trimmed := strings.TrimSpace(visibility)
+	if trimmed == "" {
+		return
+	}
+
+	if !slices.Contains([]string{"private", "public"}, trimmed) {
+		report.addError(fmt.Sprintf("main config: default_visibility must be \"private\" or \"public\", got %q", visibility))
+	}
+}
+
+func collectTemplateValidationIssues(rawTemplates interface{}) []string {
+	if rawTemplates == nil {
+		return nil
+	}
+
+	languages, ok := toStringAnyMap(rawTemplates)
+	if !ok {
+		return []string{"main config: templates must be a map"}
+	}
+
+	var issues []string
+	for language, rawTypes := range languages {
+		types, ok := toStringAnyMap(rawTypes)
+		if !ok {
+			issues = append(issues, fmt.Sprintf("main config: templates.%s must be a map", language))
+			continue
+		}
+
+		for templateType, rawEntry := range types {
+			switch entry := rawEntry.(type) {
+			case string:
+				if strings.TrimSpace(entry) == "" {
+					issues = append(issues, fmt.Sprintf("main config: templates.%s.%s must not be empty", language, templateType))
+				}
+			default:
+				entryMap, ok := toStringAnyMap(entry)
+				if !ok {
+					issues = append(issues, fmt.Sprintf("main config: templates.%s.%s must be a string or map", language, templateType))
+					continue
+				}
+
+				source, ok := entryMap["source"].(string)
+				if !ok || strings.TrimSpace(source) == "" {
+					issues = append(issues, fmt.Sprintf("main config: templates.%s.%s.source must be a non-empty string", language, templateType))
+				}
+			}
+		}
+	}
+
+	sort.Strings(issues)
+	return issues
+}
+
+func toStringAnyMap(value interface{}) (map[string]interface{}, bool) {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		return typed, true
+	case map[interface{}]interface{}:
+		result := make(map[string]interface{}, len(typed))
+		for key, item := range typed {
+			keyString, ok := key.(string)
+			if !ok {
+				return nil, false
+			}
+			result[keyString] = item
+		}
+		return result, true
+	default:
+		return nil, false
+	}
+}
+
+func collectValidationTargets(cmd *cobra.Command, cfg *config.Configuration) ([]configValidationTarget, error) {
+	validateAllTeams, err := cmd.Flags().GetBool("all-teams")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get 'all-teams' flag: %w", err)
+	}
+	if validateAllTeams {
+		return discoverTeamValidationTargets(cfg)
+	}
+
+	targets := make([]configValidationTarget, 0, 2)
+
+	teamTarget, err := resolveExplicitOrDefaultTeamValidationTarget(cmd, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if teamTarget != nil {
+		targets = append(targets, *teamTarget)
+	}
+
+	userTarget, err := resolveUserValidationTarget(cmd, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if userTarget != nil {
+		targets = append(targets, *userTarget)
+	}
+
+	return targets, nil
+}
+
+func resolveExplicitOrDefaultTeamValidationTarget(cmd *cobra.Command, cfg *config.Configuration) (*configValidationTarget, error) {
+	teamName, err := cmd.Flags().GetString("team")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get 'team' flag: %w", err)
+	}
+
+	if teamName == "" {
+		teamName = viper.GetString("default_team")
+	}
+	if teamName == "" {
+		return nil, nil
+	}
+
+	organization, err := cmd.Flags().GetString("organization")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get 'organization' flag: %w", err)
+	}
+	if organization == "" {
+		organization = viper.GetString("default_organization")
+	}
+
+	label := fmt.Sprintf("team config (%s)", teamName)
+	if organization != "" {
+		label = fmt.Sprintf("team config (%s/%s)", organization, teamName)
+	}
+
+	return &configValidationTarget{
+		label: label,
+		path:  cfg.GetTeamDir(teamName, organization),
+		kind:  "team",
+	}, nil
+}
+
+func resolveUserValidationTarget(cmd *cobra.Command, cfg *config.Configuration) (*configValidationTarget, error) {
+	username, err := cmd.Flags().GetString("user")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get 'user' flag: %w", err)
+	}
+	if username == "" {
+		return nil, nil
+	}
+
+	return &configValidationTarget{
+		label: fmt.Sprintf("user config (%s)", username),
+		path:  cfg.GetPersonalDir(username),
+		kind:  "user",
+	}, nil
+}
+
+func discoverTeamValidationTargets(cfg *config.Configuration) ([]configValidationTarget, error) {
+	targetMap := map[string]configValidationTarget{}
+
+	if err := collectLegacyTeamValidationTargets(cfg, targetMap); err != nil {
+		return nil, err
+	}
+	if err := collectOrgTeamValidationTargets(cfg, targetMap); err != nil {
+		return nil, err
+	}
+
+	targets := make([]configValidationTarget, 0, len(targetMap))
+	for _, target := range targetMap {
+		targets = append(targets, target)
+	}
+
+	sort.Slice(targets, func(i, j int) bool {
+		return targets[i].path < targets[j].path
+	})
+
+	return targets, nil
+}
+
+func collectLegacyTeamValidationTargets(cfg *config.Configuration, targetMap map[string]configValidationTarget) error {
+	entries, err := os.ReadDir(cfg.TeamsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read teams directory %s: %w", cfg.TeamsDir, err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		teamPath := filepath.Join(cfg.TeamsDir, entry.Name())
+		targetMap[teamPath] = configValidationTarget{
+			label: fmt.Sprintf("team config (%s)", entry.Name()),
+			path:  teamPath,
+			kind:  configTargetTeam,
+		}
+	}
+
+	return nil
+}
+
+func collectOrgTeamValidationTargets(cfg *config.Configuration, targetMap map[string]configValidationTarget) error {
+	orgsRoot := filepath.Join(cfg.ConfigDir, config.OrgsDirName)
+	orgEntries, err := os.ReadDir(orgsRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read organizations directory %s: %w", orgsRoot, err)
+	}
+
+	for _, orgEntry := range orgEntries {
+		if !orgEntry.IsDir() {
+			continue
+		}
+
+		teamsRoot := filepath.Join(orgsRoot, orgEntry.Name(), config.TeamsDirName)
+		teamEntries, err := os.ReadDir(teamsRoot)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("failed to read teams directory %s: %w", teamsRoot, err)
+		}
+
+		for _, teamEntry := range teamEntries {
+			if !teamEntry.IsDir() {
+				continue
+			}
+
+			teamPath := filepath.Join(teamsRoot, teamEntry.Name())
+			targetMap[teamPath] = configValidationTarget{
+				label: fmt.Sprintf("team config (%s/%s)", orgEntry.Name(), teamEntry.Name()),
+				path:  teamPath,
+				kind:  configTargetTeam,
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateConfigDirectory(target configValidationTarget, report *configValidationReport) {
+	info, err := os.Stat(target.path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			report.addError(fmt.Sprintf("%s: path does not exist: %s", target.label, target.path))
+			return
+		}
+		report.addError(fmt.Sprintf("%s: failed to stat %s: %v", target.label, target.path, err))
+		return
+	}
+	if !info.IsDir() {
+		report.addError(fmt.Sprintf("%s: expected a directory, got %s", target.label, target.path))
+		return
+	}
+
+	report.addChecked(fmt.Sprintf("%s: %s", target.label, target.path))
+	validateSecretsConfigFile(target, report)
+	validateYAMLConfigDir(target, "envs", validateEnvironmentConfigFile, report)
+	validateYAMLConfigDir(target, "rulesets", validateRulesetConfigFile, report)
+}
+
+func validateSecretsConfigFile(target configValidationTarget, report *configValidationReport) {
+	secretsPath := filepath.Join(target.path, "secrets.yaml")
+	data, err := os.ReadFile(secretsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			report.addWarning(fmt.Sprintf("%s: secrets.yaml not found", target.label))
+			return
+		}
+		report.addError(fmt.Sprintf("%s: failed to read %s: %v", target.label, secretsPath, err))
+		return
+	}
+
+	rendered, err := renderConfigTemplate(data)
+	if err != nil {
+		report.addError(fmt.Sprintf("%s: failed to render %s: %v", target.label, secretsPath, err))
+		return
+	}
+
+	var secretsConfig secretspkg.Config
+	if err := yaml.Unmarshal([]byte(rendered), &secretsConfig); err != nil {
+		report.addError(fmt.Sprintf("%s: invalid YAML in %s: %v", target.label, secretsPath, err))
+		return
+	}
+
+	for index, secret := range secretsConfig.Secrets {
+		entryPath := fmt.Sprintf("%s: secrets.yaml entry %d", target.label, index+1)
+		if strings.TrimSpace(secret.Name) == "" {
+			report.addError(entryPath + " is missing name")
+		}
+		if secret.Type != "" && !slices.Contains([]string{"secret", "variable"}, secret.Type) {
+			report.addError(fmt.Sprintf("%s has unsupported type %q", entryPath, secret.Type))
+		}
+	}
+
+	report.addChecked(fmt.Sprintf("%s: %s", target.label, secretsPath))
+}
+
+func validateYAMLConfigDir(
+	target configValidationTarget,
+	dirName string,
+	validateFile func(configValidationTarget, string, *configValidationReport),
+	report *configValidationReport,
+) {
+	dirPath := filepath.Join(target.path, dirName)
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			report.addWarning(fmt.Sprintf("%s: %s directory not found", target.label, dirPath))
+			return
+		}
+		report.addError(fmt.Sprintf("%s: failed to read %s: %v", target.label, dirPath, err))
+		return
+	}
+
+	yamlFound := false
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if !isYAMLFile(entry.Name()) {
+			continue
+		}
+
+		yamlFound = true
+		validateFile(target, filepath.Join(dirPath, entry.Name()), report)
+	}
+
+	if !yamlFound {
+		report.addWarning(fmt.Sprintf("%s: no YAML files found in %s", target.label, dirPath))
+	}
+}
+
+func validateEnvironmentConfigFile(target configValidationTarget, filePath string, report *configValidationReport) {
+	rendered, err := renderConfigTemplateFile(filePath)
+	if err != nil {
+		report.addError(fmt.Sprintf("%s: failed to render %s: %v", target.label, filePath, err))
+		return
+	}
+
+	var envConfig project.EnvConf
+	if err := yaml.Unmarshal([]byte(rendered), &envConfig); err != nil {
+		report.addError(fmt.Sprintf("%s: invalid YAML in %s: %v", target.label, filePath, err))
+		return
+	}
+	if strings.TrimSpace(envConfig.Name) == "" {
+		report.addError(fmt.Sprintf("%s: environment in %s is missing name", target.label, filePath))
+		return
+	}
+
+	report.addChecked(fmt.Sprintf("%s: %s", target.label, filePath))
+}
+
+func validateRulesetConfigFile(target configValidationTarget, filePath string, report *configValidationReport) {
+	rendered, err := renderConfigTemplateFile(filePath)
+	if err != nil {
+		report.addError(fmt.Sprintf("%s: failed to render %s: %v", target.label, filePath, err))
+		return
+	}
+
+	var ruleset map[string]interface{}
+	if err := yaml.Unmarshal([]byte(rendered), &ruleset); err != nil {
+		report.addError(fmt.Sprintf("%s: invalid YAML in %s: %v", target.label, filePath, err))
+		return
+	}
+	name := ""
+	if value, ok := ruleset["name"].(string); ok {
+		name = value
+	}
+	if strings.TrimSpace(name) == "" {
+		report.addError(fmt.Sprintf("%s: ruleset in %s is missing name", target.label, filePath))
+	}
+	targetValue, ok := ruleset["target"].(string)
+	if !ok || strings.TrimSpace(targetValue) == "" {
+		report.addError(fmt.Sprintf("%s: ruleset in %s is missing target", target.label, filePath))
+	}
+
+	report.addChecked(fmt.Sprintf("%s: %s", target.label, filePath))
+}
+
+func renderConfigTemplateFile(filePath string) (string, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+	return renderConfigTemplate(data)
+}
+
+func renderConfigTemplate(data []byte) (string, error) {
+	vars := templatepkg.NewTemplateVariables()
+	vars.Org.Name = "org"
+	vars.Org.Team = "team"
+	vars.Org.TeamID = 1
+	vars.Repo.Owner = "owner"
+	vars.Repo.Name = "repo"
+	vars.Project.Name = "project"
+
+	return templatepkg.NewRenderer(vars).RenderString(string(data))
+}
+
+func isYAMLFile(name string) bool {
+	extension := strings.ToLower(filepath.Ext(name))
+	return extension == ".yaml" || extension == ".yml"
+}
+
+func printConfigValidationReport(report *configValidationReport) {
+	fmt.Println("Configuration validation")
+
+	for _, checked := range report.checked {
+		fmt.Printf("  [ok] %s\n", checked)
+	}
+	for _, warning := range report.warnings {
+		fmt.Printf("  [warn] %s\n", warning)
+	}
+	for _, validationError := range report.errors {
+		fmt.Printf("  [error] %s\n", validationError)
+	}
+
+	if report.hasErrors() {
+		fmt.Printf("\nResult: %d error(s), %d warning(s)\n", len(report.errors), len(report.warnings))
+		return
+	}
+
+	fmt.Printf("\nResult: valid (%d warning(s))\n", len(report.warnings))
 }
 
 // initializeConfigFile creates or updates the main config file
@@ -351,10 +1198,30 @@ func init() {
 	// Add all subcommands to the config command
 	configCmd.AddCommand(initCmd)
 	configCmd.AddCommand(getCmd)
+	configCmd.AddCommand(editCmd)
+	configCmd.AddCommand(pathCmd)
 	configCmd.AddCommand(pathsCmd)
+	configCmd.AddCommand(validateCmd)
+	initCmd.AddCommand(initTeamCmd)
 
 	// Define flags for the init command
 	initCmd.Flags().StringP("team", "t", "", "Team name to scaffold configs for (optional)")
 	initCmd.Flags().Bool("override", false, "Override existing config files if they exist")
 	initCmd.Flags().StringP("organization", "o", "", "Organization name for team configs (optional)")
+
+	initTeamCmd.Flags().Bool("override", false, "Override existing team config files if they exist")
+	initTeamCmd.Flags().StringP("organization", "o", "", "Organization name for the team config")
+
+	pathCmd.Flags().StringP("team", "t", "", "Team name for the team config path (falls back to default_team)")
+	pathCmd.Flags().StringP("organization", "o", "", "Organization name for the team config path (falls back to default_organization)")
+	pathCmd.Flags().StringP("user", "u", "", "Username for the personal config path")
+
+	editCmd.Flags().StringP("team", "t", "", "Team name for the team config path (falls back to default_team)")
+	editCmd.Flags().StringP("organization", "o", "", "Organization name for the team config path (falls back to default_organization)")
+	editCmd.Flags().StringP("user", "u", "", "Username for the personal config path")
+
+	validateCmd.Flags().StringP("team", "t", "", "Team name to validate (falls back to default_team)")
+	validateCmd.Flags().StringP("organization", "o", "", "Organization name for the team config path (falls back to default_organization)")
+	validateCmd.Flags().StringP("user", "u", "", "Username for the personal config path")
+	validateCmd.Flags().Bool("all-teams", false, "Validate every discovered team configuration directory")
 }
