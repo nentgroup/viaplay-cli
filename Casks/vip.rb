@@ -3,10 +3,37 @@ cask "vip" do
   tap_path = File.expand_path("Library/Taps/nentgroup/homebrew-viaplay-cli/Casks/lib/custom_download_strategy.rb", ENV["HOMEBREW_PREFIX"])
   require tap_path
 
+  version "2.7.0"
+
+  on_macos do
+    on_intel do
+      sha256 "2cd7bf2065b86f0d1ac62138aa4656b93d35b9768e57301eda5d826e80b24350"
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_amd64.tar.gz",
+        using: GitHubPrivateRepositoryReleaseDownloadStrategy
+    end
+    on_arm do
+      sha256 "57045103a845643fdafdf6b6616ab28d43f8187d45db5876832ea6e08e61aef0"
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_arm64.tar.gz",
+        using: GitHubPrivateRepositoryReleaseDownloadStrategy
+    end
+  end
+
+  on_linux do
+    on_intel do
+      sha256 "6ced1737713ef5dcb0191d66511489b62bec9fe77236919f82bbac1dd61879e8"
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_amd64.tar.gz",
+        using: GitHubPrivateRepositoryReleaseDownloadStrategy
+    end
+    on_arm do
+      sha256 "fe496ec6e81b11ed8149fabf5847d7631f31018218a86620d26428d66c7866f6"
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_arm64.tar.gz",
+        using: GitHubPrivateRepositoryReleaseDownloadStrategy
+    end
+  end
+
   name "vip"
   desc "CLI tool for Gecko Generators."
   homepage "https://nentgroup.github.io/viaplay-cli"
-  version "2.6.0"
 
   livecheck do
     skip "Auto-generated on release."
@@ -14,40 +41,10 @@ cask "vip" do
 
   binary "vip"
 
-  on_macos do
-    on_intel do
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_amd64.tar.gz",
-        using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "d8a595db58e447024817245fcee83bcd2d73ccb9ba6f8a3ab4ee9077b84aa7bf"
-    end
-    on_arm do
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_arm64.tar.gz",
-        using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "3c554d47af247dc36840c1974c300040cee93af5bd09b9ad963cd0b733b62fbf"
-    end
-  end
-
-  on_linux do
-    on_intel do
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_amd64.tar.gz",
-        using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "4339789324456d18da01e5311edb87558467836acd759b33be1a683ad1f75687"
-    end
-    on_arm do
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_arm64.tar.gz",
-        using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "7fdae7cda97d29ac7a5203844107cc8896b6c8a3ea7d24ed1fce8ead33907443"
-    end
-  end
-
   postflight do
     if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
       system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/vip"]
     end
-  end
-
-  caveats do
-    "If you have an existing binary at /opt/homebrew/bin/vip, remove it before installing: rm /opt/homebrew/bin/vip"
   end
 
   uninstall delete: [
@@ -55,4 +52,8 @@ cask "vip" do
     ]
 
   # No zap stanza required
+
+  caveats <<~EOS
+    If you have an existing binary at /opt/homebrew/bin/vip, remove it before installing: rm /opt/homebrew/bin/vip
+  EOS
 end
