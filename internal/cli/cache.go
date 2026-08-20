@@ -16,9 +16,13 @@ import (
 )
 
 var cacheCmd = &cobra.Command{
-	Use:   "cache",
-	Short: "Manage the template cache",
-	Long:  `Manage the template cache used by viaplay-cli, including pruning old templates and cleaning the cache.`,
+	Use:        "cache",
+	Short:      "Manage the template cache",
+	Long:       `Manage the template cache used by viaplay-cli, including pruning old templates and cleaning the cache.`,
+	Deprecated: "use 'vip template <list|info|update|prune|clean>' instead",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		output.WarningMessage("'vip cache' is deprecated; use 'vip template <list|info|update|prune|clean>' instead")
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Display help information by default
 		if err := cmd.Help(); err != nil {
@@ -98,7 +102,7 @@ func getCacheManager() (*cache.Manager, error) {
 
 // pruneCache removes templates from the cache that are older than the specified days
 func pruneCache(days int) {
-	output.CacheMessage(fmt.Sprintf("Pruning templates older than %d days", days))
+	output.CacheMessage(fmt.Sprintf("Pruning local template copies older than %d days", days))
 
 	// Get the cache manager
 	manager, err := getCacheManager()
@@ -115,10 +119,10 @@ func pruneCache(days int) {
 	}
 
 	if prunedCount == 0 {
-		output.InfoMessage("No templates were pruned")
+		output.InfoMessage("No local template copies were pruned")
 		fmt.Printf("All %d templates are newer than %d days old\n", totalTemplates, days)
 	} else {
-		output.SuccessMessage(fmt.Sprintf("Successfully pruned %d/%d templates", prunedCount, totalTemplates))
+		output.SuccessMessage(fmt.Sprintf("Successfully pruned %d/%d local template copies", prunedCount, totalTemplates))
 
 		// Show more details
 		fmt.Printf("\nTemplates removed: %s\n", output.PrimaryBold(fmt.Sprintf("%d", prunedCount)))
@@ -144,13 +148,13 @@ func cleanCache(ctx context.Context) {
 	}
 
 	if len(templates) == 0 {
-		output.InfoMessage("Cache is already empty")
+		output.InfoMessage("Local template storage is already empty")
 		return
 	}
 
-	// Confirm before cleaning the entire cache
-	output.WarningMessage("This will remove ALL cached templates")
-	fmt.Print("Are you sure you want to clean the entire template cache? (y/N): ")
+	// Confirm before cleaning the entire local template storage.
+	output.WarningMessage("This will remove ALL local template copies")
+	fmt.Print("Are you sure you want to clean all local template copies? (y/N): ")
 	var response string
 	if _, err := fmt.Scanln(&response); err != nil {
 		output.ErrorMessage(fmt.Sprintf("Failed to read input: %v", err))
@@ -158,7 +162,7 @@ func cleanCache(ctx context.Context) {
 	}
 
 	if response != "y" && response != "Y" {
-		output.InfoMessage("Cache cleaning cancelled")
+		output.InfoMessage("Template cleanup cancelled")
 		return
 	}
 
@@ -211,7 +215,7 @@ func cleanCache(ctx context.Context) {
 	}
 
 	duration := time.Since(startTime)
-	output.SuccessMessage("Cache cleaned successfully")
+	output.SuccessMessage("Local template storage cleaned successfully")
 	fmt.Printf("Removed %s templates (%s) in %s\n",
 		output.Bold(fmt.Sprintf("%d", len(templates))),
 		output.Bold(output.FormatSize(totalSize)),
@@ -220,7 +224,7 @@ func cleanCache(ctx context.Context) {
 
 // listCache lists all templates in the cache
 func listCache(ctx context.Context) {
-	output.Section("Templates in Cache")
+	output.Section("Local Templates")
 
 	// Get the cache manager
 	manager, err := getCacheManager()
@@ -237,7 +241,7 @@ func listCache(ctx context.Context) {
 	}
 
 	if len(templates) == 0 {
-		output.InfoMessage("No templates found in cache")
+		output.InfoMessage("No local templates found")
 		return
 	}
 
@@ -308,7 +312,7 @@ func listCache(ctx context.Context) {
 
 // showCacheInfo displays detailed information about the cache
 func showCacheInfo(ctx context.Context) {
-	output.Section("Cache Information")
+	output.Section("Template Storage")
 
 	// Get the cache manager
 	manager, err := getCacheManager()
@@ -320,8 +324,8 @@ func showCacheInfo(ctx context.Context) {
 	// Get cache directory and ensure it exists
 	cacheDir := manager.GetCacheDir()
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
-		output.InfoMessage("Cache directory does not exist yet")
-		fmt.Printf("Cache directory: %s\n", cacheDir)
+		output.InfoMessage("Template storage directory does not exist yet")
+		fmt.Printf("Template storage directory: %s\n", cacheDir)
 		return
 	}
 
@@ -360,16 +364,16 @@ func showCacheInfo(ctx context.Context) {
 	}
 
 	// Print general information
-	fmt.Printf("Cache directory:    %s\n", output.Bold(cacheDir))
-	fmt.Printf("Total size:         %s\n", output.Bold(output.FormatSize(totalSize)))
-	fmt.Printf("Files:              %s\n", output.Bold(fmt.Sprintf("%d", fileCount)))
-	fmt.Printf("Directories:        %s\n", output.Bold(fmt.Sprintf("%d", dirCount)))
+	fmt.Printf("Template storage directory: %s\n", output.Bold(cacheDir))
+	fmt.Printf("Total size:                 %s\n", output.Bold(output.FormatSize(totalSize)))
+	fmt.Printf("Files:                      %s\n", output.Bold(fmt.Sprintf("%d", fileCount)))
+	fmt.Printf("Directories:                %s\n", output.Bold(fmt.Sprintf("%d", dirCount)))
 
 	if !oldestFile.Equal(time.Now()) && !newestFile.Equal(time.Time{}) {
-		fmt.Printf("Oldest cached file:  %s (%s ago)\n",
+		fmt.Printf("Oldest local file:          %s (%s ago)\n",
 			output.Bold(oldestFile.Format("2006-01-02 15:04:05")),
 			output.Duration(time.Since(oldestFile)))
-		fmt.Printf("Newest cached file:  %s (%s ago)\n",
+		fmt.Printf("Newest local file:          %s (%s ago)\n",
 			output.Bold(newestFile.Format("2006-01-02 15:04:05")),
 			output.Duration(time.Since(newestFile)))
 	}

@@ -36,13 +36,82 @@ func NewTemplateCommand() *cobra.Command {
 	templateCmd := &cobra.Command{
 		Use:   "template",
 		Short: "Commands for working with templates",
-		Long:  `Manage and test templates for project scaffolding.`,
+		Long:  `Manage and test templates for project scaffolding, including local template copies.`,
 	}
 
 	// Add subcommands
+	templateCmd.AddCommand(newTemplateListCommand())
+	templateCmd.AddCommand(newTemplateInfoCommand())
+	templateCmd.AddCommand(newTemplateUpdateCommand())
+	templateCmd.AddCommand(newTemplatePruneCommand())
+	templateCmd.AddCommand(newTemplateCleanCommand())
 	templateCmd.AddCommand(newTemplateTestCommand())
 
 	return templateCmd
+}
+
+func newTemplateListCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List local template copies",
+		Long:  `List template copies currently stored locally for reuse.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			listCache(cmd.Context())
+		},
+	}
+}
+
+func newTemplateInfoCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "info",
+		Short: "Show local template storage information",
+		Long:  `Show detailed information about locally stored template copies including size and statistics.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			showCacheInfo(cmd.Context())
+		},
+	}
+}
+
+func newTemplatePruneCommand() *cobra.Command {
+	pruneCmd := &cobra.Command{
+		Use:   "prune",
+		Short: "Remove old local template copies",
+		Long:  `Remove local template copies that have not been used in a specified number of days.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			days, err := cmd.Flags().GetInt("days")
+			if err != nil {
+				return fmt.Errorf("failed to get 'days' flag: %w", err)
+			}
+
+			pruneCache(days)
+			return nil
+		},
+	}
+
+	pruneCmd.Flags().Int("days", 30, "Prune local template copies older than specified days")
+	return pruneCmd
+}
+
+func newTemplateUpdateCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "update",
+		Short: "Refresh all local template copies",
+		Long:  `Fetch or refresh all locally stored template copies from their configured sources.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			updateTemplates(cmd.Context())
+		},
+	}
+}
+
+func newTemplateCleanCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "clean",
+		Short: "Remove all local template copies",
+		Long:  `Remove all locally stored template copies.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			cleanCache(cmd.Context())
+		},
+	}
 }
 
 // newTemplateTestCommand creates a new test subcommand for the template command
@@ -208,7 +277,7 @@ Templates are output to a temporary directory that is automatically created.`,
 
 	// Add flags
 	testCmd.Flags().StringVar(&templatePath, "template-path", "", "Local path to a template directory")
-	testCmd.Flags().BoolVar(&forceRefresh, "force", false, "Force refresh of template cache")
+	testCmd.Flags().BoolVar(&forceRefresh, "force", false, "Force refresh of local template copies")
 	testCmd.Flags().StringVar(&projectName, "name", "test-project", "Project name for template variables")
 	testCmd.Flags().StringVar(&projectOwner, "owner", "test-owner", "Project owner for template variables")
 	testCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format for scripting")

@@ -53,10 +53,10 @@ func FormatTemplateList(templates []Template) string {
 func FormatUpdateResults(successCount, failCount int) string {
 	var builder strings.Builder
 	builder.WriteString("\nUpdate summary:\n")
-	fmt.Fprintf(&builder, "- %d templates updated successfully\n", successCount)
+	fmt.Fprintf(&builder, "- %d %s updated successfully\n", successCount, pluralizeTemplate(successCount))
 
 	if failCount > 0 {
-		fmt.Fprintf(&builder, "- %d templates failed to update\n", failCount)
+		fmt.Fprintf(&builder, "- %d %s failed to update\n", failCount, pluralizeTemplate(failCount))
 	}
 
 	if successCount == 0 && failCount == 0 {
@@ -64,4 +64,11 @@ func FormatUpdateResults(successCount, failCount int) string {
 	}
 
 	return builder.String()
+}
+
+func pluralizeTemplate(count int) string {
+	if count == 1 {
+		return "template"
+	}
+	return "templates"
 }

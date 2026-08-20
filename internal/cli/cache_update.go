@@ -12,11 +12,11 @@ import (
 
 var cacheUpdateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update all templates in the cache",
-	Long:  `Update all templates in the cache to their latest versions.`,
+	Short: "Refresh all local template copies",
+	Long:  `Fetch or refresh all locally stored template copies from their configured sources.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
-		updateCache(ctx)
+		updateTemplates(ctx)
 	},
 }
 
@@ -24,9 +24,9 @@ func init() {
 	cacheCmd.AddCommand(cacheUpdateCmd)
 }
 
-// updateCache updates all templates in the cache
-func updateCache(ctx context.Context) {
-	output.Section("Template Cache Update")
+// updateTemplates refreshes all locally stored template copies.
+func updateTemplates(ctx context.Context) {
+	output.Section("Updating Local Templates")
 
 	// Get the cache manager
 	manager, err := getCacheManager()
@@ -35,17 +35,28 @@ func updateCache(ctx context.Context) {
 		return
 	}
 
-	output.ProcessingMessage("Updating all templates in cache...")
+	templates, err := manager.ListTemplates(ctx)
+	if err != nil {
+		output.ErrorMessage(fmt.Sprintf("Failed to list templates: %v", err))
+		return
+	}
+
+	if len(templates) == 0 {
+		output.InfoMessage("No local templates found")
+		return
+	}
+
+	output.ProcessingMessage("Refreshing all local template copies...")
 
 	// Update all templates
 	successCount, failCount, err := manager.UpdateAllTemplates(ctx)
 	if err != nil {
-		output.ErrorMessage(fmt.Sprintf("Failed to update templates: %v", err))
+		output.ErrorMessage(fmt.Sprintf("Failed to update local templates: %v", err))
 		return
 	}
 
 	if successCount > 0 {
-		output.SuccessMessage(fmt.Sprintf("Successfully updated %d templates", successCount))
+		output.SuccessMessage(fmt.Sprintf("Successfully updated %d local template(s)", successCount))
 	}
 
 	// Print summary

@@ -54,7 +54,7 @@ Example: `template.go.tmpl.raw` is copied to `template.go.tmpl` without any rend
 
 ## Template Caching
 
-Remote templates are cached locally for faster reuse. Use `vip cache update` to refresh the cache, or pass `--no-cache` when creating a project to force a fresh download.
+Remote templates are cached locally for faster reuse. Use `vip template list`, `vip template info`, `vip template update`, `vip template prune`, or `vip template clean` to manage those local copies, or pass `--no-cache` when creating a project to force a fresh download.
 
 ---
 

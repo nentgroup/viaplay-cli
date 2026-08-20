@@ -1,6 +1,30 @@
 # Template Commands
 
-The `template` command group provides tools for testing and validating templates.
+The `template` command group provides tools for managing local template copies and testing templates.
+
+## Template Management
+
+### `vip template list`
+
+List template copies currently stored locally for reuse.
+
+### `vip template info`
+
+Show details about local template storage, including size and file statistics.
+
+### `vip template update`
+
+Fetch or refresh all local template copies from their configured sources.
+
+### `vip template prune [--days <n>]`
+
+Remove local template copies that have not been used recently.
+
+- `--days <n>`: prune template copies older than the specified number of days (default: `30`)
+
+### `vip template clean`
+
+Remove all local template copies. Prompts for confirmation before deleting.
 
 ## Template Test
 
@@ -30,11 +54,21 @@ vip template test [flags]
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--json` | Output results in JSON format for scripting | `false` |
-| `--force` | Force refresh of template cache | `false` |
+| `--force` | Force refresh of local template copies | `false` |
 | `--name` | Project name for template variables | `test-project` |
 | `--owner` | Project owner for template variables | `test-owner` |
 
 ### Examples
+
+#### Local Template Management
+
+```bash
+vip template list
+vip template info
+vip template update
+vip template prune --days 60
+vip template clean
+```
 
 #### Basic Template Testing
 

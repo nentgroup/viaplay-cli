@@ -2,13 +2,14 @@
 
 Manage the local cache of project templates.
 
+> **Deprecated:** Use `vip template list`, `vip template info`, `vip template update`, `vip template prune`, and `vip template clean` instead.
+
 ---
 
 ## Subcommands & Flags
 
 ### `vip cache update`
-Update all templates in the cache to their latest versions.
-- No arguments or flags.
+Refresh all local template copies from their configured sources.
 
 ### `vip cache prune [--days <n>]`
 Remove templates from the cache that haven't been used in a specified number of days.
@@ -25,18 +26,6 @@ List all templates currently stored in the cache.
 ### `vip cache info`
 Show detailed information about the template cache, including size and statistics.
 - No arguments or flags.
-
----
-
-## Update the Template Cache
-
-Refresh the local cache of remote templates:
-
-```
-vip cache update
-```
-
-This ensures you have the latest version of all templates.
 
 ---
 
