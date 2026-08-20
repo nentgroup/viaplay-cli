@@ -1,5 +1,62 @@
 # Changelog
 
+## [2.7.0](https://github.com/nentgroup/viaplay-cli/compare/v2.6.0...v2.7.0) (2026-08-20)
+
+
+### Features
+
+* apply secrets to existing repos ([eb071aa](https://github.com/nentgroup/viaplay-cli/commit/eb071aa47e44ea2b63aa7fe2704d3829e334bb4a))
+
+
+### Documentation
+
+* clean documentation ([#148](https://github.com/nentgroup/viaplay-cli/issues/148)) ([1608a05](https://github.com/nentgroup/viaplay-cli/commit/1608a05d002d9259f1af98852792692a0a730d87))
+* update readme and documentation ([#146](https://github.com/nentgroup/viaplay-cli/issues/146)) ([5122e98](https://github.com/nentgroup/viaplay-cli/commit/5122e98823b9d462b2a5b27d4428701440dc549f))
+
+
+### Dependencies
+
+* **deps:** update actions/checkout action to v7 ([#169](https://github.com/nentgroup/viaplay-cli/issues/169)) ([82952de](https://github.com/nentgroup/viaplay-cli/commit/82952de240fd11963340e36ac7402e985ab9d11d))
+* **deps:** update actions/labeler action to v7 ([#177](https://github.com/nentgroup/viaplay-cli/issues/177)) ([35f46dc](https://github.com/nentgroup/viaplay-cli/commit/35f46dc2be816a1cd5d8db42c3c082ff87c3b60c))
+* **deps:** update actions/setup-go action to v7 ([#176](https://github.com/nentgroup/viaplay-cli/issues/176)) ([f1ff33d](https://github.com/nentgroup/viaplay-cli/commit/f1ff33d5d9367b979468fd1ccf8cdb21a5ceccec))
+* **deps:** update actions/upload-artifact action to v7 ([#134](https://github.com/nentgroup/viaplay-cli/issues/134)) ([92b2ffc](https://github.com/nentgroup/viaplay-cli/commit/92b2ffc5f37a538edea71ea77f15a596ee70276f))
+* **deps:** update dependency font-awesome to v7.3.0 ([#175](https://github.com/nentgroup/viaplay-cli/issues/175)) ([c106989](https://github.com/nentgroup/viaplay-cli/commit/c106989bd3f26225928874725ce28647c5c9b28c))
+* **deps:** update dependency font-awesome to v7.3.1 ([#182](https://github.com/nentgroup/viaplay-cli/issues/182)) ([b05a746](https://github.com/nentgroup/viaplay-cli/commit/b05a746be15c25e77a115c36128831910be6a0e3))
+* **deps:** update dependency go to 1.26 ([#130](https://github.com/nentgroup/viaplay-cli/issues/130)) ([d4d6ec4](https://github.com/nentgroup/viaplay-cli/commit/d4d6ec40bb7020655d455b6d5c169696b9070de6))
+* **deps:** update dependency go to 1.27 ([#183](https://github.com/nentgroup/viaplay-cli/issues/183)) ([12edc5b](https://github.com/nentgroup/viaplay-cli/commit/12edc5bae4d18b21ef2d8d4363aa829b976ce5ea))
+* **deps:** update googleapis/release-please-action action to v5 ([#154](https://github.com/nentgroup/viaplay-cli/issues/154)) ([e6e291c](https://github.com/nentgroup/viaplay-cli/commit/e6e291cf4a8c08f32529207f43660098aed4226a))
+* **deps:** update goreleaser/goreleaser-action action to v7 ([#133](https://github.com/nentgroup/viaplay-cli/issues/133)) ([b52fb81](https://github.com/nentgroup/viaplay-cli/commit/b52fb810bdec98b5d92e7bbbef73785b8d8fbf1b))
+* **deps:** update module github.com/charmbracelet/bubbles to v1 ([#128](https://github.com/nentgroup/viaplay-cli/issues/128)) ([f15c5f5](https://github.com/nentgroup/viaplay-cli/commit/f15c5f52a2bffd5d27f4a413762c996b7c9ca91b))
+* **deps:** update module github.com/fatih/color to v1.19.0 ([#144](https://github.com/nentgroup/viaplay-cli/issues/144)) ([bda77fa](https://github.com/nentgroup/viaplay-cli/commit/bda77fa524df59464fccf395fbb93819e2470225))
+* **deps:** update module github.com/google/go-github/v74 to v83 ([#131](https://github.com/nentgroup/viaplay-cli/issues/131)) ([9eae730](https://github.com/nentgroup/viaplay-cli/commit/9eae730d2a9427294425d34ee808543a333f242d))
+* **deps:** update module github.com/google/go-github/v74 to v84 ([#138](https://github.com/nentgroup/viaplay-cli/issues/138)) ([712e732](https://github.com/nentgroup/viaplay-cli/commit/712e7327ed7839a67dc4bb6cf931875acfeced90))
+* **deps:** update module github.com/google/go-github/v74 to v85 ([#151](https://github.com/nentgroup/viaplay-cli/issues/151)) ([c181b95](https://github.com/nentgroup/viaplay-cli/commit/c181b95c684eb97149d0bcabe903188344f1a57e))
+* **deps:** update module github.com/google/go-github/v74 to v86 ([#155](https://github.com/nentgroup/viaplay-cli/issues/155)) ([f61e3b2](https://github.com/nentgroup/viaplay-cli/commit/f61e3b23008577dc9ce52ddd0d50361de30737cf))
+* **deps:** update module github.com/google/go-github/v74 to v87 ([#160](https://github.com/nentgroup/viaplay-cli/issues/160)) ([9946d52](https://github.com/nentgroup/viaplay-cli/commit/9946d52ef859d5493315a537911bd25297be4ba7))
+* **deps:** update module github.com/google/go-github/v74 to v88 ([#163](https://github.com/nentgroup/viaplay-cli/issues/163)) ([4611508](https://github.com/nentgroup/viaplay-cli/commit/4611508c445813d9a1b41053492905da52a49a65))
+* **deps:** update module github.com/google/go-github/v74 to v89 ([#170](https://github.com/nentgroup/viaplay-cli/issues/170)) ([72013c8](https://github.com/nentgroup/viaplay-cli/commit/72013c825dced3cf4a18f8e629c08eb70c87b426))
+* **deps:** update module github.com/google/go-github/v74 to v90 ([#178](https://github.com/nentgroup/viaplay-cli/issues/178)) ([08a037f](https://github.com/nentgroup/viaplay-cli/commit/08a037f92e924de8ee79f496872ce311c126543e))
+* **deps:** update module github.com/google/go-github/v83 to v84 ([#139](https://github.com/nentgroup/viaplay-cli/issues/139)) ([f1bb0aa](https://github.com/nentgroup/viaplay-cli/commit/f1bb0aa39dc24ed1bc4e16a1aee77812541cbc0d))
+* **deps:** update module github.com/google/go-github/v84 to v85 ([#152](https://github.com/nentgroup/viaplay-cli/issues/152)) ([acdbc8a](https://github.com/nentgroup/viaplay-cli/commit/acdbc8a9de5b1a2575db8ea74a88efbb1c525133))
+* **deps:** update module github.com/google/go-github/v85 to v86 ([#156](https://github.com/nentgroup/viaplay-cli/issues/156)) ([32dc5ae](https://github.com/nentgroup/viaplay-cli/commit/32dc5ae91568fbfe7d2032d3bafcae43b64821e9))
+* **deps:** update module github.com/google/go-github/v86 to v87 ([#161](https://github.com/nentgroup/viaplay-cli/issues/161)) ([ea47d53](https://github.com/nentgroup/viaplay-cli/commit/ea47d53e6dbbf9146b1864a1a17e5389f1b7956a))
+* **deps:** update module github.com/google/go-github/v87 to v88 ([#164](https://github.com/nentgroup/viaplay-cli/issues/164)) ([1844473](https://github.com/nentgroup/viaplay-cli/commit/1844473bc1d5a2830fb0bf30255f5687754714eb))
+* **deps:** update module github.com/google/go-github/v88 to v89 ([#171](https://github.com/nentgroup/viaplay-cli/issues/171)) ([0f935da](https://github.com/nentgroup/viaplay-cli/commit/0f935dab9073e51715a6336e52c9d0e891800dcc))
+* **deps:** update module github.com/google/go-github/v89 to v90 ([#179](https://github.com/nentgroup/viaplay-cli/issues/179)) ([322e7e6](https://github.com/nentgroup/viaplay-cli/commit/322e7e65f283e975fd0de23ded137e3a565904e2))
+* **deps:** update module github.com/zalando/go-keyring to v0.2.7 ([#145](https://github.com/nentgroup/viaplay-cli/issues/145)) ([b5b5671](https://github.com/nentgroup/viaplay-cli/commit/b5b567177e2fce58f1edd68682c22551d133185e))
+* **deps:** update module github.com/zalando/go-keyring to v0.2.8 ([#147](https://github.com/nentgroup/viaplay-cli/issues/147)) ([a084e2b](https://github.com/nentgroup/viaplay-cli/commit/a084e2b021b41a62cf47dad55bbfb9f4e0819568))
+* **deps:** update module golang.org/x/crypto to v0.49.0 ([#143](https://github.com/nentgroup/viaplay-cli/issues/143)) ([a69c8ba](https://github.com/nentgroup/viaplay-cli/commit/a69c8ba23f7de21cceefddbf2bf34998c6c60585))
+* **deps:** update module golang.org/x/crypto to v0.50.0 ([#150](https://github.com/nentgroup/viaplay-cli/issues/150)) ([ecb45d9](https://github.com/nentgroup/viaplay-cli/commit/ecb45d94ee1a2270ab6cbf19897f25d6617a41bb))
+* **deps:** update module golang.org/x/crypto to v0.51.0 ([#159](https://github.com/nentgroup/viaplay-cli/issues/159)) ([9446350](https://github.com/nentgroup/viaplay-cli/commit/94463506745b064ffcb7fd5d9503fc71ceee75e6))
+* **deps:** update module golang.org/x/crypto to v0.52.0 ([#166](https://github.com/nentgroup/viaplay-cli/issues/166)) ([b186b70](https://github.com/nentgroup/viaplay-cli/commit/b186b702b9bb974cb477704d0fb5a697d53347ba))
+* **deps:** update module golang.org/x/crypto to v0.53.0 ([#167](https://github.com/nentgroup/viaplay-cli/issues/167)) ([61f8c3f](https://github.com/nentgroup/viaplay-cli/commit/61f8c3f2d274590b995970a22b7ee7a3c5ff5cd7))
+* **deps:** update module golang.org/x/crypto to v0.54.0 ([#173](https://github.com/nentgroup/viaplay-cli/issues/173)) ([da900a8](https://github.com/nentgroup/viaplay-cli/commit/da900a855dc4926ffa4e1ea7542cbbe4000a47da))
+* **deps:** update module golang.org/x/crypto to v0.55.0 ([#181](https://github.com/nentgroup/viaplay-cli/issues/181)) ([74cda12](https://github.com/nentgroup/viaplay-cli/commit/74cda12d555b2788b46faacf14374790cfbeaef9))
+* **deps:** update module golang.org/x/oauth2 to v0.36.0 ([#141](https://github.com/nentgroup/viaplay-cli/issues/141)) ([0101871](https://github.com/nentgroup/viaplay-cli/commit/0101871603ab38b15c813819ff2d87a58825d822))
+* **deps:** update module golang.org/x/term to v0.41.0 ([#142](https://github.com/nentgroup/viaplay-cli/issues/142)) ([d230f60](https://github.com/nentgroup/viaplay-cli/commit/d230f605102973956219ade77398a946ceafa703))
+* **deps:** update module golang.org/x/term to v0.42.0 ([#149](https://github.com/nentgroup/viaplay-cli/issues/149)) ([53cccff](https://github.com/nentgroup/viaplay-cli/commit/53cccff25fa825bf6a5465fc38cbf64455840573))
+* **deps:** update module golang.org/x/term to v0.43.0 ([#158](https://github.com/nentgroup/viaplay-cli/issues/158)) ([0864d03](https://github.com/nentgroup/viaplay-cli/commit/0864d0383bb4884cfff38a0747032ab72c6429e1))
+
 ## [2.6.0](https://github.com/nentgroup/viaplay-cli/compare/v2.5.0...v2.6.0) (2026-02-09)
 
 
