@@ -39,11 +39,11 @@ func FormatTemplateList(templates []Template) string {
 			remote = unknownVersion
 		}
 
-		builder.WriteString(fmt.Sprintf("  %s/%s (version: %s, remote: %s)\n",
+		fmt.Fprintf(&builder, "  %s/%s (version: %s, remote: %s)\n",
 			tmpl.Language,
 			tmpl.Type,
 			version,
-			remote))
+			remote)
 	}
 
 	return builder.String()
@@ -53,10 +53,10 @@ func FormatTemplateList(templates []Template) string {
 func FormatUpdateResults(successCount, failCount int) string {
 	var builder strings.Builder
 	builder.WriteString("\nUpdate summary:\n")
-	builder.WriteString(fmt.Sprintf("- %d templates updated successfully\n", successCount))
+	fmt.Fprintf(&builder, "- %d templates updated successfully\n", successCount)
 
 	if failCount > 0 {
-		builder.WriteString(fmt.Sprintf("- %d templates failed to update\n", failCount))
+		fmt.Fprintf(&builder, "- %d templates failed to update\n", failCount)
 	}
 
 	if successCount == 0 && failCount == 0 {

@@ -194,9 +194,9 @@ func List(items []string, numbered bool, indent int) string {
 
 	for i, item := range items {
 		if numbered {
-			sb.WriteString(fmt.Sprintf("%s%d. %s\n", indentStr, i+1, item))
+			fmt.Fprintf(&sb, "%s%d. %s\n", indentStr, i+1, item)
 		} else {
-			sb.WriteString(fmt.Sprintf("%s%s %s\n", indentStr, ActiveIcons.Bullet, item))
+			fmt.Fprintf(&sb, "%s%s %s\n", indentStr, ActiveIcons.Bullet, item)
 		}
 	}
 
@@ -235,7 +235,7 @@ func KeyValueTable(pairs map[string]string, indent int) string {
 	// We could sort keys here if needed
 
 	for _, key := range keys {
-		sb.WriteString(fmt.Sprintf(format, indentStr, Bold(key), pairs[key]))
+		fmt.Fprintf(&sb, format, indentStr, Bold(key), pairs[key])
 	}
 
 	return sb.String()
@@ -307,7 +307,7 @@ func ProgressBar(current, total, width int) string {
 	sb.WriteString(strings.Repeat("█", completed))
 	sb.WriteString(strings.Repeat(" ", width-completed))
 	sb.WriteString("]")
-	sb.WriteString(fmt.Sprintf(" %.1f%%", percentage*100))
+	fmt.Fprintf(&sb, " %.1f%%", percentage*100)
 
 	return sb.String()
 }

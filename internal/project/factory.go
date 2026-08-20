@@ -111,6 +111,48 @@ func (c *Factory) Create(ctx context.Context, opts Options) (*Summary, error) {
 	return cctx.Summary, nil
 }
 
+// ApplyConfigurations applies repository configuration to an existing repository.
+func (c *Factory) ApplyConfigurations(ctx context.Context, opts Options) error {
+	if u, err := c.GitHubClient.GetUser(ctx, opts.RepoOwner); err == nil && u.Type != nil {
+		switch strings.ToLower(u.GetType()) {
+		case "organization":
+			opts.AccountType = OrganizationAccount
+		default:
+			opts.AccountType = PersonalAccount
+		}
+	}
+
+	c.templateVars = c.optsToTemplateVars(ctx, opts)
+	if username, err := c.GitHubClient.GetAuthenticatedUser(ctx); err == nil && username != "" {
+		c.templateVars.Meta.CreatedBy = username
+	}
+
+	return c.applyConfigurations(ctx, opts)
+}
+
+// ApplyEnvs applies environments to an existing repository
+func (c *Factory) ApplyEnvs(ctx context.Context, owner, repo, configDir, team string) error {
+	teamDir := filepath.Join(configDir, "teams", team)
+	return c.applyEnvs(ctx, owner, repo, teamDir)
+}
+
+// ApplyRulesets applies rulesets to an existing repository
+func (c *Factory) ApplyRulesets(ctx context.Context, owner, repo, configDir, team string) error {
+	teamDir := filepath.Join(configDir, "teams", team)
+	return c.applyRulesets(ctx, owner, repo, teamDir)
+}
+
+// ApplySecrets applies secrets to an existing repository
+func (c *Factory) ApplySecrets(ctx context.Context, owner, repo, configDir, team string) error {
+	teamDir := filepath.Join(configDir, "teams", team)
+	return c.applySecrets(ctx, owner, repo, teamDir)
+}
+
+// ApplyRepoSecrets applies repository-specific secrets to an existing repository
+func (c *Factory) ApplyRepoSecrets(ctx context.Context, owner, repo, secretsJSON string) error {
+	return c.applyRepoSecrets(ctx, owner, repo, secretsJSON)
+}
+
 // newCreationContext initialises the creation context: account type, summary, cleanup, names and paths.
 func (c *Factory) newCreationContext(ctx context.Context, opts Options) (*creationContext, error) {
 	c.Reporter.Debug(fmt.Sprintf("Starting project creation with options: %+v", opts))

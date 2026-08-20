@@ -10,6 +10,7 @@
 - [CLI Reference](cli/index.md)
   - [Project](cli/project.md)
   - [Repo](cli/repo.md)
+  - [Repo Apply](cli/repo-apply.md)
   - [Config](cli/config.md)
   - [Template](cli/template.md)
   - [Secrets](cli/secrets.md)

@@ -157,8 +157,11 @@ func getTerminalSize() (width, height int) {
 	width, height = 80, 20
 
 	// Try to get the actual terminal size
-	if w, h, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
-		width, height = w, h
+	fd := os.Stdout.Fd()
+	if fd <= uintptr(^uint(0)>>1) {
+		if w, h, err := term.GetSize(int(fd)); err == nil {
+			width, height = w, h
+		}
 	}
 
 	return width, height

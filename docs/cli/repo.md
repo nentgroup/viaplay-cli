@@ -7,6 +7,8 @@ The `vip repo` command manages GitHub repositories without scaffolding code.
 ## Subcommands
 
 - `vip repo create` — Create a GitHub repository without code scaffolding.
+- `vip repo apply` — Apply environments, rulesets, secrets, and variables to an existing repository.
+  - Includes `vip repo apply secret` and `vip repo apply variable` for one-off updates.
 
 ## Repo Create Command
 
@@ -75,5 +77,5 @@ The command takes one argument in the format `[owner/]<repo-name>`:
 
 ---
 
-See `vip repo create --help` for more details.
+See `vip repo create --help` and `vip repo apply --help` for more details.
 
