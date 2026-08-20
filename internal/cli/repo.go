@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -127,7 +128,7 @@ This command reuses the same configuration as 'repo create' but without creating
 
 	cmd.Flags().StringVar(&applyOpts.Team, "team", "", "Team name for loading configuration (uses default_team from config if not specified)")
 	cmd.Flags().StringVar(&applyOpts.Owner, "owner", "", "Repository owner (required if not specified in repo argument)")
-	cmd.Flags().StringVar(&applyOpts.OnlyScopes, "only", "", "Comma-separated list of scopes to apply (envs,rulesets,secrets,repo-secrets)")
+	cmd.Flags().StringVar(&applyOpts.OnlyScopes, "only", "", "Comma-separated list of scopes to apply (envs,rulesets,secrets,variables,repo-secrets)")
 	cmd.Flags().StringVar(&applyOpts.SkipScopes, "skip", "", "Comma-separated list of scopes to skip")
 	cmd.Flags().StringVar(&applyOpts.RepoSecrets, "repo-secrets", "", "JSON string containing repository-specific secrets/variables")
 	cmd.Flags().StringVar(&applyOpts.SecretsFile, "secrets-file", "", "Path to a JSON file containing repository-specific secrets/variables")
@@ -176,14 +177,14 @@ func applyRepoConfig(ctx context.Context, opts *RepoApplyOptions) error {
 	scopesToApply := buildRepoApplyScopes(opts, repoSecretsStr != "")
 	projectOpts := buildRepoApplyProjectOptions(opts, configDir, repoSecretsStr, scopesToApply)
 
-	if opts.DryRun {
-		printRepoApplyDryRun(opts, scopesToApply)
-		return nil
-	}
-
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	if opts.DryRun {
+		printRepoApplyDryRun(ctx, ghClient, cfg, opts, repoSecretsStr, scopesToApply)
+		return nil
 	}
 
 	reporter := output.NewCallbackReporter(output.DefaultCB, viper.GetBool("verbose"))
@@ -244,6 +245,7 @@ func buildRepoApplyScopes(opts *RepoApplyOptions, hasRepoSecrets bool) map[strin
 		"envs":         true,
 		"rulesets":     true,
 		"secrets":      true,
+		"variables":    true,
 		"repo-secrets": hasRepoSecrets,
 	}
 	applyScopeList(scopesToApply, opts.OnlyScopes, true)
@@ -275,21 +277,156 @@ func buildRepoApplyProjectOptions(opts *RepoApplyOptions, configDir, repoSecrets
 		ApplyEnvs:       scopes["envs"],
 		ApplyRulesets:   scopes["rulesets"],
 		ApplySecrets:    scopes["secrets"],
+		ApplyVariables:  scopes["variables"],
 		RepoSecrets:     repoSecretsStr,
 	}
 }
 
-func printRepoApplyDryRun(opts *RepoApplyOptions, scopesToApply map[string]bool) {
+func printRepoApplyDryRun(ctx context.Context, ghClient *gh.GitHubClient, cfg *config.Configuration, opts *RepoApplyOptions, repoSecretsStr string, scopesToApply map[string]bool) {
 	output.WarningMessage("DRY RUN: No changes will be applied")
 	fmt.Printf("Repository: %s/%s\n", opts.Owner, opts.Repo)
 	if opts.Team != "" {
 		fmt.Printf("Team: %s\n", opts.Team)
 	}
-	fmt.Println("Scopes to apply:")
-	for _, scope := range []string{"envs", "rulesets", "secrets", "repo-secrets"} {
+	configDir := determineRepoApplyConfigDir(ctx, ghClient, cfg, opts)
+	if configDir != "" {
+		fmt.Printf("Config directory: %s\n", configDir)
+	}
+	fmt.Println("Plan:")
+	for _, scope := range []string{"envs", "rulesets", "secrets", "variables", "repo-secrets"} {
 		if scopesToApply[scope] {
-			fmt.Printf("  - %s\n", scope)
+			printRepoApplyScopePlan(scope, configDir, repoSecretsStr)
 		}
+	}
+}
+
+func determineRepoApplyConfigDir(ctx context.Context, ghClient *gh.GitHubClient, cfg *config.Configuration, opts *RepoApplyOptions) string {
+	if opts.Team != "" {
+		u, err := ghClient.GetUser(ctx, opts.Owner)
+		if err == nil && strings.EqualFold(u.GetType(), "Organization") {
+			return cfg.GetTeamDir(opts.Team, opts.Owner)
+		}
+	}
+	username, err := ghClient.GetAuthenticatedUser(ctx)
+	if err == nil && username != "" {
+		return cfg.GetPersonalDir(username)
+	}
+	if opts.Team != "" {
+		return cfg.GetTeamDir(opts.Team, "")
+	}
+	return cfg.GetPersonalDir(opts.Owner)
+}
+
+func printRepoApplyScopePlan(scope, configDir, repoSecretsStr string) {
+	fmt.Printf("  - %s\n", scope)
+	switch scope {
+	case "envs":
+		printRepoApplyEnvPlan(configDir)
+	case "rulesets":
+		printRepoApplyRulesetPlan(configDir)
+	case "secrets":
+		printRepoApplySecretsPlan(configDir, false)
+	case "variables":
+		printRepoApplySecretsPlan(configDir, true)
+	case "repo-secrets":
+		printRepoApplyRepoSecretsPlan(repoSecretsStr)
+	}
+}
+
+func printRepoApplyEnvPlan(configDir string) {
+	printRepoApplyFileList(filepath.Join(configDir, "envs"), []string{".yaml"}, "environment")
+}
+
+func printRepoApplyRulesetPlan(configDir string) {
+	printRepoApplyFileList(filepath.Join(configDir, "rulesets"), []string{".yaml", ".yml"}, "ruleset")
+}
+
+func printRepoApplyFileList(dir string, exts []string, label string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		fmt.Printf("      source: %s (unavailable: %v)\n", dir, err)
+		return
+	}
+	fmt.Printf("      source: %s\n", dir)
+	count := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !repoApplyHasExt(entry.Name(), exts) {
+			continue
+		}
+		fmt.Printf("      %s file: %s\n", label, entry.Name())
+		count++
+	}
+	if count == 0 {
+		fmt.Printf("      no %s files found\n", label)
+	}
+}
+
+func repoApplyHasExt(name string, exts []string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	for _, allowed := range exts {
+		if ext == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+func printRepoApplySecretsPlan(configDir string, variablesOnly bool) {
+	secretsPath := filepath.Join(configDir, "secrets.yaml")
+	data, err := os.ReadFile(secretsPath)
+	if err != nil {
+		fmt.Printf("      source: %s (unavailable: %v)\n", secretsPath, err)
+		return
+	}
+	fmt.Printf("      source: %s\n", secretsPath)
+	var secretsConfig secretspkg.Config
+	if err := yaml.Unmarshal(data, &secretsConfig); err != nil {
+		fmt.Printf("      could not parse secrets file: %v\n", err)
+		return
+	}
+	printRepoApplySecretEntries(secretsConfig.Secrets, variablesOnly)
+}
+
+func printRepoApplyRepoSecretsPlan(repoSecretsStr string) {
+	if repoSecretsStr == "" {
+		fmt.Println("      no repo-specific secrets input provided")
+		return
+	}
+	fmt.Println("      source: --repo-secrets/--secrets-file")
+	var secretsConfig secretspkg.Config
+	if err := json.Unmarshal([]byte(repoSecretsStr), &secretsConfig); err != nil {
+		fmt.Printf("      could not parse repo-specific secrets: %v\n", err)
+		return
+	}
+	printRepoApplySecretEntries(secretsConfig.Secrets, false)
+}
+
+func repoApplyValueOrDefault(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func printRepoApplySecretEntries(entries []secretspkg.Secret, variablesOnly bool) {
+	count := 0
+	for _, secret := range entries {
+		if secret.Name == "" {
+			continue
+		}
+		isVariable := secret.Type == repoSecretTypeVariable
+		if variablesOnly != isVariable {
+			continue
+		}
+		fmt.Printf("      %s %s (%s)\n", repoApplyValueOrDefault(secret.Type, repoSecretTypeSecret), secret.Name, repoApplyValueOrDefault(secret.Env, "repo"))
+		count++
+	}
+	if count == 0 {
+		if variablesOnly {
+			fmt.Println("      no variable entries found")
+			return
+		}
+		fmt.Println("      no secret entries found")
 	}
 }
 

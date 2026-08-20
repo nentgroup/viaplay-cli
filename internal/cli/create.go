@@ -371,10 +371,11 @@ func executeProjectCreation(ctx context.Context, ghClient *gh.GitHubClient, conf
 		// Configuration options
 		ConfigDir: configDir,
 		// If no-repo is set, we should skip applying environments, rulesets and secrets as they only make sense with a repo
-		ApplyEnvs:     opts.ApplyEnvs && !opts.NoRepo,
-		ApplyRulesets: opts.ApplyRulesets && !opts.NoRepo,
-		ApplySecrets:  opts.ApplySecrets && !opts.NoRepo,
-		RepoSecrets:   secretsData,
+		ApplyEnvs:      opts.ApplyEnvs && !opts.NoRepo,
+		ApplyRulesets:  opts.ApplyRulesets && !opts.NoRepo,
+		ApplySecrets:   opts.ApplySecrets && !opts.NoRepo,
+		ApplyVariables: opts.ApplySecrets && !opts.NoRepo,
+		RepoSecrets:    secretsData,
 
 		// Template options (only used if withScaffolding is true)
 		TemplateSource: opts.TemplateSource,

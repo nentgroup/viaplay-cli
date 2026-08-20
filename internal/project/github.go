@@ -53,8 +53,8 @@ func (c *Factory) applyConfigurations(ctx context.Context, opts Options) error {
 		}
 	}
 
-	if opts.ApplySecrets {
-		if err := c.applySecrets(ctx, opts.RepoOwner, opts.RepoName, configDir); err != nil {
+	if opts.ApplySecrets || opts.ApplyVariables {
+		if err := c.applySecrets(ctx, opts.RepoOwner, opts.RepoName, configDir, opts.ApplySecrets, opts.ApplyVariables); err != nil {
 			return fmt.Errorf("failed to apply secrets: %w", err)
 		}
 	}
@@ -424,8 +424,8 @@ func (c *Factory) applyRulesets(ctx context.Context, owner, repo, teamDir string
 	return nil
 }
 
-// applySecrets applies secrets defined in the team directory
-func (c *Factory) applySecrets(ctx context.Context, owner, repo, teamDir string) error {
+// applySecrets applies secrets and/or variables defined in the team directory.
+func (c *Factory) applySecrets(ctx context.Context, owner, repo, teamDir string, applySecrets, applyVariables bool) error {
 	mainOperation := "Applying secrets"
 	c.Reporter.Start(mainOperation, "")
 
@@ -501,6 +501,10 @@ func (c *Factory) applySecrets(ctx context.Context, owner, repo, teamDir string)
 			continue // Skip again
 		}
 
+		if !shouldApplySecretEntry(secret, applySecrets, applyVariables) {
+			continue
+		}
+
 		secretValue, valueSource, ok := secrets.GetSecretValueAndSource(secret, secretValues)
 		if !ok {
 			if secret.Reference != "" {
@@ -533,6 +537,14 @@ func (c *Factory) applySecrets(ctx context.Context, owner, repo, teamDir string)
 	}
 
 	return nil
+}
+
+func shouldApplySecretEntry(secret secrets.Secret, applySecrets, applyVariables bool) bool {
+	isVariable := secret.Type == secretTypeVariable
+	if isVariable {
+		return applyVariables
+	}
+	return applySecrets
 }
 
 // applyRepoSecrets applies repository-specific secrets from a JSON string

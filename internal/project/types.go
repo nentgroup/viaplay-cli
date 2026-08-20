@@ -46,11 +46,12 @@ type Options struct {
 	SkipHooks   bool   // Skip running post-installation hooks
 
 	// Configuration options
-	ConfigDir     string
-	ApplyEnvs     bool
-	ApplyRulesets bool
-	ApplySecrets  bool
-	RepoSecrets   string // JSON string of repo-specific secrets
+	ConfigDir      string
+	ApplyEnvs      bool
+	ApplyRulesets  bool
+	ApplySecrets   bool
+	ApplyVariables bool
+	RepoSecrets    string // JSON string of repo-specific secrets
 
 	// Template options
 	TemplateSource string

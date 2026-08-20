@@ -145,7 +145,7 @@ func (c *Factory) ApplyRulesets(ctx context.Context, owner, repo, configDir, tea
 // ApplySecrets applies secrets to an existing repository
 func (c *Factory) ApplySecrets(ctx context.Context, owner, repo, configDir, team string) error {
 	teamDir := filepath.Join(configDir, "teams", team)
-	return c.applySecrets(ctx, owner, repo, teamDir)
+	return c.applySecrets(ctx, owner, repo, teamDir, true, true)
 }
 
 // ApplyRepoSecrets applies repository-specific secrets to an existing repository
