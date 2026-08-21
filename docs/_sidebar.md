@@ -12,6 +12,7 @@
   - [Repo](cli/repo.md)
   - [Repo Apply](cli/repo-apply.md)
   - [Config](cli/config.md)
+  - [Hooks](cli/hooks.md)
   - [Template](cli/template.md)
   - [Secrets](cli/secrets.md)
   - [Auth](cli/auth.md)

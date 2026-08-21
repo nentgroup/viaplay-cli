@@ -82,3 +82,12 @@ func (c *Configuration) GetPostInstallHooks(language, projectType string) []*Pos
 func (c *Configuration) GetHooksDir() string {
 	return filepath.Join(c.ConfigDir, "hooks")
 }
+
+// ResolveHookScriptPath resolves a hook script path against the global hooks directory.
+func (c *Configuration) ResolveHookScriptPath(scriptPath string) string {
+	if filepath.IsAbs(scriptPath) {
+		return scriptPath
+	}
+
+	return filepath.Join(c.GetHooksDir(), scriptPath)
+}

@@ -58,25 +58,19 @@ func (c *Factory) RunHooks(ctx context.Context, projectPath, language, projectTy
 
 			// Process scripts
 			for _, scriptPath := range hook.GetAllScripts() {
-				// Render template variables in the script path
-				renderedScriptPath, err := renderer.RenderString(scriptPath)
+				fullScriptPath, err := c.resolveRenderedHookScriptPath(renderer, scriptPath)
 				if err != nil {
-					return fmt.Errorf("failed to render script path template: %w", err)
+					return err
 				}
 
-				// Check if this is a relative path or absolute
-				fullScriptPath := renderedScriptPath
-				if !filepath.IsAbs(renderedScriptPath) {
-					// If it's relative, look in the hooks directory
-					fullScriptPath = filepath.Join(c.Config.GetHooksDir(), renderedScriptPath)
+				renderedScriptPath, cleanup, err := renderHookScriptFile(renderer, fullScriptPath)
+				if err != nil {
+					return err
 				}
-				// Check if script exists
-				if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
-					return fmt.Errorf("hook script not found: %s", fullScriptPath)
-				}
+				defer cleanup()
 
-				// Create a command to run the script
-				execCmd := exec.CommandContext(ctx, fullScriptPath)
+				// Create a command to run the rendered script
+				execCmd := exec.CommandContext(ctx, renderedScriptPath)
 				execCmd.Dir = projectPath
 
 				// Run the script using our executor
@@ -102,4 +96,62 @@ func (c *Factory) RunHooks(ctx context.Context, projectPath, language, projectTy
 	}
 
 	return err
+}
+
+func (c *Factory) resolveRenderedHookScriptPath(renderer *template.Renderer, scriptPath string) (string, error) {
+	renderedScriptPath, err := renderer.RenderString(scriptPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to render script path template: %w", err)
+	}
+
+	fullScriptPath := c.Config.ResolveHookScriptPath(renderedScriptPath)
+	if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("hook script not found: %s", fullScriptPath)
+	}
+
+	return fullScriptPath, nil
+}
+
+func renderHookScriptFile(renderer *template.Renderer, scriptPath string) (string, func(), error) {
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return "", func() {}, fmt.Errorf("failed to read hook script %s: %w", scriptPath, err)
+	}
+
+	renderedData, err := renderer.RenderString(string(data))
+	if err != nil {
+		return "", func() {}, fmt.Errorf("failed to render hook script %s: %w", scriptPath, err)
+	}
+
+	info, err := os.Stat(scriptPath)
+	if err != nil {
+		return "", func() {}, fmt.Errorf("failed to stat hook script %s: %w", scriptPath, err)
+	}
+
+	tempFile, err := os.CreateTemp("", "vip-hook-*"+filepath.Ext(scriptPath))
+	if err != nil {
+		return "", func() {}, fmt.Errorf("failed to create temporary hook script: %w", err)
+	}
+
+	cleanup := func() {
+		_ = os.Remove(tempFile.Name())
+	}
+
+	if _, err := tempFile.WriteString(renderedData); err != nil {
+		_ = tempFile.Close()
+		cleanup()
+		return "", func() {}, fmt.Errorf("failed to write rendered hook script: %w", err)
+	}
+
+	if err := tempFile.Close(); err != nil {
+		cleanup()
+		return "", func() {}, fmt.Errorf("failed to close rendered hook script: %w", err)
+	}
+
+	if err := os.Chmod(tempFile.Name(), info.Mode().Perm()); err != nil {
+		cleanup()
+		return "", func() {}, fmt.Errorf("failed to apply permissions to rendered hook script: %w", err)
+	}
+
+	return tempFile.Name(), cleanup, nil
 }

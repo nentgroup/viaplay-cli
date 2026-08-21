@@ -76,6 +76,7 @@ func init() {
 		secretsCmd,           // Secrets management
 		cacheCmd,             // Cache management
 		configCmd,            // Configuration
+		NewHooksCommand(),    // Hooks management
 		versionCmd,           // Version information
 		NewProjectCommand(),  // Project management
 		NewRepoCommand(),     // Repository management

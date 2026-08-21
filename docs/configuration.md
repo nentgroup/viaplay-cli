@@ -230,6 +230,15 @@ vip project create nentgroup/myservice --language go --type service --team mytea
 vip project create nentgroup/myservice --language go --type service --team myteam --no-hooks
 ```
 
+You can also inspect and manage hook configuration directly:
+
+```bash
+vip hooks init
+vip hooks list go/service
+vip hooks doctor go/service
+vip hooks run go/service --path ./myservice
+```
+
 ### Locating Hook Scripts
 
 Hook scripts referenced in the `scripts` section are resolved in the following order:

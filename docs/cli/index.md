@@ -7,6 +7,7 @@ This section provides documentation for the most important viaplay-cli commands.
 - [Project](../cli/project.md): Create a new project with scaffolding and GitHub repository.
 - [Repo](../cli/repo.md): Manage GitHub repositories without scaffolding.
 - [Config](../cli/config.md): Manage global, team, and project configuration.
+- [Hooks](../cli/hooks.md): Inspect, validate, run, and scaffold post-install hooks.
 - [Template](../cli/template.md): Work with project templates, including testing and validation.
 - [Secrets](../cli/secrets.md): Securely manage secrets for your projects and teams.
 - [Auth](../cli/auth.md): Authenticate with GitHub for repository and secret management.
