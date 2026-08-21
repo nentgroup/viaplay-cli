@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.2](https://github.com/nentgroup/viaplay-cli/compare/v2.8.1...v2.8.2) (2026-08-21)
+
+
+### Dependencies
+
+* upgrade all modules ([078fdd6](https://github.com/nentgroup/viaplay-cli/commit/078fdd60b2cddc9203892a3cc461d60f7072b2e5))
+
 ## [2.8.1](https://github.com/nentgroup/viaplay-cli/compare/v2.8.0...v2.8.1) (2026-08-21)
 
 
