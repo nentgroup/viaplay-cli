@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.8.1](https://github.com/nentgroup/viaplay-cli/compare/v2.8.0...v2.8.1) (2026-08-21)
+
+
+### Documentation
+
+* upgrade docsify ([81a337d](https://github.com/nentgroup/viaplay-cli/commit/81a337d9c1b8ea847edc2630e58cad535bbccd8b))
+
+
+### Dependencies
+
+* **deps:** update google/go-github/v74 to v90 ([#180](https://github.com/nentgroup/viaplay-cli/issues/180)) ([7181296](https://github.com/nentgroup/viaplay-cli/commit/7181296634932dca7a1512011d0fc20cdd14d7af))
+
 ## [2.8.0](https://github.com/nentgroup/viaplay-cli/compare/v2.7.0...v2.8.0) (2026-08-21)
 
 
