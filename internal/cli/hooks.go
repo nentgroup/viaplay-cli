@@ -201,11 +201,18 @@ func newHooksRunCommand() *cobra.Command {
 
 func newHooksInitCommand() *cobra.Command {
 	var override bool
+	var team, organization string
 
 	cmd := &cobra.Command{
-		Use:          "init",
-		Short:        "Scaffold the hooks directory",
-		Long:         `Create the global hooks directory and a sample post-install script.`,
+		Use:   "init",
+		Short: "Scaffold the hooks directory for the active team",
+		Long: `Create a hooks/ directory inside the active team's local config directory and write
+a sample post-install script. Scripts placed here should be committed to your
+shared config repository (vip-shared-configs) so teammates can pull them with
+'vip config pull hooks'.
+
+If no team is configured, the sample is written to the global hooks directory
+(~/.config/viaplay/hooks/) instead.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.LoadConfig()
@@ -213,7 +220,24 @@ func newHooksInitCommand() *cobra.Command {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
 
-			hooksDir := cfg.GetHooksDir()
+			// Resolve team and org: flag > config default
+			resolvedTeam := strings.TrimSpace(team)
+			if resolvedTeam == "" {
+				resolvedTeam = cfg.DefaultTeam
+			}
+			resolvedOrg := strings.TrimSpace(organization)
+			if resolvedOrg == "" {
+				resolvedOrg = cfg.DefaultOrganization
+			}
+
+			if resolvedTeam == "" {
+				return fmt.Errorf(
+					"team is required — set default_team in config or pass --team <name>",
+				)
+			}
+
+			hooksDir := filepath.Join(cfg.GetTeamDir(resolvedTeam, resolvedOrg), "hooks")
+
 			if err := os.MkdirAll(hooksDir, 0o755); err != nil {
 				return fmt.Errorf("failed to create hooks directory: %w", err)
 			}
@@ -236,11 +260,17 @@ func newHooksInitCommand() *cobra.Command {
 			output.SuccessMessage("Hooks directory scaffolded successfully")
 			fmt.Printf("Hooks directory: %s\n", output.Bold(hooksDir))
 			fmt.Printf("Sample script:   %s\n", output.Bold(scriptPath))
+			fmt.Printf("\nCommit %s to your shared config repo, then run:\n", output.Bold("hooks/"))
+			fmt.Printf("  %s\n", output.Bold("vip config pull hooks"))
+			fmt.Printf("to activate scripts in the runtime hooks directory.\n")
+
 			return nil
 		},
 	}
 
 	cmd.Flags().BoolVar(&override, "override", false, "Override the sample hook script if it already exists")
+	cmd.Flags().StringVarP(&team, "team", "t", "", "Team to scaffold hooks for (falls back to default_team)")
+	cmd.Flags().StringVarP(&organization, "organization", "o", "", "Organization for the team (falls back to default_organization)")
 	return cmd
 }
 
