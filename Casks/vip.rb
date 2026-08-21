@@ -3,16 +3,16 @@ cask "vip" do
   tap_path = File.expand_path("Library/Taps/nentgroup/homebrew-viaplay-cli/Casks/lib/custom_download_strategy.rb", ENV["HOMEBREW_PREFIX"])
   require tap_path
 
-  version "2.8.0"
+  version "2.8.1"
 
   on_macos do
     on_intel do
-      sha256 "7d452a23beda37361bcb859dfbfbc7a022f7fcf8214a23972d821523724e2d9d"
+      sha256 "de4ab7939647b5ff942fa4807e043a3453df4cf420ee346f6dc4aecf1ac5c4f9"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
     on_arm do
-      sha256 "8a798c8956ac3cc96d2e84246dd84489323e124588eb5fe3669343d59f9856d8"
+      sha256 "7bdf6f3b0634cf7d05b5a666c3b9052efd903c67062c555992148875ad083f02"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
@@ -20,12 +20,12 @@ cask "vip" do
 
   on_linux do
     on_intel do
-      sha256 "1a368b214c91a4b21a7b92f1772b43f6a985750c515ab49d0596a2dd11bdf13a"
+      sha256 "7bffc2942b3e7aa8e1b4cfba0a16343f2c68fc7e5ef9f7eb2bfd0b6183cf9bc0"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
     on_arm do
-      sha256 "bc9ec8397632ddd3b8b680e7acfa8df609137a1162a683ce5c85859cc5aeeab8"
+      sha256 "4fb7aee87c5b4dd4c7c81bd15a8e1ecaa44451ea7c020ebe55eaa9d8393adef6"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
