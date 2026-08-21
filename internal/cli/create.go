@@ -134,8 +134,8 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 func createProjectOrRepo(ctx context.Context, opts *CreateCommandOptions, withScaffolding bool) error {
 	// Start timing the operation
 	startTime := time.Now()
-	// Setup GitHub client and get config
-	ghClient, configDir, err := setupGitHubClient()
+	// Setup GitHub client
+	ghClient, _, err := setupGitHubClient()
 	if err != nil {
 		return err
 	}
@@ -145,6 +145,17 @@ func createProjectOrRepo(ctx context.Context, opts *CreateCommandOptions, withSc
 	if err != nil {
 		output.FatalError(fmt.Sprintf("Repo parameters validation failed: %v", err))
 		return nil
+	}
+
+	cfg, err := loadConfigWithTeamOverrides(repoParams.team, repoParams.owner)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	if withScaffolding {
+		if err := setupScaffoldingOptions(cfg, opts); err != nil {
+			return err
+		}
 	}
 
 	// Handle secrets data
@@ -180,7 +191,7 @@ func createProjectOrRepo(ctx context.Context, opts *CreateCommandOptions, withSc
 	}
 
 	// Create the project using the Factory
-	summary, createErr := executeProjectCreation(ctx, ghClient, configDir, repoParams, opts, secretsData,
+	summary, createErr := executeProjectCreation(ctx, ghClient, cfg, repoParams, opts, secretsData,
 		withScaffolding)
 
 	// Calculate total execution time
@@ -287,13 +298,6 @@ func validateRepoParameters(opts *CreateCommandOptions, withScaffolding bool) (r
 		params.team = viper.GetString("default_team")
 	}
 
-	// For project creation, ensure language and project type are set
-	if withScaffolding {
-		if err := setupScaffoldingOptions(opts); err != nil {
-			return params, err
-		}
-	}
-
 	return params, nil
 }
 
@@ -342,13 +346,9 @@ func validateRepositoryDoesNotExist(ctx context.Context, ghClient *gh.GitHubClie
 }
 
 // executeProjectCreation executes the project creation workflow
-func executeProjectCreation(ctx context.Context, ghClient *gh.GitHubClient, configDir string, params repoParameters,
+func executeProjectCreation(ctx context.Context, ghClient *gh.GitHubClient, cfg *config.Configuration, params repoParameters,
 	opts *CreateCommandOptions, secretsData string, withScaffolding bool,
 ) (*project.Summary, error) { // Create project creator with reporter
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
 	creator := project.NewFactory(ghClient, output.NewCallbackReporter(output.DefaultCB, viper.GetBool("verbose")), cfg)
 
 	// Set up options
@@ -369,7 +369,7 @@ func executeProjectCreation(ctx context.Context, ghClient *gh.GitHubClient, conf
 		SkipHooks:   opts.NoHooks,    // Skip running post-installation hooks if flag is set
 
 		// Configuration options
-		ConfigDir: configDir,
+		ConfigDir: cfg.ConfigDir,
 		// If no-repo is set, we should skip applying environments, rulesets and secrets as they only make sense with a repo
 		ApplyEnvs:      opts.ApplyEnvs && !opts.NoRepo,
 		ApplyRulesets:  opts.ApplyRulesets && !opts.NoRepo,
@@ -492,22 +492,21 @@ func printProjectSummary(summary *project.Summary, executionTime time.Duration) 
 }
 
 // Helper to set up project scaffolding options
-func setupScaffoldingOptions(opts *CreateCommandOptions) error {
+func setupScaffoldingOptions(cfg *config.Configuration, opts *CreateCommandOptions) error {
 	if opts.Language == "" {
-		opts.Language = viper.GetString("default_language")
+		opts.Language = cfg.DefaultLanguage
 		if opts.Language == "" {
 			opts.Language = "go"
 		}
 	}
 	if opts.ProjectType == "" {
-		opts.ProjectType = viper.GetString("default_type")
+		opts.ProjectType = cfg.DefaultType
 		if opts.ProjectType == "" {
 			opts.ProjectType = "service"
 		}
 	}
 	if opts.TemplateSource == "" {
-		templateKey := fmt.Sprintf("templates.%s.%s.source", opts.Language, opts.ProjectType)
-		opts.TemplateSource = viper.GetString(templateKey)
+		opts.TemplateSource = cfg.GetTemplateSource(opts.Language, opts.ProjectType)
 		if opts.TemplateSource == "" {
 			return fmt.Errorf("no template found for %s/%s, please specify with --template-source", opts.Language, opts.ProjectType)
 		}

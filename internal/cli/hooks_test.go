@@ -22,3 +22,19 @@ func TestParseHookTemplateRefRejectsInvalidValue(t *testing.T) {
 		t.Fatal("expected error for invalid template reference")
 	}
 }
+
+func TestResolveHookTemplateRefUsesFlags(t *testing.T) {
+	t.Parallel()
+
+	const expectedProjectType = "service"
+
+	opts := &hooksCommandOptions{Language: "go", ProjectType: expectedProjectType}
+	language, projectType, err := resolveHookTemplateRef(nil, opts)
+	if err != nil {
+		t.Fatalf("resolveHookTemplateRef returned error: %v", err)
+	}
+
+	if language != "go" || projectType != expectedProjectType {
+		t.Fatalf("unexpected result: %s/%s", language, projectType)
+	}
+}

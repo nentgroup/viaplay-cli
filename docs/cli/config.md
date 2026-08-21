@@ -7,17 +7,35 @@ The `vip config` command manages global, team, and project-specific configuratio
 ## Subcommands & Flags
 
 ### `vip config init`
-Initialises the main config file and (optionally) team configs.
+Initialises the main config file, personal config, and optionally team config.
+
+If an organization is selected and a conventional shared config repo exists at
+`<org>/vip-shared-configs`, `vip` configures it as the shared source and pulls
+hooks plus the selected/default team config.
 
 **Flags:**
-- `--team <team>`: Initialise a config for the specified team (creates `~/.config/viaplay/teams/<team>/config.yaml`).
+- `--team`, `-t`: Team to initialise
+- `--organization`, `-o`: Organization to initialise against
+- `--override`: Replace existing generated files
 
 ### `vip config init team <name>`
-Scaffold a team configuration folder with starter files for environments, rulesets, and secrets.
+Scaffold a team configuration folder with starter files for environments, rulesets, secrets, and a team `config.yaml` override file.
 
 **Flags:**
 - `--organization`, `-o`: Organization name for the team config folder. Falls back to `default_organization` when configured.
 - `--override`: Replace existing starter files if they already exist.
+
+### `vip config init source`
+Configure the read-only shared config source repository.
+
+When `--repository` is omitted, `vip` looks for the conventional
+`<organization>/vip-shared-configs` repository and configures it automatically.
+
+**Flags:**
+- `--repository`, `-r`: Shared config repository URL
+- `--organization`, `-o`: Organization used for convention-based detection
+- `--branch`: Source repository branch (defaults to current config or `main`)
+- `--root`: Root path inside the source repository (defaults to current config or `.`)
 
 ### `vip config get [key]`
 Get a config value (or all values if no key is provided).
@@ -57,6 +75,23 @@ By default it validates the active config file, and if `default_team` is configu
 - `--user`, `-u`: Username for personal config validation
 - `--all-teams`: Validate every discovered team config directory
 
+### `vip config pull`
+Pull shared hooks and the default team from the configured shared source.
+
+If no `default_team` is configured, it pulls hooks only.
+
+### `vip config pull team <name>`
+Pull one shared team config directory.
+
+**Flags:**
+- `--organization`, `-o`: Organization name for the shared team config (falls back to `default_organization`)
+
+### `vip config pull hooks`
+Pull shared hooks from the configured shared source.
+
+### `vip config pull all`
+Pull all shared hooks and all shared team config directories from the configured shared source.
+
 ---
 
 ## Example Config File
@@ -77,18 +112,24 @@ default_private: true
 
 templates:
   go:
-    service: github@github.com/nentgroup/go-service-template.git
+    service:
+      source: git@github.com:nentgroup/go-service-template.git
   node:
-    service: github@github.com/nentgroup/node-service-template.git
+    service:
+      source: git@github.com:nentgroup/node-service-template.git
   # Add more language/type templates as needed
   # rust:
-  #   service: local@/path/to/your/rust-service-template
+  #   service:
+  #     source: local@/path/to/your/rust-service-template
+
+config_source:
+  repository: git@github.com:nentgroup/vip-shared-configs.git
+  branch: main
+  root: .
 
 config_dir: "~/.config/viaplay"
 teams_dir: "~/.config/viaplay/teams"
-global_dir: "~/.config/viaplay/global"
-default_branch: "main"
-github_api: "https://api.github.com"
+orgs_dir: "~/.config/viaplay/orgs"
 container_registry: "ecr"
 debug: false
 ```
@@ -99,9 +140,14 @@ debug: false
 
 ```bash
 vip config init
-vip config init --team myteam
+vip config init --team myteam --organization nentgroup
 vip config init team myteam --organization nentgroup
-vip config get default_account
+vip config init source --organization nentgroup
+vip config pull
+vip config pull team myteam --organization nentgroup
+vip config pull hooks
+vip config pull all
+vip config get default_team
 vip config edit
 vip config edit team --team myteam --organization nentgroup
 vip config path team --team myteam --organization nentgroup

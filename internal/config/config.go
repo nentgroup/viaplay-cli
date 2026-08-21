@@ -54,8 +54,27 @@ type Configuration struct {
 	NoRepo         bool // Default for skipping repository creation
 	NoCache        bool // Default for disabling caching
 
-	// Template mappings
-	Templates map[string]map[string]string
+	// Template mappings, optionally overridden by team config.yaml.
+	Templates map[string]map[string]*TemplateDefinition
+
+	// Shared config source settings.
+	Source SourceConfig
+}
+
+// TemplateDefinition represents one template source and its optional hooks.
+type TemplateDefinition struct {
+	Source string         `mapstructure:"source" yaml:"source"`
+	Hooks  *TemplateHooks `mapstructure:"hooks,omitempty" yaml:"hooks,omitempty"`
+}
+
+// TemplateHooks groups hooks by lifecycle stage.
+type TemplateHooks struct {
+	Post *TemplateHookStage `mapstructure:"post,omitempty" yaml:"post,omitempty"`
+}
+
+// TemplateHookStage groups hooks by action.
+type TemplateHookStage struct {
+	Install *PostInstallHook `mapstructure:"install,omitempty" yaml:"install,omitempty"`
 }
 
 // getHomeBasedPath returns a path based on the user's home directory
@@ -112,7 +131,12 @@ func LoadConfig() (*Configuration, error) {
 		NoRepo:         viper.GetBool("no_repo"),
 		NoCache:        viper.GetBool("no_cache"),
 
-		Templates: make(map[string]map[string]string),
+		Templates: make(map[string]map[string]*TemplateDefinition),
+		Source: SourceConfig{
+			Repository: viper.GetString("config_source.repository"),
+			Branch:     viper.GetString("config_source.branch"),
+			Root:       viper.GetString("config_source.root"),
+		},
 	}
 
 	// Set default paths if not provided
@@ -140,20 +164,24 @@ func LoadConfig() (*Configuration, error) {
 		config.TeamsDir = paths.Expand(config.TeamsDir)
 	}
 
-	// Load template mappings
-	templatesMap := viper.GetStringMap("templates")
-	for lang, types := range templatesMap {
-		if typesMap, ok := types.(map[string]interface{}); ok {
-			config.Templates[lang] = make(map[string]string)
-			for typeName, source := range typesMap {
-				if sourceStr, ok := source.(string); ok {
-					config.Templates[lang][typeName] = sourceStr
-				}
-			}
-		}
+	if err := loadTemplatesFromViper(config); err != nil {
+		return nil, err
 	}
 
+	config.Source = config.Source.normalized()
+
 	return config, nil
+}
+
+func loadTemplatesFromViper(cfg *Configuration) error {
+	templatesMap := viper.GetStringMap("templates")
+	templates, err := normalizeTemplateDefinitions(templatesMap)
+	if err != nil {
+		return fmt.Errorf("failed to parse templates configuration: %w", err)
+	}
+
+	cfg.Templates = templates
+	return nil
 }
 
 // InitConfig initialises viper configuration
@@ -182,6 +210,8 @@ func InitConfig(cfgFile string) error {
 	viper.SetDefault("default_language", "go")
 	viper.SetDefault("default_type", "service")
 	viper.SetDefault("default_visibility", "private")
+	viper.SetDefault("config_source.branch", DefaultSourceBranch)
+	viper.SetDefault("config_source.root", ".")
 
 	// Read in environment variables that match
 	viper.AutomaticEnv()

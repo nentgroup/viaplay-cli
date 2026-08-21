@@ -1,12 +1,7 @@
 // Package config provides post-install hooks configuration
 package config
 
-import (
-	"fmt"
-	"path/filepath"
-
-	"github.com/spf13/viper"
-)
+import "path/filepath"
 
 // PostInstallHook represents a hook to run after project scaffolding
 type PostInstallHook struct {
@@ -52,30 +47,13 @@ func (h *PostInstallHook) GetAllScripts() []string {
 
 // GetPostInstallHooks returns the post-install hooks for a specific language and project type
 func (c *Configuration) GetPostInstallHooks(language, projectType string) []*PostInstallHook {
-	// Holds the hooks in order of execution
-	var hooks []*PostInstallHook
-
-	// Check for template-specific hooks
-	// This is the approach where hooks are defined directly in the template configuration
-	templateKey := fmt.Sprintf("templates.%s.%s", language, projectType)
-
-	// Get commands using 'cmd' key
-	templateHooksCmd := viper.GetStringSlice(templateKey + ".hooks.post.install.cmd")
-
-	// Get scripts (unchanged)
-	templateHooksScripts := viper.GetStringSlice(templateKey + ".hooks.post.install.scripts")
-
-	// If we found template-specific hooks, use them
-	if len(templateHooksCmd) > 0 || len(templateHooksScripts) > 0 {
-		hooks = append(hooks, &PostInstallHook{
-			Cmd:     templateHooksCmd,
-			Scripts: templateHooksScripts,
-		})
-		return hooks
+	templateDefinition := c.GetTemplate(language, projectType)
+	if templateDefinition == nil || templateDefinition.Hooks == nil || templateDefinition.Hooks.Post == nil ||
+		templateDefinition.Hooks.Post.Install == nil {
+		return nil
 	}
 
-	// No hooks found
-	return nil
+	return []*PostInstallHook{templateDefinition.Hooks.Post.Install}
 }
 
 // GetHooksDir returns the directory where global hook scripts are stored

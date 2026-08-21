@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,14 +45,16 @@ var configCmd = &cobra.Command{
 	Long: `Manage global and team-specific configuration for viaplay-cli.
 
 - View CLI settings
-- Scaffold team config folders and example JSON files
-- Set up directories for rulesets, secrets, and environments
-- Integrate with $HOME/.config/viaplay/config.yaml by default
+- Scaffold local team config folders and example YAML files
+- Configure a shared read-only source for hooks and team config
+- Pull shared hooks and team config into your local config directory
 
 Examples:
-  vip config init                     				# Initialize config file
-  vip config init --team myteam --organization nentgroup        # Initialize with team config
-  vip config get default_account      				# Get a config value
+  vip config init
+  vip config init team myteam --organization nentgroup
+  vip config init source --organization nentgroup
+  vip config pull
+  vip config get default_team
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := cmd.Help(); err != nil {
@@ -65,19 +68,20 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize viaplay-cli configuration",
 	Long: `Initialize the viaplay-cli configuration directory and config.yaml.
-Optionally scaffold team config files with --team <team> and --org <organization>.
+Optionally scaffold team config files with --team <team> and --organization <organization>.
 
 This command will:
 1. Create the main config.yaml with settings from your authenticated GitHub account
-2. Set up personal account configurations in ~/.config/viaplay/personal/
+2. Set up personal account configurations in ~/.config/viaplay/users/
 3. Set up team configurations when specified with --team flag
+4. Auto-configure the conventional shared source repo when available
 
 When run without flags, it will guide you through an interactive selection of organization and team.
 
 Examples:
   vip config init                          # Initialize config using your GitHub account
   vip config init --team platform          # Initialize with team config
-  vip config init --team platform --org myorg
+  vip config init --team platform --organization myorg
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
@@ -150,6 +154,8 @@ Examples:
 			return fmt.Errorf("failed to initialize config file: %w", err)
 		}
 
+		syncSharedSourceDuringInit(ctx, configuredConfigFilePath(), team, organization)
+
 		// Show success message and next steps
 		showInitSuccessMessage(team, organization)
 
@@ -185,12 +191,15 @@ Examples:
 			return fmt.Errorf("failed to get 'organization' flag: %w", err)
 		}
 
-		if err := config.InitConfig(defaultConfigFile); err != nil {
-			return fmt.Errorf("failed to initialize config: %w", err)
-		}
-
 		if organization == "" {
-			organization = viper.GetString("default_organization")
+			if _, statErr := os.Stat(configuredConfigFilePath()); statErr == nil {
+				if err := config.InitConfig(configuredConfigFilePath()); err != nil {
+					return fmt.Errorf("failed to initialize config: %w", err)
+				}
+				organization = viper.GetString("default_organization")
+			} else if statErr != nil && !os.IsNotExist(statErr) {
+				return fmt.Errorf("failed to stat config file: %w", statErr)
+			}
 		}
 		if organization == "" {
 			return fmt.Errorf("organization is required (use --organization or configure default_organization)")
@@ -211,6 +220,176 @@ Examples:
 		fmt.Printf("  %s Apply it to a repo with %s\n", output.ActiveIcons.Bullet, output.Bold("vip repo apply <owner/repo> --team "+team))
 		fmt.Println()
 
+		return nil
+	},
+}
+
+// initSourceCmd configures the shared config source repository.
+var initSourceCmd = &cobra.Command{
+	Use:          "source",
+	Short:        "Configure the shared config source",
+	SilenceUsage: true,
+	Long: `Configure the read-only repository used to distribute shared team config
+and hooks.
+
+If --repository is omitted, vip looks for the conventional repository
+<organization>/vip-shared-configs and configures it when found.
+
+Examples:
+  vip config init source --organization nentgroup
+  vip config init source --repository git@github.com:nentgroup/vip-shared-configs.git
+  vip config init source --organization nentgroup --root shared-config
+`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		configFile := configuredConfigFilePath()
+		if err := config.InitializeConfigFile(configFile, false, "", ""); err != nil {
+			return fmt.Errorf("failed to initialize config file: %w", err)
+		}
+		if err := config.InitConfig(configFile); err != nil {
+			return fmt.Errorf("failed to initialize config: %w", err)
+		}
+
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		sourceCfg, err := resolveSourceConfigInput(cmd, cfg)
+		if err != nil {
+			return err
+		}
+
+		if err := config.UpdateSourceConfigFile(configFile, sourceCfg); err != nil {
+			return err
+		}
+
+		output.SuccessMessage("Shared config source configured")
+		fmt.Printf("Repository: %s\n", output.Bold(sourceCfg.Repository))
+		fmt.Printf("Branch:     %s\n", output.Bold(sourceCfg.Branch))
+		fmt.Printf("Root:       %s\n", output.Bold(sourceCfg.Root))
+		fmt.Printf("\nNext: %s\n", output.Bold("vip config pull"))
+
+		return nil
+	},
+}
+
+var pullCmd = &cobra.Command{
+	Use:          "pull",
+	Short:        "Pull shared configuration",
+	SilenceUsage: true,
+	Long: `Pull shared configuration from the configured source.
+
+Without subcommands, this pulls shared hooks and the default team when one is
+configured.
+
+Examples:
+  vip config pull
+  vip config pull team gecko --organization nentgroup
+  vip config pull hooks
+  vip config pull all
+`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfigWithSource()
+		if err != nil {
+			return err
+		}
+
+		pulledAnything := false
+
+		if hooksSummary, err := cfg.PullHooks(cmd.Context()); err != nil {
+			if isMissingSharedPathError(err) {
+				output.InfoMessage("No shared hooks found in the source repository")
+			} else {
+				return err
+			}
+		} else {
+			printSourcePullSummary("hooks", hooksSummary)
+			pulledAnything = true
+		}
+
+		teamName := strings.TrimSpace(cfg.DefaultTeam)
+		if teamName != "" {
+			teamSummary, err := cfg.PullTeam(cmd.Context(), teamName, cfg.DefaultOrganization)
+			if err != nil {
+				return err
+			}
+			printSourcePullSummary(fmt.Sprintf("team %s", teamName), teamSummary)
+			pulledAnything = true
+		}
+
+		if !pulledAnything {
+			return fmt.Errorf("nothing to pull: configure default_team or use 'vip config pull team <name>'")
+		}
+
+		return nil
+	},
+}
+
+var pullTeamCmd = &cobra.Command{
+	Use:          "team <name>",
+	Short:        "Pull one shared team configuration",
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfigWithSource()
+		if err != nil {
+			return err
+		}
+
+		organization, err := cmd.Flags().GetString("organization")
+		if err != nil {
+			return fmt.Errorf("failed to get 'organization' flag: %w", err)
+		}
+		if organization == "" {
+			organization = cfg.DefaultOrganization
+		}
+
+		summary, err := cfg.PullTeam(cmd.Context(), args[0], organization)
+		if err != nil {
+			return err
+		}
+
+		printSourcePullSummary(fmt.Sprintf("team %s", args[0]), summary)
+		return nil
+	},
+}
+
+var pullHooksCmd = &cobra.Command{
+	Use:          "hooks",
+	Short:        "Pull shared hooks",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfigWithSource()
+		if err != nil {
+			return err
+		}
+
+		summary, err := cfg.PullHooks(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		printSourcePullSummary("hooks", summary)
+		return nil
+	},
+}
+
+var pullAllCmd = &cobra.Command{
+	Use:          "all",
+	Short:        "Pull all shared hooks and team configs",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfigWithSource()
+		if err != nil {
+			return err
+		}
+
+		summary, err := cfg.PullAll(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		printSourcePullSummary("all shared config", summary)
 		return nil
 	},
 }
@@ -464,6 +643,181 @@ func configuredConfigFilePath() string {
 	return defaultConfigFile
 }
 
+func loadConfigWithSource() (*config.Configuration, error) {
+	configFile := configuredConfigFilePath()
+	if err := config.InitConfig(configFile); err != nil {
+		return nil, fmt.Errorf("failed to initialize config: %w", err)
+	}
+
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+	if !cfg.HasSource() {
+		return nil, fmt.Errorf("shared config source is not configured (run 'vip config init source')")
+	}
+
+	return cfg, nil
+}
+
+func resolveSourceConfigInput(cmd *cobra.Command, cfg *config.Configuration) (config.SourceConfig, error) {
+	repository, err := cmd.Flags().GetString("repository")
+	if err != nil {
+		return config.SourceConfig{}, fmt.Errorf("failed to get 'repository' flag: %w", err)
+	}
+	branch, err := cmd.Flags().GetString("branch")
+	if err != nil {
+		return config.SourceConfig{}, fmt.Errorf("failed to get 'branch' flag: %w", err)
+	}
+	root, err := cmd.Flags().GetString("root")
+	if err != nil {
+		return config.SourceConfig{}, fmt.Errorf("failed to get 'root' flag: %w", err)
+	}
+	organization, err := cmd.Flags().GetString("organization")
+	if err != nil {
+		return config.SourceConfig{}, fmt.Errorf("failed to get 'organization' flag: %w", err)
+	}
+
+	if organization == "" && cfg != nil {
+		organization = cfg.DefaultOrganization
+	}
+
+	if repository == "" {
+		repository, err = detectSharedSourceRepository(cmd.Context(), organization)
+		if err != nil {
+			return config.SourceConfig{}, err
+		}
+	}
+	if branch == "" {
+		if cfg != nil && cfg.Source.Branch != "" {
+			branch = cfg.Source.Branch
+		} else {
+			branch = config.DefaultSourceBranch
+		}
+	}
+	if root == "" {
+		if cfg != nil && cfg.Source.Root != "" {
+			root = cfg.Source.Root
+		} else {
+			root = config.DefaultSourceRoot
+		}
+	}
+
+	return config.SourceConfig{
+		Repository: repository,
+		Branch:     branch,
+		Root:       root,
+	}, nil
+}
+
+func detectSharedSourceRepository(ctx context.Context, organization string) (string, error) {
+	organization = strings.TrimSpace(organization)
+	if organization == "" {
+		return "", fmt.Errorf("organization is required when --repository is omitted")
+	}
+
+	token, err := gh.GetToken()
+	if err != nil || token == "" {
+		return "", fmt.Errorf("GitHub authentication is required to detect %s/%s automatically; run 'vip auth login' or pass --repository",
+			organization, config.SharedConfigRepoName)
+	}
+
+	ghClient := gh.NewGitHubClient(token)
+	exists, err := ghClient.RepositoryExists(ctx, organization, config.SharedConfigRepoName)
+	if err != nil {
+		return "", fmt.Errorf("failed to check for shared config repository %s/%s: %w", organization, config.SharedConfigRepoName, err)
+	}
+	if !exists {
+		return "", fmt.Errorf("shared config repository not found: %s/%s", organization, config.SharedConfigRepoName)
+	}
+
+	return fmt.Sprintf("git@github.com:%s/%s.git", organization, config.SharedConfigRepoName), nil
+}
+
+func syncSharedSourceDuringInit(ctx context.Context, configFile, team, organization string) {
+	cfg, err := loadConfigWithSource()
+	if err == nil && cfg.HasSource() {
+		pullSharedSourceDuringInit(ctx, cfg, team, organization)
+		return
+	}
+
+	if strings.TrimSpace(organization) == "" {
+		return
+	}
+
+	sourceCfg := config.SourceConfig{
+		Branch: config.DefaultSourceBranch,
+		Root:   config.DefaultSourceRoot,
+	}
+	sourceCfg.Repository, err = detectSharedSourceRepository(ctx, organization)
+	if err != nil {
+		return
+	}
+
+	if err := config.UpdateSourceConfigFile(configFile, sourceCfg); err != nil {
+		output.WarningMessage(fmt.Sprintf("Detected shared config source but failed to save it: %v", err))
+		return
+	}
+
+	output.InfoMessage(fmt.Sprintf("Configured shared source from %s/%s", organization, config.SharedConfigRepoName))
+
+	cfg, err = loadConfigWithSource()
+	if err != nil {
+		output.WarningMessage(fmt.Sprintf("Shared source was configured but could not be loaded: %v", err))
+		return
+	}
+
+	pullSharedSourceDuringInit(ctx, cfg, team, organization)
+}
+
+func pullSharedSourceDuringInit(ctx context.Context, cfg *config.Configuration, team, organization string) {
+	if hooksSummary, err := cfg.PullHooks(ctx); err == nil {
+		printSourcePullSummary("hooks", hooksSummary)
+	} else if !isMissingSharedPathError(err) {
+		output.WarningMessage(fmt.Sprintf("Failed to pull shared hooks: %v", err))
+	}
+
+	team = strings.TrimSpace(team)
+	if team == "" {
+		team = cfg.DefaultTeam
+	}
+	if team == "" {
+		return
+	}
+
+	organization = strings.TrimSpace(organization)
+	if organization == "" {
+		organization = cfg.DefaultOrganization
+	}
+
+	teamSummary, err := cfg.PullTeam(ctx, team, organization)
+	if err != nil {
+		output.WarningMessage(fmt.Sprintf("Failed to pull shared team config for %s: %v", team, err))
+		return
+	}
+
+	printSourcePullSummary(fmt.Sprintf("team %s", team), teamSummary)
+}
+
+func isMissingSharedPathError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "shared config path not found")
+}
+
+func printSourcePullSummary(label string, summary *config.SourcePullSummary) {
+	if summary == nil || summary.FileOps == nil {
+		return
+	}
+
+	output.SuccessMessage(fmt.Sprintf("Pulled %s", label))
+	fmt.Printf("Source root: %s\n", output.Bold(summary.SourceRoot))
+	for _, target := range summary.Targets {
+		fmt.Printf("Target:      %s\n", output.Bold(target))
+	}
+	fmt.Printf("Created:     %d\n", len(summary.FileOps.Created))
+	fmt.Printf("Updated:     %d\n", len(summary.FileOps.Overrode))
+	fmt.Println()
+}
+
 // showConfigPaths displays all configuration paths
 func showConfigPaths() {
 	fmt.Println("Configuration paths:")
@@ -623,6 +977,7 @@ func validateMainConfig(configFile string, report *configValidationReport) error
 
 func validateMainConfigSettings(raw map[string]interface{}, report *configValidationReport) {
 	validateDefaultVisibility(raw["default_visibility"], report)
+	validateSourceConfig(raw["config_source"], report)
 
 	for _, issue := range collectTemplateValidationIssues(raw["templates"]) {
 		report.addError(issue)
@@ -647,6 +1002,39 @@ func validateDefaultVisibility(value interface{}, report *configValidationReport
 
 	if !slices.Contains([]string{"private", "public"}, trimmed) {
 		report.addError(fmt.Sprintf("main config: default_visibility must be \"private\" or \"public\", got %q", visibility))
+	}
+}
+
+func validateSourceConfig(value interface{}, report *configValidationReport) {
+	if value == nil {
+		return
+	}
+
+	sourceMap, ok := toStringAnyMap(value)
+	if !ok {
+		report.addError("main config: config_source must be a map")
+		return
+	}
+
+	if repository, exists := sourceMap["repository"]; exists {
+		repositoryValue, ok := repository.(string)
+		if !ok || strings.TrimSpace(repositoryValue) == "" {
+			report.addError("main config: config_source.repository must be a non-empty string when set")
+		}
+	}
+
+	if branch, exists := sourceMap["branch"]; exists {
+		branchValue, ok := branch.(string)
+		if !ok || strings.TrimSpace(branchValue) == "" {
+			report.addError("main config: config_source.branch must be a non-empty string when set")
+		}
+	}
+
+	if root, exists := sourceMap["root"]; exists {
+		rootValue, ok := root.(string)
+		if !ok || strings.TrimSpace(rootValue) == "" {
+			report.addError("main config: config_source.root must be a non-empty string when set")
+		}
 	}
 }
 
@@ -896,6 +1284,7 @@ func validateConfigDirectory(target configValidationTarget, report *configValida
 
 	report.addChecked(fmt.Sprintf("%s: %s", target.label, target.path))
 	validateSecretsConfigFile(target, report)
+	validateTeamOverrideConfigFile(target, report)
 	validateYAMLConfigDir(target, "envs", validateEnvironmentConfigFile, report)
 	validateYAMLConfigDir(target, "rulesets", validateRulesetConfigFile, report)
 }
@@ -935,6 +1324,40 @@ func validateSecretsConfigFile(target configValidationTarget, report *configVali
 	}
 
 	report.addChecked(fmt.Sprintf("%s: %s", target.label, secretsPath))
+}
+
+func validateTeamOverrideConfigFile(target configValidationTarget, report *configValidationReport) {
+	configPath := filepath.Join(target.path, "config.yaml")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			report.addWarning(fmt.Sprintf("%s: config.yaml not found", target.label))
+			return
+		}
+		report.addError(fmt.Sprintf("%s: failed to read %s: %v", target.label, configPath, err))
+		return
+	}
+
+	var overrideFile struct {
+		Templates map[string]map[string]*config.TemplateDefinition `yaml:"templates"`
+	}
+	if err := yaml.Unmarshal(data, &overrideFile); err != nil {
+		report.addError(fmt.Sprintf("%s: invalid YAML in %s: %v", target.label, configPath, err))
+		return
+	}
+
+	for language, types := range overrideFile.Templates {
+		for projectType, definition := range types {
+			if definition == nil {
+				continue
+			}
+			if definition.Source == "" && definition.Hooks == nil {
+				report.addError(fmt.Sprintf("%s: templates.%s.%s must define source and/or hooks", target.label, language, projectType))
+			}
+		}
+	}
+
+	report.addChecked(fmt.Sprintf("%s: %s", target.label, configPath))
 }
 
 func validateYAMLConfigDir(
@@ -1201,8 +1624,13 @@ func init() {
 	configCmd.AddCommand(editCmd)
 	configCmd.AddCommand(pathCmd)
 	configCmd.AddCommand(pathsCmd)
+	configCmd.AddCommand(pullCmd)
 	configCmd.AddCommand(validateCmd)
 	initCmd.AddCommand(initTeamCmd)
+	initCmd.AddCommand(initSourceCmd)
+	pullCmd.AddCommand(pullTeamCmd)
+	pullCmd.AddCommand(pullHooksCmd)
+	pullCmd.AddCommand(pullAllCmd)
 
 	// Define flags for the init command
 	initCmd.Flags().StringP("team", "t", "", "Team name to scaffold configs for (optional)")
@@ -1211,6 +1639,11 @@ func init() {
 
 	initTeamCmd.Flags().Bool("override", false, "Override existing team config files if they exist")
 	initTeamCmd.Flags().StringP("organization", "o", "", "Organization name for the team config")
+
+	initSourceCmd.Flags().StringP("repository", "r", "", "Shared config repository URL")
+	initSourceCmd.Flags().String("branch", "", "Branch to use from the shared config repository (defaults to current config or main)")
+	initSourceCmd.Flags().String("root", "", "Root path inside the shared config repository (defaults to current config or .)")
+	initSourceCmd.Flags().StringP("organization", "o", "", "Organization used to detect the conventional vip-shared-configs repository")
 
 	pathCmd.Flags().StringP("team", "t", "", "Team name for the team config path (falls back to default_team)")
 	pathCmd.Flags().StringP("organization", "o", "", "Organization name for the team config path (falls back to default_organization)")
@@ -1224,4 +1657,6 @@ func init() {
 	validateCmd.Flags().StringP("organization", "o", "", "Organization name for the team config path (falls back to default_organization)")
 	validateCmd.Flags().StringP("user", "u", "", "Username for the personal config path")
 	validateCmd.Flags().Bool("all-teams", false, "Validate every discovered team configuration directory")
+
+	pullTeamCmd.Flags().StringP("organization", "o", "", "Organization name for the team config path (falls back to default_organization)")
 }

@@ -81,6 +81,17 @@ func SetupDirs(baseDir string, isTeam, override bool) (*FileOps, error) {
 		{RulesetBlueprintFile, filepath.Join(rulesetsDir, "block-dev-branch.yaml"), "ruleset"},
 		{SecretsBlueprintFile, filepath.Join(baseDir, "secrets.yaml"), "secrets"},
 	}
+	if isTeam {
+		blueprintConfigs = append(blueprintConfigs, struct {
+			blueprintFile string
+			destPath      string
+			description   string
+		}{
+			blueprintFile: TeamConfigBlueprintFile,
+			destPath:      filepath.Join(baseDir, "config.yaml"),
+			description:   "team config override",
+		})
+	}
 
 	for _, config := range blueprintConfigs {
 		configResult, err := createFileFromBlueprint(config.blueprintFile, config.destPath, isTeam, override)

@@ -54,50 +54,19 @@ func NewRegistry(cfg *config.Configuration) *Registry {
 func (r *Registry) LoadTemplates() error {
 	// Load templates from config
 	for language, types := range r.Config.Templates {
-		for templateType, source := range types {
+		for templateType, definition := range types {
+			if definition == nil || definition.Source == "" {
+				continue
+			}
 			templateID := fmt.Sprintf("%s/%s", language, templateType)
 
 			r.Templates[templateID] = &TemplateInfo{
 				ID:          templateID,
 				Language:    language,
 				Type:        templateType,
-				Source:      source,
+				Source:      definition.Source,
 				Description: fmt.Sprintf("%s %s template", language, templateType),
 				Tags:        []string{language, templateType},
-			}
-		}
-	}
-
-	// Additionally load from viper directly in case config struct doesn't have all templates
-	templatesMap := viper.GetStringMap("templates")
-	for lang, typesInterface := range templatesMap {
-		language := lang
-		if typesMap, ok := typesInterface.(map[string]interface{}); ok {
-			for typeKey, sourceInterface := range typesMap {
-				templateType := typeKey
-
-				// Skip if already loaded
-				templateID := fmt.Sprintf("%s/%s", language, templateType)
-				if _, exists := r.Templates[templateID]; exists {
-					continue
-				}
-
-				// Convert source to string
-				var source string
-				if sourceStr, ok := sourceInterface.(string); ok {
-					source = sourceStr
-				} else {
-					continue // Skip if source is not a string
-				}
-
-				r.Templates[templateID] = &TemplateInfo{
-					ID:          templateID,
-					Language:    language,
-					Type:        templateType,
-					Source:      source,
-					Description: fmt.Sprintf("%s %s template", language, templateType),
-					Tags:        []string{language, templateType},
-				}
 			}
 		}
 	}
@@ -184,17 +153,17 @@ func (r *Registry) RegisterTemplate(template *TemplateInfo) error {
 
 	// Update configuration
 	if r.Config.Templates == nil {
-		r.Config.Templates = make(map[string]map[string]string)
+		r.Config.Templates = make(map[string]map[string]*config.TemplateDefinition)
 	}
 
 	if r.Config.Templates[template.Language] == nil {
-		r.Config.Templates[template.Language] = make(map[string]string)
+		r.Config.Templates[template.Language] = make(map[string]*config.TemplateDefinition)
 	}
 
-	r.Config.Templates[template.Language][template.Type] = template.Source
+	r.Config.Templates[template.Language][template.Type] = &config.TemplateDefinition{Source: template.Source}
 
 	// Update viper configuration
-	viperKey := fmt.Sprintf("templates.%s.%s", template.Language, template.Type)
+	viperKey := fmt.Sprintf("templates.%s.%s.source", template.Language, template.Type)
 	viper.Set(viperKey, template.Source)
 
 	return nil
@@ -218,7 +187,7 @@ func (r *Registry) UnregisterTemplate(language, templateType string) error {
 	}
 
 	// Update viper configuration
-	viperKey := fmt.Sprintf("templates.%s.%s", language, templateType)
+	viperKey := fmt.Sprintf("templates.%s.%s.source", language, templateType)
 	viper.Set(viperKey, nil)
 
 	return nil
@@ -228,7 +197,7 @@ func (r *Registry) UnregisterTemplate(language, templateType string) error {
 func (r *Registry) SaveTemplates() error {
 	// Write to viper config
 	for _, template := range r.Templates {
-		viperKey := fmt.Sprintf("templates.%s.%s", template.Language, template.Type)
+		viperKey := fmt.Sprintf("templates.%s.%s.source", template.Language, template.Type)
 		viper.Set(viperKey, template.Source)
 	}
 

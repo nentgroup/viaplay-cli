@@ -15,6 +15,7 @@ const (
 	EnvironmentBlueprintFile = "blueprints/environment.yaml"
 	RulesetBlueprintFile     = "blueprints/ruleset.yaml"
 	SecretsBlueprintFile     = "blueprints/secrets.yaml"
+	TeamConfigBlueprintFile  = "blueprints/team-config.yaml"
 )
 
 // GetBlueprintContent returns the content of a blueprint file
@@ -30,6 +31,8 @@ func GetBlueprintContent(blueprintName string) ([]byte, error) {
 		blueprintPath = RulesetBlueprintFile
 	case "secrets.yaml":
 		blueprintPath = SecretsBlueprintFile
+	case "team-config.yaml":
+		blueprintPath = TeamConfigBlueprintFile
 	}
 
 	return blueprintFiles.ReadFile(blueprintPath)

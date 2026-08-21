@@ -12,6 +12,7 @@ rulesets, secrets, and more. There are three main types of configuration:
 - **Global config:** `~/.config/viaplay/config.yaml` — User-wide defaults and settings.
 - **Organization team configs:** `~/.config/viaplay/orgs/<organization>/<team>/` — Team-specific settings folder containing various configuration files like rulesets, environments, and secrets within an organization.
 - **Personal user configs:** `~/.config/viaplay/users/<username>/` — User-specific settings folder containing configuration files for personal repositories.
+- **Shared config source:** an optional read-only Git repository used to distribute hooks and team config directories locally via `vip config pull`.
 
 ---
 
@@ -115,6 +116,17 @@ templates:
 
 
 # -----------------------------------------------
+# Shared Configuration Source
+# -----------------------------------------------
+
+# Optional read-only repository used to distribute shared team configs and hooks
+config_source:
+  repository: "git@github.com:nentgroup/vip-shared-configs.git"
+  branch: "main"
+  root: "."
+
+
+# -----------------------------------------------
 # Directory Configuration
 # -----------------------------------------------
 
@@ -141,6 +153,54 @@ container_registry: "ecr"
 # Debug mode (enables verbose logging)
 debug: false
 ```
+
+---
+
+## Shared Config Source
+
+You can keep shared hooks and team configuration in a dedicated Git repository
+and pull it into your local viaplay config.
+
+### Configuring the source
+
+```bash
+vip config init source --organization nentgroup
+```
+
+This looks for the conventional repository `nentgroup/vip-shared-configs`. You
+can also configure an explicit repository URL:
+
+```bash
+vip config init source --repository git@github.com:nentgroup/vip-shared-configs.git
+```
+
+### Expected repository layout
+
+The shared source is read-only from `vip` and can contain any of these paths:
+
+```text
+hooks/
+teams/<team>/
+orgs/<organization>/teams/<team>/
+```
+
+### Pulling shared config
+
+```bash
+vip config pull
+vip config pull team gecko --organization nentgroup
+vip config pull hooks
+vip config pull all
+```
+
+- `vip config pull` pulls shared hooks and your `default_team` when configured.
+- `vip config pull team <name>` pulls one team config.
+- `vip config pull hooks` pulls only shared hooks.
+- `vip config pull all` pulls hooks and every shared team config directory found in the source repo.
+
+During `vip config init`, if an organization is selected and the conventional
+shared config repository exists, `vip` configures it automatically and pulls
+hooks plus the selected/default team config.
 
 ---
 
@@ -239,6 +299,8 @@ vip hooks doctor go/service
 vip hooks run go/service --path ./myservice
 ```
 
+Teams can also override template sources and hooks with a `config.yaml` file inside the team config directory. When present, the team config overlays the main config for matching `<language>/<type>` entries.
+
 ### Locating Hook Scripts
 
 Hook scripts referenced in the `scripts` section are resolved in the following order:
@@ -267,6 +329,8 @@ To create a new hook script:
 - Use `vip config edit` to open the main config file in your configured editor.
 - Use `vip config edit team --team <name> --organization <org>` to jump straight into a team config directory.
 - Use `vip config get <key>` to view current values.
+- Use `vip config init source` to configure the shared config repository once.
+- Use `vip config pull` to refresh local shared hooks and team config from that source.
 - Use `vip config path <team|user|hooks|templates>` to print one resolved config path for scripts or quick navigation.
 - Use `vip config validate` to check the main config file and any selected team or user config directories before applying them.
 - Edit YAML files directly for advanced changes.

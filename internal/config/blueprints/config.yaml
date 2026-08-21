@@ -99,6 +99,17 @@ templates:
 
 
 # -----------------------------------------------
+# Shared Configuration Source
+# -----------------------------------------------
+
+# Optional read-only repository used to distribute shared team configs and hooks
+config_source:
+  repository: ""
+  branch: "main"
+  root: "."
+
+
+# -----------------------------------------------
 # Directory Configuration
 # -----------------------------------------------
 

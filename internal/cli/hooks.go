@@ -22,6 +22,8 @@ const sampleHookScriptName = "example-post-install.sh"
 var unresolvedHookTemplatePattern = regexp.MustCompile(`{{[^}]+}}`)
 
 type hooksCommandOptions struct {
+	Language    string
+	ProjectType string
 	Path        string
 	Name        string
 	Owner       string
@@ -71,17 +73,17 @@ func newHooksListCommand() *cobra.Command {
 	opts := &hooksCommandOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "list <language>/<type>",
+		Use:   "list [<language>/<type>]",
 		Short: "List configured hooks for a template",
 		Long:  `List the post-install hook commands and scripts configured for a template.`,
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			language, projectType, err := parseHookTemplateRef(args[0])
+			language, projectType, err := resolveHookTemplateRef(args, opts)
 			if err != nil {
 				return err
 			}
 
-			cfg, err := config.LoadConfig()
+			cfg, err := loadConfigWithTeamOverrides(valueOrDefault(opts.Team, viper.GetString("default_team")), "")
 			if err != nil {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
@@ -117,18 +119,18 @@ func newHooksDoctorCommand() *cobra.Command {
 	opts := &hooksCommandOptions{}
 
 	cmd := &cobra.Command{
-		Use:          "doctor <language>/<type>",
+		Use:          "doctor [<language>/<type>]",
 		Short:        "Validate hooks for a template",
 		Long:         `Validate that configured hook commands render correctly and referenced scripts exist and are executable.`,
-		Args:         cobra.ExactArgs(1),
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			language, projectType, err := parseHookTemplateRef(args[0])
+			language, projectType, err := resolveHookTemplateRef(args, opts)
 			if err != nil {
 				return err
 			}
 
-			cfg, err := config.LoadConfig()
+			cfg, err := loadConfigWithTeamOverrides(valueOrDefault(opts.Team, viper.GetString("default_team")), "")
 			if err != nil {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
@@ -162,18 +164,18 @@ func newHooksRunCommand() *cobra.Command {
 	opts := &hooksCommandOptions{}
 
 	cmd := &cobra.Command{
-		Use:          "run <language>/<type>",
+		Use:          "run [<language>/<type>]",
 		Short:        "Run post-install hooks for a template",
 		Long:         `Run the configured post-install hooks for a template against a target directory.`,
-		Args:         cobra.ExactArgs(1),
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			language, projectType, err := parseHookTemplateRef(args[0])
+			language, projectType, err := resolveHookTemplateRef(args, opts)
 			if err != nil {
 				return err
 			}
 
-			cfg, err := config.LoadConfig()
+			cfg, err := loadConfigWithTeamOverrides(valueOrDefault(opts.Team, viper.GetString("default_team")), "")
 			if err != nil {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
@@ -243,6 +245,8 @@ func newHooksInitCommand() *cobra.Command {
 }
 
 func addSharedHooksFlags(cmd *cobra.Command, opts *hooksCommandOptions) {
+	cmd.Flags().StringVar(&opts.Language, "language", "", "Template language (falls back to default_language)")
+	cmd.Flags().StringVar(&opts.ProjectType, "type", "", "Template type (falls back to default_type)")
 	cmd.Flags().StringVar(&opts.Path, "path", ".", "Target project directory")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Project name for template variable rendering (defaults to directory name)")
 	cmd.Flags().StringVar(&opts.Owner, "owner", "", "Repository owner for template variable rendering")
@@ -260,7 +264,7 @@ func printHookListPreviewNote(cmd *cobra.Command) {
 }
 
 func hasExplicitHookPreviewInput(cmd *cobra.Command) bool {
-	for _, flagName := range []string{"path", "name", "owner", "team", "description"} {
+	for _, flagName := range []string{"language", "type", "path", "name", "owner", "team", "description"} {
 		if cmd.Flags().Changed(flagName) {
 			return true
 		}
@@ -276,6 +280,28 @@ func parseHookTemplateRef(value string) (string, string, error) {
 	}
 
 	return parts[0], parts[1], nil
+}
+
+func resolveHookTemplateRef(args []string, opts *hooksCommandOptions) (string, string, error) {
+	if len(args) == 1 {
+		return parseHookTemplateRef(args[0])
+	}
+
+	language := opts.Language
+	if language == "" {
+		language = viper.GetString("default_language")
+	}
+
+	projectType := opts.ProjectType
+	if projectType == "" {
+		projectType = viper.GetString("default_type")
+	}
+
+	if language == "" || projectType == "" {
+		return "", "", fmt.Errorf("template reference is required (pass <language>/<type> or set --language/--type, or configure default_language/default_type)")
+	}
+
+	return language, projectType, nil
 }
 
 func buildHooksRenderer(opts *hooksCommandOptions, language, projectType string) (*templatepkg.Renderer, error) {

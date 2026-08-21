@@ -1,0 +1,19 @@
+# Team Config Overrides
+# This file lets a team override selected parts of the main viaplay-cli config.
+#
+# Supported overrides today:
+# - templates.<language>.<type>.source
+# - templates.<language>.<type>.hooks
+#
+# Example:
+# templates:
+#   go:
+#     service:
+#       source: git@github.com:nentgroup/team-go-service-template.git
+#       hooks:
+#         post:
+#           install:
+#             cmd:
+#               - echo "team specific setup"
+
+templates: {}
