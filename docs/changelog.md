@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.8.0](https://github.com/nentgroup/viaplay-cli/compare/v2.7.0...v2.8.0) (2026-08-21)
+
+
+### Features
+
+* add hooks command ([ff40d19](https://github.com/nentgroup/viaplay-cli/commit/ff40d19f3cb03109dfe4e443954ca0d78e1eae9e))
+* add support for remote shared configs ([3349548](https://github.com/nentgroup/viaplay-cli/commit/3349548faf6d03bd8abbfde28962692d191079c7))
+* enhance config command ergonomics ([975ee24](https://github.com/nentgroup/viaplay-cli/commit/975ee2480ef825da3769d523f489d157734e040a))
+* enhance template command ergonomics ([fcdf4b4](https://github.com/nentgroup/viaplay-cli/commit/fcdf4b46582af04b9d8dcfe8ca5616de7ddafe4b))
+* refactor hooks discovery ([5f819f5](https://github.com/nentgroup/viaplay-cli/commit/5f819f56fe5ba0a703d949278698159dddfe2501))
+
+
+### Bug Fixes
+
+* correct apply --only flag ([69cb9c0](https://github.com/nentgroup/viaplay-cli/commit/69cb9c010d983804375891f721b6e3a366bea309))
+* refactor shared hooks ([9b716c5](https://github.com/nentgroup/viaplay-cli/commit/9b716c5ad5fb74339e380c661f9c9b5f9b41fbf9))
+
 ## [2.7.0](https://github.com/nentgroup/viaplay-cli/compare/v2.6.0...v2.7.0) (2026-08-20)
 
 
