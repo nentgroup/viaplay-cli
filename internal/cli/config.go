@@ -119,19 +119,15 @@ Examples:
 
 		// Interactive organisation and team selection if neither team nor organisation flags are set
 		if !cmd.Flags().Changed("team") && !cmd.Flags().Changed("organization") {
-			// Interactive selection of organization
 			selectedOrg, err := SelectOrganizationWithBubbles(ctx, ghClient)
 			if err != nil {
-				fmt.Printf("Warning: %v\n", err)
-				// Continue without organization if there's an error
+				output.WarningMessage(fmt.Sprintf("Could not select organization: %v", err))
 			} else if selectedOrg != "" {
 				organization = selectedOrg
 
-				// If we have an organization, also select a team
 				selectedTeam, err := SelectTeamWithBubbles(ctx, ghClient, organization)
 				if err != nil {
-					fmt.Printf("Warning: %v\n", err)
-					// Continue without team if there's an error
+					output.WarningMessage(fmt.Sprintf("Could not select team: %v", err))
 				} else if selectedTeam != "" {
 					team = selectedTeam
 				}
@@ -296,7 +292,7 @@ Examples:
 
 		pulledAnything := false
 
-		if hooksSummary, err := cfg.PullHooks(cmd.Context()); err != nil {
+		if hooksSummary, err := cfg.PullHooks(cmd.Context(), cfg.DefaultOrganization, cfg.DefaultTeam); err != nil {
 			if isMissingSharedPathError(err) {
 				output.InfoMessage("No shared hooks found in the source repository")
 			} else {
@@ -356,7 +352,7 @@ var pullTeamCmd = &cobra.Command{
 
 var pullHooksCmd = &cobra.Command{
 	Use:          "hooks",
-	Short:        "Pull shared hooks",
+	Short:        "Pull hooks for the active team from the shared config source",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := loadConfigWithSource()
@@ -364,7 +360,16 @@ var pullHooksCmd = &cobra.Command{
 			return err
 		}
 
-		summary, err := cfg.PullHooks(cmd.Context())
+		org, err := cmd.Flags().GetString("organization")
+		if err != nil {
+			return err
+		}
+		team, err := cmd.Flags().GetString("team")
+		if err != nil {
+			return err
+		}
+
+		summary, err := cfg.PullHooks(cmd.Context(), org, team)
 		if err != nil {
 			return err
 		}
@@ -376,7 +381,7 @@ var pullHooksCmd = &cobra.Command{
 
 var pullAllCmd = &cobra.Command{
 	Use:          "all",
-	Short:        "Pull all shared hooks and team configs",
+	Short:        "Pull all shared team configs and their hooks",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := loadConfigWithSource()
@@ -771,23 +776,23 @@ func syncSharedSourceDuringInit(ctx context.Context, configFile, team, organizat
 }
 
 func pullSharedSourceDuringInit(ctx context.Context, cfg *config.Configuration, team, organization string) {
-	if hooksSummary, err := cfg.PullHooks(ctx); err == nil {
+	team = strings.TrimSpace(team)
+	if team == "" {
+		team = cfg.DefaultTeam
+	}
+	organization = strings.TrimSpace(organization)
+	if organization == "" {
+		organization = cfg.DefaultOrganization
+	}
+
+	if hooksSummary, err := cfg.PullHooks(ctx, organization, team); err == nil {
 		printSourcePullSummary("hooks", hooksSummary)
 	} else if !isMissingSharedPathError(err) {
 		output.WarningMessage(fmt.Sprintf("Failed to pull shared hooks: %v", err))
 	}
 
-	team = strings.TrimSpace(team)
-	if team == "" {
-		team = cfg.DefaultTeam
-	}
 	if team == "" {
 		return
-	}
-
-	organization = strings.TrimSpace(organization)
-	if organization == "" {
-		organization = cfg.DefaultOrganization
 	}
 
 	teamSummary, err := cfg.PullTeam(ctx, team, organization)
@@ -800,7 +805,12 @@ func pullSharedSourceDuringInit(ctx context.Context, cfg *config.Configuration, 
 }
 
 func isMissingSharedPathError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "shared config path not found")
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "shared config path not found") ||
+		strings.Contains(msg, "no hooks directory found")
 }
 
 func printSourcePullSummary(label string, summary *config.SourcePullSummary) {
@@ -1659,4 +1669,7 @@ func init() {
 	validateCmd.Flags().Bool("all-teams", false, "Validate every discovered team configuration directory")
 
 	pullTeamCmd.Flags().StringP("organization", "o", "", "Organization name for the team config path (falls back to default_organization)")
+
+	pullHooksCmd.Flags().StringP("organization", "o", "", "Override organization for hook layer resolution (falls back to default_organization)")
+	pullHooksCmd.Flags().StringP("team", "t", "", "Override team for hook layer resolution (falls back to default_team)")
 }

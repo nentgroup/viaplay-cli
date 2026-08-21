@@ -138,27 +138,48 @@ func (c *Configuration) SyncSourceRepository(ctx context.Context) (string, error
 	return sourceRoot, nil
 }
 
-// PullHooks copies hooks from the shared config source into the local hooks directory.
-func (c *Configuration) PullHooks(ctx context.Context) (*SourcePullSummary, error) {
+// PullHooks copies the hooks from the active team's shared config directory into the local
+// hooks directory. org and team fall back to the values in the main config when empty.
+func (c *Configuration) PullHooks(ctx context.Context, org, team string) (*SourcePullSummary, error) {
+	if org == "" {
+		org = strings.TrimSpace(c.DefaultOrganization)
+	}
+	if team == "" {
+		team = strings.TrimSpace(c.DefaultTeam)
+	}
+	if team == "" {
+		return nil, fmt.Errorf("team is required for hook pull (set default_team in config or pass --team)")
+	}
+
 	sourceRoot, err := c.SyncSourceRepository(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	sourceHooksDir := filepath.Join(sourceRoot, "hooks")
-	result, err := copyTree(sourceHooksDir, c.GetHooksDir())
+	sourceDir, _, err := c.resolveSourceTeamDir(sourceRoot, team, org)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SourcePullSummary{
+	summary := &SourcePullSummary{
 		SourceRoot: sourceRoot,
-		Targets:    []string{c.GetHooksDir()},
-		FileOps:    result,
-	}, nil
+		FileOps:    NewFileOps(),
+	}
+
+	found, err := c.pullHooksFromDir(filepath.Join(sourceDir, "hooks"), summary)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("no hooks directory found for team %s in shared config source", team)
+	}
+
+	summary.Targets = []string{c.GetHooksDir()}
+	return summary, nil
 }
 
-// PullTeam copies one team directory from the shared config source into the local config.
+// PullTeam copies one team directory from the shared config source into the local config,
+// and merges team-level hooks into the local hooks directory.
 func (c *Configuration) PullTeam(ctx context.Context, team, org string) (*SourcePullSummary, error) {
 	if strings.TrimSpace(team) == "" {
 		return nil, fmt.Errorf("team name is required")
@@ -179,14 +200,24 @@ func (c *Configuration) PullTeam(ctx context.Context, team, org string) (*Source
 		return nil, err
 	}
 
-	return &SourcePullSummary{
+	summary := &SourcePullSummary{
 		SourceRoot: sourceRoot,
 		Targets:    []string{destDir},
 		FileOps:    result,
-	}, nil
+	}
+
+	// Merge team-level hooks (a hooks/ subdir inside the team source dir).
+	if _, err := c.pullHooksFromDir(filepath.Join(sourceDir, "hooks"), summary); err != nil {
+		return nil, err
+	}
+	if len(summary.FileOps.Created)+len(summary.FileOps.Overrode) > len(result.Created)+len(result.Overrode) {
+		summary.Targets = append(summary.Targets, c.GetHooksDir())
+	}
+
+	return summary, nil
 }
 
-// PullAll copies hooks and all shared team directories from the source into the local config.
+// PullAll copies all shared team configs and their hooks from the source into the local config.
 func (c *Configuration) PullAll(ctx context.Context) (*SourcePullSummary, error) {
 	sourceRoot, err := c.SyncSourceRepository(ctx)
 	if err != nil {
@@ -198,15 +229,6 @@ func (c *Configuration) PullAll(ctx context.Context) (*SourcePullSummary, error)
 		FileOps:    NewFileOps(),
 	}
 
-	sourceHooksDir := filepath.Join(sourceRoot, "hooks")
-	if exists, err := directoryExists(sourceHooksDir); err != nil {
-		return nil, err
-	} else if exists {
-		if err := mergePulledTree(summary, sourceHooksDir, c.GetHooksDir()); err != nil {
-			return nil, err
-		}
-	}
-
 	if err := c.pullLegacyTeams(sourceRoot, summary); err != nil {
 		return nil, err
 	}
@@ -215,7 +237,7 @@ func (c *Configuration) PullAll(ctx context.Context) (*SourcePullSummary, error)
 	}
 
 	if len(summary.Targets) == 0 {
-		return nil, fmt.Errorf("shared config source does not contain hooks/, teams/, or orgs/")
+		return nil, fmt.Errorf("shared config source does not contain any team configs (teams/ or orgs/)")
 	}
 
 	return summary, nil
@@ -230,6 +252,24 @@ func mergePulledTree(summary *SourcePullSummary, sourceDir, destDir string) erro
 	summary.Targets = append(summary.Targets, destDir)
 	summary.FileOps.Merge(result)
 	return nil
+}
+
+// pullHooksFromDir merges a hooks directory into the local hooks dir.
+// It is a no-op when the source directory does not exist.
+// Returns true if the directory was found and processed.
+func (c *Configuration) pullHooksFromDir(hooksDir string, summary *SourcePullSummary) (bool, error) {
+	exists, err := directoryExists(hooksDir)
+	if err != nil || !exists {
+		return false, err
+	}
+
+	result, err := copyTree(hooksDir, c.GetHooksDir())
+	if err != nil {
+		return false, err
+	}
+
+	summary.FileOps.Merge(result)
+	return true, nil
 }
 
 func (c *Configuration) pullLegacyTeams(sourceRoot string, summary *SourcePullSummary) error {
@@ -248,8 +288,14 @@ func (c *Configuration) pullLegacyTeams(sourceRoot string, summary *SourcePullSu
 			continue
 		}
 
+		teamSourceDir := filepath.Join(legacyTeamsDir, entry.Name())
 		destDir := c.GetTeamDir(entry.Name(), "")
-		if err := mergePulledTree(summary, filepath.Join(legacyTeamsDir, entry.Name()), destDir); err != nil {
+		if err := mergePulledTree(summary, teamSourceDir, destDir); err != nil {
+			return err
+		}
+
+		// Team-level hooks inside legacy team source dir
+		if _, err := c.pullHooksFromDir(filepath.Join(teamSourceDir, "hooks"), summary); err != nil {
 			return err
 		}
 	}
@@ -273,7 +319,8 @@ func (c *Configuration) pullOrganizationTeams(sourceRoot string, summary *Source
 			continue
 		}
 
-		teamsRoot := filepath.Join(orgsRoot, orgEntry.Name(), TeamsDirName)
+		orgDir := filepath.Join(orgsRoot, orgEntry.Name())
+		teamsRoot := filepath.Join(orgDir, TeamsDirName)
 		teamEntries, err := os.ReadDir(teamsRoot)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
@@ -287,8 +334,14 @@ func (c *Configuration) pullOrganizationTeams(sourceRoot string, summary *Source
 				continue
 			}
 
+			teamSourceDir := filepath.Join(teamsRoot, teamEntry.Name())
 			destDir := c.GetTeamDir(teamEntry.Name(), orgEntry.Name())
-			if err := mergePulledTree(summary, filepath.Join(teamsRoot, teamEntry.Name()), destDir); err != nil {
+			if err := mergePulledTree(summary, teamSourceDir, destDir); err != nil {
+				return err
+			}
+
+			// Team-level hooks inside the team source dir
+			if _, err := c.pullHooksFromDir(filepath.Join(teamSourceDir, "hooks"), summary); err != nil {
 				return err
 			}
 		}
