@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.9.0](https://github.com/nentgroup/viaplay-cli/compare/v2.8.2...v2.9.0) (2026-09-06)
+
+
+### Features
+
+* add interactive templates ([#192](https://github.com/nentgroup/viaplay-cli/issues/192)) ([1b67e94](https://github.com/nentgroup/viaplay-cli/commit/1b67e942670ade8d4632101ab30cd7dc33738069))
+
+
+### Dependencies
+
+* **deps:** update module github.com/google/go-github/v74 to v91 ([#189](https://github.com/nentgroup/viaplay-cli/issues/189)) ([f239d49](https://github.com/nentgroup/viaplay-cli/commit/f239d4914b6a696b242d0f00e584da43686d9e20))
+* **deps:** update module golang.org/x/crypto to v0.56.0 ([#188](https://github.com/nentgroup/viaplay-cli/issues/188)) ([82bfaca](https://github.com/nentgroup/viaplay-cli/commit/82bfaca20abbdf1fe7484db281ea31eb7c2280fa))
+
 ## [2.8.2](https://github.com/nentgroup/viaplay-cli/compare/v2.8.1...v2.8.2) (2026-08-21)
 
 
