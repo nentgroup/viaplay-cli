@@ -9,7 +9,7 @@ import (
 )
 
 var projectCmd = &cobra.Command{
-	Use:   "project",
+	Use:   defaultProjectName,
 	Short: "Manage projects",
 	Long: `Manage projects with GitHub integration.
 

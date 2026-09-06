@@ -56,7 +56,7 @@ func (r *hookDoctorReport) hasErrors() bool {
 // NewHooksCommand creates the hooks command with subcommands.
 func NewHooksCommand() *cobra.Command {
 	hooksCmd := &cobra.Command{
-		Use:   "hooks",
+		Use:   pathHooks,
 		Short: "Inspect and run post-install hooks",
 		Long:  `Inspect, validate, run, and scaffold post-install hooks defined in template configuration.`,
 	}
@@ -101,7 +101,7 @@ func newHooksListCommand() *cobra.Command {
 
 			output.Section(fmt.Sprintf("Hooks for %s/%s", language, projectType))
 			rows, warnings := buildHookListRows(cfg, hooks, renderer)
-			fmt.Print(output.Table([]string{"Type", "Configured", "Preview"}, rows, 0))
+			fmt.Print(output.Table([]string{colType, "Configured", "Preview"}, rows, 0))
 			printHookListPreviewNote(cmd)
 			for _, warning := range warnings {
 				output.WarningMessage(warning)
@@ -294,7 +294,7 @@ func printHookListPreviewNote(cmd *cobra.Command) {
 }
 
 func hasExplicitHookPreviewInput(cmd *cobra.Command) bool {
-	for _, flagName := range []string{"language", "type", "path", "name", "owner", "team", "description"} {
+	for _, flagName := range []string{"language", "type", "path", "name", flagOwner, configTargetTeam, "description"} {
 		if cmd.Flags().Changed(flagName) {
 			return true
 		}
@@ -371,7 +371,7 @@ func buildHookTemplateVars(projectPath string, opts *hooksCommandOptions, langua
 		projectName = filepath.Base(projectPath)
 	}
 	if projectName == "" || projectName == "." || projectName == string(filepath.Separator) {
-		projectName = "project"
+		projectName = defaultProjectName
 	}
 
 	owner := opts.Owner

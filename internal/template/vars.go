@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// FeatureSet contains template feature selections.
+type FeatureSet map[string]any
+
 // ProjectInfo contains basic project information
 type ProjectInfo struct {
 	Name        string // Name of the project/repository
@@ -115,19 +118,20 @@ type MetaInfo struct {
 
 // Variables defines all variables that can be used in templates
 type Variables struct {
-	Project ProjectInfo
-	Repo    RepoInfo
-	Service ServiceInfo
-	Go      GoInfo
-	Rust    RustInfo
-	Node    NodeInfo
-	Lambda  LambdaInfo
-	Cloud   CloudInfo
-	Docker  DockerInfo
-	Org     OrgInfo
-	Env     EnvInfo
-	Docs    DocInfo
-	Meta    MetaInfo
+	Project  ProjectInfo
+	Repo     RepoInfo
+	Service  ServiceInfo
+	Go       GoInfo
+	Rust     RustInfo
+	Node     NodeInfo
+	Lambda   LambdaInfo
+	Cloud    CloudInfo
+	Docker   DockerInfo
+	Org      OrgInfo
+	Env      EnvInfo
+	Docs     DocInfo
+	Meta     MetaInfo
+	Features FeatureSet
 }
 
 // NewTemplateVariables returns a template variables struct with sensible defaults
@@ -176,6 +180,7 @@ func NewTemplateVariables() *Variables {
 			CreatedAt: time.Now(),
 			Year:      currentYear,
 		},
+		Features: FeatureSet{},
 	}
 }
 
@@ -210,4 +215,12 @@ func (tv *Variables) WithServiceDetails(serviceName, serviceOwner, port string) 
 	tv.Service.Port = port
 
 	return tv
+}
+
+// SetFeature records a template feature selection.
+func (tv *Variables) SetFeature(key string, value any) {
+	if tv.Features == nil {
+		tv.Features = FeatureSet{}
+	}
+	tv.Features[key] = value
 }

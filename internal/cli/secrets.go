@@ -21,7 +21,7 @@ const (
 
 // secretsCmd represents the secrets command
 var secretsCmd = &cobra.Command{
-	Use:   "secrets",
+	Use:   scopeSecrets,
 	Short: "Manage secrets in the system keyring",
 	Long: `Manage secrets in the system keyring for use with viaplay-cli.
 These secrets can be referenced in team configuration files and used 
@@ -122,7 +122,7 @@ Example:
 
 // secretsListCmd represents the secrets list command
 var secretsListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   cmdList,
 	Short: "List all secrets stored in the system keyring",
 	Long: `List all secrets stored in the system keyring for viaplay-cli.
 This command only shows the names of the secrets, not their values.

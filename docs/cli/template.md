@@ -1,6 +1,6 @@
 # Template Commands
 
-The `template` command group provides tools for managing local template copies and testing templates.
+The `template` command group provides tools for managing local template copies, testing templates, and inspecting manifest-defined options.
 
 ## Template Management
 
@@ -57,6 +57,8 @@ vip template test [flags]
 | `--force` | Force refresh of local template copies | `false` |
 | `--name` | Project name for template variables | `test-project` |
 | `--owner` | Project owner for template variables | `test-owner` |
+| `--set` | Set a template manifest option or variable using `key=value` (repeatable) | none |
+| `--no-input` | Do not prompt for manifest options/variables; use `--set` values/defaults | `false` |
 
 ### Examples
 
@@ -154,3 +156,43 @@ vip template test \
 - The command outputs the path to the temporary directory for easy access
 - JSON output is available for scripting and CI/CD pipeline integration
 - Template variables are minimal by default and may need customization for complex templates
+- If the template defines a `template.yaml` manifest, `template test` prompts
+  for its options and variables interactively, unless overridden with `--set` and/or `--no-input`.
+  See [Interactive Templates (Manifest)](../templates.md#interactive-templates-manifest) for
+  details on manifest structure, options vs. variables, and validation.
+
+### `vip template options`
+
+Inspect a template and list the options/variables its manifest defines, without
+scaffolding anything. Useful for discovering which `--set key=value` flags a
+template supports before running `project create` or `template test`.
+
+```bash
+vip template options --template-path ./path/to/my-template
+vip template options --template-source github@nentgroup/go-service-template --json
+```
+
+| Flag | Description |
+|------|-------------|
+| `--template-path` | Local path to a template directory |
+| `--template-source` | Template source (e.g. `local@/path`, `github@owner/repo`) |
+| `--force` | Force refresh of local template copies |
+| `--json` | Output the manifest as JSON |
+
+If the template has no `template.yaml`, the command reports that it has no
+configurable options.
+
+### Setting options with `--set` and `--no-input`
+
+Both `vip project create` and `vip template test` accept:
+
+- `--set key=value` (repeatable) — pre-set a manifest option or variable, skipping
+  its prompt; invalid values (per `validate.pattern`) are rejected immediately
+- `--no-input` — never prompt; any manifest option/variable not covered by `--set`
+  uses its declared default (validated the same way)
+
+```bash
+vip project create myorg/my-service \
+  --template-source github@nentgroup/go-service-template \
+  --no-input --set sqs=true --set sns=false --set shortName=my-service
+```

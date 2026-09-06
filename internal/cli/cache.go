@@ -56,7 +56,7 @@ var cacheCleanCmd = &cobra.Command{
 }
 
 var cacheListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   cmdList,
 	Short: "List all templates in the cache",
 	Long:  `List all templates currently stored in the cache.`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -201,7 +201,7 @@ func cleanCache(ctx context.Context) {
 	})
 
 	fmt.Print(output.Table(
-		[]string{"Language", "Type", "Size", "Last Used"},
+		[]string{"Language", colType, "Size", "Last Used"},
 		rows,
 		2,
 	))
@@ -297,7 +297,7 @@ func listCache(ctx context.Context) {
 
 	// Print the table
 	fmt.Print(output.Table(
-		[]string{"Language", "Type", "Size", "Version", "Repository"},
+		[]string{"Language", colType, "Size", "Version", "Repository"},
 		rows,
 		0,
 	))

@@ -426,8 +426,8 @@ func (c *Factory) setUp(ctx context.Context, opts Options, templateVars *templat
 		templateSource = templatef.Source
 	}
 
-	if err := c.Scaffolder.ScaffoldProject(ctx, outputDir, opts.Language, opts.ProjectType, templateSource, templateVars,
-		opts.SkipHooks, opts.NoCache); err != nil {
+	if err := c.Scaffolder.ScaffoldProjectWithOptions(ctx, outputDir, opts.Language, opts.ProjectType, templateSource, templateVars,
+		opts.SkipHooks, opts.NoCache, opts.TemplateSet, opts.NoInput); err != nil {
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
 

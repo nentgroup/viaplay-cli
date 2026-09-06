@@ -4,6 +4,11 @@ import (
 	"testing"
 )
 
+const (
+	testProjectName = "TestProject"
+	testKey1        = "key1"
+)
+
 func TestRenderWithLiteralUnknowns(t *testing.T) {
 	// Test data structure with various field types
 	type TestData struct {
@@ -19,13 +24,13 @@ func TestRenderWithLiteralUnknowns(t *testing.T) {
 
 	// Create test data with realistic values
 	data := TestData{
-		Name:     "TestProject",
+		Name:     testProjectName,
 		Count:    42,
 		IsActive: true,
 		Tags:     []string{"go", "template", "test"},
 		Properties: map[string]string{
-			"key1": "value1",
-			"key2": "value2",
+			testKey1: "value1",
+			"key2":   "value2",
 		},
 		Nested: struct {
 			Value string
@@ -110,7 +115,7 @@ func TestRenderWithLiteralUnknowns(t *testing.T) {
 			name:           "Whitespace control",
 			templateString: "{{- .Name -}}",
 			data:           data,
-			expected:       "TestProject",
+			expected:       testProjectName,
 			expectError:    false,
 		},
 
@@ -228,12 +233,12 @@ func TestFieldExists(t *testing.T) {
 
 	// Create test data
 	data := TestData{
-		Name:  "TestProject",
+		Name:  testProjectName,
 		Count: 42,
 		Tags:  []string{"go", "template", "test"},
 		Properties: map[string]string{
-			"key1": "value1",
-			"key2": "value2",
+			testKey1: "value1",
+			"key2":   "value2",
 		},
 		Nested: struct {
 			Value string
@@ -282,7 +287,7 @@ func TestFieldExists(t *testing.T) {
 		{
 			name:     "Map key exists",
 			data:     data,
-			path:     []string{"Properties", "key1"},
+			path:     []string{"Properties", testKey1},
 			expected: true,
 		},
 		{

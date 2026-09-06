@@ -150,7 +150,7 @@ func fieldExists(data interface{}, path []string) bool {
 	v := reflect.ValueOf(data)
 
 	for _, p := range path {
-		if v.Kind() == reflect.Ptr {
+		if v.Kind() == reflect.Pointer {
 			if v.IsNil() {
 				return false
 			}
