@@ -3,30 +3,29 @@ cask "vip" do
   tap_path = File.expand_path("Library/Taps/nentgroup/homebrew-viaplay-cli/Casks/lib/custom_download_strategy.rb", ENV["HOMEBREW_PREFIX"])
   require tap_path
 
-  version "2.8.2"
+  version "2.9.0"
 
   on_macos do
-    on_intel do
-      sha256 "6bb72ea041a9067e7ea0a3beba6501190f319da428e07f82f392772c6d5aba26"
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_amd64.tar.gz",
-        using: GitHubPrivateRepositoryReleaseDownloadStrategy
-    end
     on_arm do
-      sha256 "b279c0c8c10d0d47dcb91f986d62c0aa9abba4c2d78534ad88692864e5994756"
+      sha256 "60ee1f3a3cf185905299f3d2a005bfe238d64c8b9cdb71504de1b3b1fe0287b5"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_arm64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
-  end
-
-  on_linux do
     on_intel do
-      sha256 "49ea071c0706a536775c0c5a3851e6be41b2fd06c4c1f5d66eff5be7d3753b34"
-      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_amd64.tar.gz",
+      sha256 "ba23233cf9423ee7c586d238cdd75e657d6a2dba0c2586f5219a51ef4cd75921"
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
+  end
+  on_linux do
     on_arm do
-      sha256 "9ef18b88dc31af2c3a197834a14b61e5178cd2305c670e19f92a6bc8eee459bd"
+      sha256 "9cbd83496b51e80f68ba089ce9c2eb97ddafee668d0aaee76404ad34d81ccac1"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_arm64.tar.gz",
+        using: GitHubPrivateRepositoryReleaseDownloadStrategy
+    end
+    on_intel do
+      sha256 "1ac76a6b9ee2a59cee9b18a4bc7469c7e121deb5add75fe62f2e596f31582581"
+      url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_amd64.tar.gz",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
   end
