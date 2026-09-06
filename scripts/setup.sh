@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Setting up lefthook, commitlint, and golangci-lint..."
+echo "Setting up lefthook, commitlint, golangci-lint, Task, and graphify-rs..."
 
 command_exists () {
     type "$1" &> /dev/null ;
@@ -29,6 +29,8 @@ esac
 lefthook_installed=false
 commitlint_installed=false
 golangci_lint_installed=false
+task_installed=false
+graphify_rs_installed=false
 
 # Check if lefthook is already installed
 if ! command_exists lefthook; then
@@ -129,6 +131,53 @@ else
   fi
 fi
 
+# Check if Task is already installed
+if ! command_exists task; then
+  echo "Installing Task..."
+
+  case "${OS}" in
+    Linux*|MINGW*|MSYS*|CYGWIN*)
+      if command_exists curl; then
+        sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b "$(go env GOPATH)/bin"
+        task_installed=true
+      else
+        echo "Please install curl or Task manually: https://taskfile.dev/installation/"
+        exit 1
+      fi
+      ;;
+    Darwin*)
+      if command_exists brew; then
+        brew install go-task
+        task_installed=true
+      elif command_exists curl; then
+        sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b "$(go env GOPATH)/bin"
+        task_installed=true
+      else
+        echo "Please install Homebrew or curl, then run this again"
+        exit 1
+      fi
+      ;;
+  esac
+else
+  echo "✅ Task is already installed"
+fi
+
+# Check if graphify-rs is already installed
+# graphify-rs indexes the codebase into a knowledge graph used for AI-assisted
+# navigation (see AGENTS.md/CLAUDE.md). It's optional tooling: setup should not
+# fail if it can't be installed (e.g. no Rust toolchain available).
+if ! command_exists graphify-rs; then
+  echo "Installing graphify-rs..."
+
+  if command_exists cargo; then
+    cargo install graphify-rs && graphify_rs_installed=true
+  else
+    echo "⚠️  Skipping graphify-rs: install Rust/cargo, then run this again, or install graphify-rs manually."
+  fi
+else
+  echo "✅ graphify-rs is already installed"
+fi
+
 # Initialize lefthook hooks
 echo "Setting up git hooks..."
 lefthook install
@@ -142,5 +191,11 @@ echo "Installation summary:"
 [ "$lefthook_installed" = true ] && echo "✅ lefthook newly installed" || echo "✅ lefthook was already installed"
 [ "$commitlint_installed" = true ] && echo "✅ commitlint newly installed" || echo "✅ commitlint was already installed"
 [ "$golangci_lint_installed" = true ] && echo "✅ golangci-lint v2 newly installed or upgraded" || echo "✅ golangci-lint v2 was already installed"
+[ "$task_installed" = true ] && echo "✅ Task newly installed" || echo "✅ Task was already installed"
+if command_exists graphify-rs; then
+  [ "$graphify_rs_installed" = true ] && echo "✅ graphify-rs newly installed" || echo "✅ graphify-rs was already installed"
+else
+  echo "⚠️  graphify-rs was not installed (optional; see above for manual install instructions)"
+fi
 
 echo "Your git hooks are now active. They will run automatically on git operations."

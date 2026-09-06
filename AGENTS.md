@@ -81,3 +81,23 @@ Run `task setup:lefthook` to install hooks locally.
 - Update `docs/` when changing user-facing CLI behavior.
 - Avoid committing secrets/tokens; this tool interacts with the system keyring and
   GitHub tokens — never hardcode credentials in code or tests.
+
+## Codebase navigation
+
+This repository is indexed with graphify-rs.
+
+For questions involving codebase structure, dependencies, call relationships,
+architecture, or locating relevant implementation:
+
+1. Use `graphify-rs query "<question>"` from the repository root first.
+2. Use Graphify results to identify relevant symbols and files.
+3. Inspect the actual source files before making changes or drawing conclusions.
+4. Prefer Graphify for broad codebase discovery instead of repeatedly using
+   grep/find/glob across the entire repository.
+5. Graphify's generated data is stored in its default per-project location
+   under `~/.graphify-rs/`; do not assume generated graph files are in this repo.
+
+After significant structural code changes, refresh the graph with the
+appropriate graphify-rs update/build command.
+
+`.graphifyignore` defines paths that should not be indexed.
