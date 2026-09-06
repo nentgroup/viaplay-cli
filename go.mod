@@ -7,7 +7,6 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/fatih/color v1.19.0
 	github.com/google/go-github/v74 v74.0.0
-	github.com/google/go-github/v91 v91.0.0
 	github.com/invopop/yaml v0.3.1
 	github.com/manifoldco/promptui v0.9.0
 	github.com/muesli/termenv v0.16.0

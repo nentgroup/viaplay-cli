@@ -1,4 +1,3 @@
-// Package scaffolding handles project scaffolding from templates
 package scaffolding
 
 import (
@@ -15,277 +14,266 @@ import (
 	templ "github.com/nentgroup/viaplay-cli/internal/template"
 )
 
-// ProjectScaffolder handles applying templates to create project structures
 type ProjectScaffolder struct {
 	CacheManager *cache.Manager
 	Config       *config.Configuration
 }
 
-// NewProjectScaffolder creates a new project scaffolder
 func NewProjectScaffolder(cacheManager *cache.Manager, cfg *config.Configuration) *ProjectScaffolder {
-	return &ProjectScaffolder{
-		CacheManager: cacheManager,
-		Config:       cfg,
-	}
+	return &ProjectScaffolder{CacheManager: cacheManager, Config: cfg}
 }
 
-// ScaffoldProject creates a project structure from a template
-// Parameters:
-// - destPath: The path where the project should be created
-// - language: The programming language (go, typescript, etc.)
-// - projectType: The type of project (service, lambda, cli, etc.)
-// - templateSource: The source of the template
-// - variables: Map of template variables to replace in the project
-// - forceUpdate: If true, forces update of the template cache
-func (ps *ProjectScaffolder) ScaffoldProject(ctx context.Context, destPath, language, projectType,
-	templateSource string,
-	opts interface{}, skipHooks, forceUpdate bool,
+// ScaffoldProject applies a template using default (interactive) manifest option resolution.
+// Use ScaffoldProjectWithOptions to control --set overrides and --no-input behaviour.
+func (ps *ProjectScaffolder) ScaffoldProject(ctx context.Context, destPath, language, projectType, templateSource string, opts interface{}, skipHooks, forceUpdate bool) error {
+	return ps.ScaffoldProjectWithOptions(ctx, destPath, language, projectType, templateSource, opts, skipHooks, forceUpdate, nil, false)
+}
+
+// ScaffoldProjectWithOptions applies a template, resolving any manifest options via --set
+// overrides (templateSet) and/or interactive prompts (unless noInput is true).
+func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(ctx context.Context, destPath, language, projectType, templateSource string,
+	opts interface{}, skipHooks, forceUpdate bool, templateSet []string, noInput bool,
 ) error {
-	// Ensure the template is available in the cache
-	var templatePath string
-	var err error
-
-	templatePath, err = ps.CacheManager.EnsureTemplate(ctx, language, projectType, templateSource, forceUpdate)
+	templatePath, manifest, err := ps.resolveTemplateManifest(ctx, language, projectType, templateSource, forceUpdate)
 	if err != nil {
-		return fmt.Errorf("failed to ensure template is available: %w", err)
+		return err
 	}
-
-	// Create the destination directory if it doesn't exist
 	if err := os.MkdirAll(destPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
-
-	// Assert opts to *template.Variables
 	templateVars, ok := opts.(*templ.Variables)
 	if !ok {
 		return fmt.Errorf("opts must be of type *template.Variables")
 	}
-
 	renderer := templ.NewRenderer(templateVars)
 
-	// Copy the template files to the destination with variable substitution
-	if err := ps.copyTemplateFiles(templatePath, destPath, renderer); err != nil {
-		return fmt.Errorf("failed to copy template files: %w", err)
+	if manifest != nil {
+		if err := templ.ResolveManifestSelections(manifest, templateVars, templateSet, noInput); err != nil {
+			return fmt.Errorf("failed to resolve template options: %w", err)
+		}
 	}
-
-	return nil
+	return ps.copyTemplateFiles(templatePath, destPath, renderer, manifest)
 }
 
-// copyTemplateFiles copies files from the template directory to the destination
-// with variable substitution using the template renderer
-func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, renderer *templ.Renderer) error {
-	// check if the template path has the special _template directory and use it if present
+// GetTemplateManifest ensures the template is available locally and loads its manifest,
+// if any, without scaffolding a project. Returns a nil manifest (and nil error) when the
+// template has no template.yaml, preserving backward compatibility for plain templates.
+func (ps *ProjectScaffolder) GetTemplateManifest(ctx context.Context, language, projectType, templateSource string, forceUpdate bool) (*templ.Manifest, error) {
+	_, manifest, err := ps.resolveTemplateManifest(ctx, language, projectType, templateSource, forceUpdate)
+	return manifest, err
+}
+
+// resolveTemplateManifest ensures the template is locally available and loads its
+// manifest (template.yaml), checking both the template root and the "_template"
+// subdirectory since manifests live at the repository root, which may differ from
+// the rendered content root.
+func (ps *ProjectScaffolder) resolveTemplateManifest(ctx context.Context, language, projectType, templateSource string, forceUpdate bool) (string, *templ.Manifest, error) {
+	templatePath, err := ps.CacheManager.EnsureTemplate(ctx, language, projectType, templateSource, forceUpdate)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to ensure template is available: %w", err)
+	}
+
+	manifestRoot := templatePath
+	if _, err := os.Stat(filepath.Join(manifestRoot, "template.yaml")); err != nil {
+		if _, err := os.Stat(filepath.Join(manifestRoot, "_template", "template.yaml")); err == nil {
+			manifestRoot = filepath.Join(manifestRoot, "_template")
+		}
+	}
+	manifest, err := templ.LoadManifest(manifestRoot)
+	if err != nil {
+		return "", nil, err
+	}
+	return templatePath, manifest, nil
+}
+
+func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, renderer *templ.Renderer, manifest *templ.Manifest) error {
 	specialTemplateDir := filepath.Join(templatePath, "_template")
 	if stat, err := os.Stat(specialTemplateDir); err == nil && stat.IsDir() {
 		templatePath = specialTemplateDir
 	}
 
-	// List of directories to skip
-	skipDirs := map[string]bool{
-		".git":         true,
-		"node_modules": true,
-		"vendor":       true,
-		"dist":         true,
-		"build":        true,
-		".idea":        true,
-	}
-
-	// List of files to skip
-	skipFiles := map[string]bool{
-		".DS_Store": true,
-		"Thumbs.db": true,
-		".env":      true, // Skip actual .env files (but allow .env.example)
-		".npmrc":    true, // Skip actual .npmrc files with tokens
-		".yarnrc":   true, // Skip actual .yarnrc files with tokens
-	}
-
-	// Walk through the template directory
 	return filepath.Walk(templatePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
-		baseName := filepath.Base(path)
-
-		// Skip directories in the skipDirs list
-		if info.IsDir() && skipDirs[baseName] {
-			return filepath.SkipDir
-		}
-
-		// Skip files in the skipFiles list
-		if !info.IsDir() && skipFiles[baseName] {
-			return nil
-		}
-
-		// Compute the relative path from the template root
-		relPath, err := filepath.Rel(templatePath, path)
-		if err != nil {
-			return fmt.Errorf("failed to compute relative path: %w", err)
-		}
-
-		// Skip if it's the root directory
-		if relPath == "." {
-			return nil
-		}
-
-		destRelPath, err := renderer.RenderDirectoryPath(relPath)
-		if err != nil {
-			return fmt.Errorf("failed to parse path as template: %s: %w", relPath, err)
-		}
-
-		// Special case for .env.example files - rename to .env
-		if strings.HasSuffix(destRelPath, ".env.example") {
-			destRelPath = strings.TrimSuffix(destRelPath, ".example")
-		}
-
-		destFilePath := filepath.Join(destPath, destRelPath)
-
-		// Handle directories
-		if info.IsDir() {
-			return os.MkdirAll(destFilePath, 0o755)
-		}
-
-		isBinary, err := isBinaryFile(path)
-		if err != nil {
-			return fmt.Errorf("failed to check if file is binary: %w", err)
-		}
-
-		if isBinary { //nolint:nestif
-			// Use helper to copy binary file
-			if err = copyBinaryFile(path, destFilePath, info.Mode()); err != nil {
-				return err
-			}
-		} else {
-			if strings.HasSuffix(baseName, ".raw") {
-				// Remove .raw extension for and copy as it is
-				destFilePath = strings.TrimSuffix(destFilePath, ".raw")
-				if err = copyBinaryFile(path, destFilePath, info.Mode()); err != nil {
-					return err
-				}
-			} else {
-				// Always render non-binary files as templates
-				if err = renderer.RenderFile(path, destFilePath, true); err != nil {
-					return fmt.Errorf("failed to render template file %s: %w", relPath, err)
-				}
-			}
-		}
-
-		// Copy file mode from the template file to preserve executability
-		if err = os.Chmod(destFilePath, info.Mode()); err != nil {
-			fmt.Printf("Warning: Failed to set file mode for %s: %v\n", destFilePath, err)
-		}
-
-		return nil
+		return ps.copyTemplateEntry(templatePath, destPath, path, info, renderer, manifest)
 	})
 }
 
-// copyBinaryFile copies a binary file from srcPath to destPath, preserving file mode
+// copyTemplateEntry processes a single file/directory entry found while walking a
+// template's source tree: it applies skip rules (well-known dirs/files, manifest
+// gating), renders the destination path, and copies/renders the file contents.
+func (ps *ProjectScaffolder) copyTemplateEntry(templatePath, destPath, path string, info os.FileInfo, renderer *templ.Renderer, manifest *templ.Manifest) error {
+	skipDirs := map[string]bool{".git": true, "node_modules": true, "vendor": true, "dist": true, "build": true, ".idea": true}
+	skipFiles := map[string]bool{".DS_Store": true, "Thumbs.db": true, ".env": true, ".npmrc": true, ".yarnrc": true}
+
+	relPath, err := filepath.Rel(templatePath, path)
+	if err != nil {
+		return fmt.Errorf("failed to compute relative path: %w", err)
+	}
+	if relPath == "." {
+		return nil
+	}
+	baseName := filepath.Base(path)
+	if info.IsDir() && skipDirs[baseName] {
+		return filepath.SkipDir
+	}
+	if !info.IsDir() && skipFiles[baseName] {
+		return nil
+	}
+	if manifest != nil && shouldSkipPath(relPath, info.IsDir(), manifest, renderer.Variables) {
+		if info.IsDir() {
+			return filepath.SkipDir
+		}
+		return nil
+	}
+	destRelPath, err := renderer.RenderDirectoryPath(relPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse path as template: %s: %w", relPath, err)
+	}
+	if strings.HasSuffix(destRelPath, ".env.example") {
+		destRelPath = strings.TrimSuffix(destRelPath, ".example")
+	}
+	destFilePath := filepath.Join(destPath, destRelPath)
+	if info.IsDir() {
+		return os.MkdirAll(destFilePath, 0o755)
+	}
+	destFilePath, err = ps.copyOrRenderFile(path, destFilePath, relPath, baseName, info, renderer)
+	if err != nil {
+		return err
+	}
+	if err := os.Chmod(destFilePath, info.Mode()); err != nil {
+		fmt.Printf("Warning: Failed to set file mode for %s: %v\n", destFilePath, err)
+	}
+	return nil
+}
+
+// copyOrRenderFile copies a file as-is (binary or ".raw"-suffixed) or renders it as a
+// Go template, writing the result to destFilePath. It returns the actual path the
+// file was written to (which may differ from destFilePath when a ".raw" suffix is
+// trimmed) so the caller can apply the correct file mode.
+func (ps *ProjectScaffolder) copyOrRenderFile(path, destFilePath, relPath, baseName string, info os.FileInfo, renderer *templ.Renderer) (string, error) {
+	isBinary, err := isBinaryFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to check if file is binary: %w", err)
+	}
+	switch {
+	case isBinary:
+		return destFilePath, copyBinaryFile(path, destFilePath, info.Mode())
+	case strings.HasSuffix(baseName, ".raw"):
+		destFilePath = strings.TrimSuffix(destFilePath, ".raw")
+		return destFilePath, copyBinaryFile(path, destFilePath, info.Mode())
+	default:
+		if err := renderer.RenderFile(path, destFilePath, true); err != nil {
+			return "", fmt.Errorf("failed to render template file %s: %w", relPath, err)
+		}
+		return destFilePath, nil
+	}
+}
+
+// shouldSkipPath decides whether a given relative path should be skipped during
+// scaffolding based on the manifest's file rules. Semantics:
+//   - exclude rules skip a matching path when their condition evaluates to true.
+//   - include rules gate a matching path: skip it when their condition evaluates to false.
+//   - paths that don't match any rule are never skipped (rules only affect the
+//     specific paths they target, they are not a whitelist for the whole tree).
+//
+// Directory entries are matched against a rule if the directory is (or is an
+// ancestor of) something the rule's glob pattern would match, e.g. a rule
+// targeting "internal/storage/dynamo/*" also matches the directory
+// "internal/storage/dynamo" itself — otherwise the directory would still get
+// created (via os.MkdirAll further down the walk) and left empty even though
+// every file inside it was correctly skipped.
+func shouldSkipPath(relPath string, isDir bool, manifest *templ.Manifest, vars *templ.Variables) bool {
+	matches := func(pattern string) bool {
+		if isDir {
+			return dirMatchesPattern(pattern, relPath)
+		}
+		match, err := filepath.Match(pattern, relPath)
+		return err == nil && match
+	}
+	for _, rule := range manifest.Files.Exclude {
+		if matches(rule.Path) {
+			ok, err := templ.EvalCondition(rule.When, vars)
+			if err == nil && ok {
+				return true
+			}
+		}
+	}
+	for _, rule := range manifest.Files.Include {
+		if matches(rule.Path) {
+			ok, err := templ.EvalCondition(rule.When, vars)
+			if err == nil && !ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// dirMatchesPattern reports whether relPath (a directory) is the immediate
+// parent directory targeted by pattern's final wildcard segment, or matches
+// the pattern's full depth outright, by comparing path segments
+// component-by-component with filepath.Match. This lets a file-glob rule
+// like "internal/storage/dynamo/*" also gate the "internal/storage/dynamo"
+// directory entry itself — but not shallower ancestors like
+// "internal/storage" or "internal", which may hold sibling entries governed
+// by different (or no) rules.
+func dirMatchesPattern(pattern, relPath string) bool {
+	patternParts := strings.Split(pattern, "/")
+	relParts := strings.Split(relPath, "/")
+	if len(relParts) != len(patternParts)-1 && len(relParts) != len(patternParts) {
+		return false
+	}
+	for i, part := range relParts {
+		match, err := filepath.Match(patternParts[i], part)
+		if err != nil || !match {
+			return false
+		}
+	}
+	return true
+}
+
 func copyBinaryFile(srcPath, destPath string, mode os.FileMode) error {
 	src, err := os.Open(srcPath)
 	if err != nil {
 		return fmt.Errorf("failed to open binary file: %w", err)
 	}
 	defer src.Close()
-
 	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
-
 	dst, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
 	defer dst.Close()
-
 	if _, err := io.Copy(dst, src); err != nil {
 		return fmt.Errorf("failed to copy binary file: %w", err)
 	}
-
 	return nil
 }
 
-// isBinaryFile checks if a file is likely binary by examining its content
-// It uses a common heuristic: if a file contains NUL bytes or a high proportion
-// of non-printable characters, it's likely binary
 func isBinaryFile(path string) (bool, error) {
-	binaryExtensions := map[string]bool{
-		".png":   true,
-		".jpg":   true,
-		".jpeg":  true,
-		".gif":   true,
-		".ico":   true,
-		".pdf":   true,
-		".zip":   true,
-		".tar":   true,
-		".gz":    true,
-		".exe":   true,
-		".dll":   true,
-		".so":    true,
-		".dylib": true,
-		".woff":  true,
-		".woff2": true,
-		".ttf":   true,
-		".eot":   true,
-		".otf":   true,
-		".svg":   true,
-		".mp3":   true,
-		".mp4":   true,
-		".avi":   true,
-		".mov":   true,
-		".webm":  true,
-		".webp":  true,
-		".doc":   true,
-		".docx":  true,
-		".xls":   true,
-		".xlsx":  true,
-		".ppt":   true,
-		".pptx":  true,
-	}
-
 	ext := strings.ToLower(filepath.Ext(path))
-	if binaryExtensions[ext] {
+	switch ext {
+	case ".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".tar", ".gz", ".exe", ".dll", ".so", ".dylib", ".woff", ".woff2", ".ttf", ".eot", ".otf", ".svg", ".mp3", ".mp4", ".avi", ".mov", ".webm", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx":
 		return true, nil
 	}
-
 	file, err := os.Open(path)
 	if err != nil {
 		return false, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
-
 	buf := make([]byte, 512)
 	n, err := file.Read(buf)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return false, fmt.Errorf("failed to read file: %w", err)
 	}
-	buf = buf[:n]
-
-	nullCount := 0
-	nonPrintableCount := 0
-	for _, b := range buf {
-		if b == 0 {
-			nullCount++
-		} else if b < 32 && !isAllowedNonPrintable(b) {
-			nonPrintableCount++
+	for i := 0; i < n; i++ {
+		if buf[i] == 0 {
+			return true, nil
 		}
 	}
-
-	if nullCount > 0 {
-		return true, nil
-	}
-
-	if n > 0 && float64(nonPrintableCount)/float64(n) > 0.3 {
-		return true, nil
-	}
-
 	return false, nil
-}
-
-func isAllowedNonPrintable(b byte) bool {
-	switch b {
-	case '\t', '\n', '\r', '\f', '\v':
-		return true
-	default:
-		return false
-	}
 }

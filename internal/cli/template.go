@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -46,13 +47,14 @@ func NewTemplateCommand() *cobra.Command {
 	templateCmd.AddCommand(newTemplatePruneCommand())
 	templateCmd.AddCommand(newTemplateCleanCommand())
 	templateCmd.AddCommand(newTemplateTestCommand())
+	templateCmd.AddCommand(newTemplateOptionsCommand())
 
 	return templateCmd
 }
 
 func newTemplateListCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
+		Use:   cmdList,
 		Short: "List local template copies",
 		Long:  `List template copies currently stored locally for reuse.`,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -122,6 +124,8 @@ func newTemplateTestCommand() *cobra.Command {
 		projectName  string
 		projectOwner string
 		jsonOutput   bool
+		templateSet  []string
+		noInput      bool
 	)
 
 	testCmd := &cobra.Command{
@@ -230,7 +234,6 @@ Templates are output to a temporary directory that is automatically created.`,
 					Environments: []string{"dev", "staging", "production"},
 				},
 			}
-
 			// Get absolute path for output
 			absOutputPath, err := filepath.Abs(outputPath)
 			if err != nil {
@@ -248,8 +251,15 @@ Templates are output to a temporary directory that is automatically created.`,
 				fmt.Fprintf(os.Stderr, "📁 Output directory: %s\n", outputPath)
 			}
 
-			// Run the scaffolding
-			err = scaffolder.ScaffoldProject(ctx, absOutputPath, "", "", templatePath, vars, true, forceRefresh)
+			templateSource := templatePath
+			if templateSource != "" && !strings.Contains(templateSource, "@") {
+				templateSource = "local@" + templateSource
+			}
+
+			// Run the scaffolding. Manifest options (if any) are resolved interactively,
+			// unless overridden via --set or suppressed via --no-input.
+			err = scaffolder.ScaffoldProjectWithOptions(ctx, absOutputPath, "", "", templateSource, vars, true, forceRefresh,
+				templateSet, noInput)
 			if err != nil {
 				result.Error = fmt.Sprintf("failed to scaffold template: %v", err)
 				if jsonOutput {
@@ -281,6 +291,8 @@ Templates are output to a temporary directory that is automatically created.`,
 	testCmd.Flags().StringVar(&projectName, "name", "test-project", "Project name for template variables")
 	testCmd.Flags().StringVar(&projectOwner, "owner", "test-owner", "Project owner for template variables")
 	testCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format for scripting")
+	testCmd.Flags().StringArrayVar(&templateSet, "set", nil, "Set a template option using key=value")
+	testCmd.Flags().BoolVar(&noInput, "no-input", false, "Do not prompt for template options; use defaults/--set values")
 
 	return testCmd
 }
@@ -293,4 +305,134 @@ func printJSONResult(result TestResult) {
 		return
 	}
 	fmt.Println(string(jsonData))
+}
+
+// newTemplateOptionsCommand creates a new "options" subcommand that inspects a
+// template and lists the manifest-driven options (if any) it supports, without
+// scaffolding anything. Templates without a template.yaml are reported as having
+// no configurable options, preserving backward compatibility.
+func newTemplateOptionsCommand() *cobra.Command {
+	var (
+		templatePath   string
+		templateSource string
+		forceRefresh   bool
+		jsonOutput     bool
+	)
+
+	optionsCmd := &cobra.Command{
+		Use:   "options",
+		Short: "List the manifest-defined options a template supports",
+		Long: `Inspect a template's manifest (template.yaml), if present, and print the
+options and variables it exposes (key, type, prompt, default, choices).
+
+Use --set key=value with 'project create' or 'template test' to set these
+options non-interactively. Templates without a manifest report no options.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
+			source := templateSource
+			if source == "" {
+				source = templatePath
+			}
+			if source == "" {
+				return fmt.Errorf("either --template-path or --template-source must be provided")
+			}
+			if !strings.Contains(source, "@") {
+				source = "local@" + source
+			}
+
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				return fmt.Errorf("failed to load configuration: %w", err)
+			}
+			cacheManager := cache.NewManager(cfg)
+			scaffolder := scaffolding.NewProjectScaffolder(cacheManager, cfg)
+
+			manifest, err := scaffolder.GetTemplateManifest(ctx, "", "", source, forceRefresh)
+			if err != nil {
+				return fmt.Errorf("failed to inspect template: %w", err)
+			}
+
+			if jsonOutput {
+				printTemplateOptionsJSON(manifest)
+				return nil
+			}
+			printTemplateOptionsHuman(manifest)
+			return nil
+		},
+	}
+
+	optionsCmd.Flags().StringVar(&templatePath, "template-path", "", "Local path to a template directory")
+	optionsCmd.Flags().StringVar(&templateSource, "template-source", "", "Template source (e.g. local@/path, github@owner/repo)")
+	optionsCmd.Flags().BoolVar(&forceRefresh, "force", false, "Force refresh of local template copies")
+	optionsCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format for scripting")
+
+	return optionsCmd
+}
+
+// printTemplateOptionsJSON prints the manifest options/variables as JSON, or an
+// empty/null manifest when the template has none.
+func printTemplateOptionsJSON(manifest *template.Manifest) {
+	jsonData, err := json.Marshal(manifest)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling JSON: %v\n", err)
+		return
+	}
+	fmt.Println(string(jsonData))
+}
+
+// printTemplateOptionsHuman prints a human-readable summary of the manifest's
+// options and variables.
+func printTemplateOptionsHuman(manifest *template.Manifest) {
+	if manifest == nil {
+		fmt.Println("This template has no manifest (template.yaml) — no configurable options.")
+		return
+	}
+
+	if manifest.Metadata.Name != "" || manifest.Metadata.Description != "" {
+		fmt.Printf("📦 %s\n", strings.TrimSpace(manifest.Metadata.Name+" "+manifest.Metadata.Description))
+	}
+	if !manifest.IsSupported() {
+		fmt.Printf("⚠ Warning: manifest schema %d is not supported by this version of vip\n", manifest.Schema)
+	}
+
+	if len(manifest.Options) == 0 && len(manifest.Variables) == 0 {
+		fmt.Println("This template defines a manifest but no options or variables.")
+		return
+	}
+
+	if len(manifest.Options) > 0 {
+		fmt.Println("Options (use --set key=value):")
+		for _, opt := range manifest.Options {
+			printManifestOptionLine(opt.Key, opt.Type, opt.Description, opt.Default, opt.Required, opt.Choices)
+		}
+	}
+
+	if len(manifest.Variables) > 0 {
+		fmt.Println("Variables (use --set key=value):")
+		for _, v := range manifest.Variables {
+			printManifestOptionLine(v.Key, v.Type, v.Description, v.Default, v.Required, nil)
+		}
+	}
+}
+
+func printManifestOptionLine(key, typ, description string, def any, required bool, choices []template.ManifestChoice) {
+	line := fmt.Sprintf("  - %s (%s)", key, typ)
+	if required {
+		line += " [required]"
+	}
+	if def != nil {
+		line += fmt.Sprintf(" default=%v", def)
+	}
+	fmt.Println(line)
+	if description != "" {
+		fmt.Printf("      %s\n", description)
+	}
+	for _, c := range choices {
+		label := c.Label
+		if label == "" {
+			label = c.Value
+		}
+		fmt.Printf("      • %s: %s\n", c.Value, label)
+	}
 }

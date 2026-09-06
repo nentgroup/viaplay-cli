@@ -91,9 +91,17 @@ func (r *Renderer) RenderDirectoryPath(path string) (string, error) {
 		return path, nil
 	}
 
-	// Create a new template for the path
-	tmpl, err := template.New("path").
+	// Create a new template for the path, with the same case-conversion helpers
+	// available to file contents (e.g. {{.Service.Name | pascal}}) so filenames can
+	// be derived from template variables too.
+	funcMap := template.FuncMap{
+		"pascal": tmpl.ToPascalCase,
+		"kebab":  tmpl.ToKebabCase,
+		"title":  tmpl.ToTitleCase,
+	}
+	tmplPath, err := template.New("path").
 		Option("missingkey=invalid").
+		Funcs(funcMap).
 		Parse(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse path as template: %w", err)
@@ -101,7 +109,7 @@ func (r *Renderer) RenderDirectoryPath(path string) (string, error) {
 
 	// Execute the template
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, r.Variables); err != nil {
+	if err := tmplPath.Execute(&buf, r.Variables); err != nil {
 		return "", fmt.Errorf("failed to execute path template: %w", err)
 	}
 

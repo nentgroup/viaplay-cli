@@ -58,6 +58,132 @@ Remote templates are cached locally for faster reuse. Use `vip template list`, `
 
 ---
 
+## Interactive Templates (Manifest)
+
+Templates may optionally include a `template.yaml` manifest at the repository root declaring user-selectable
+options, e.g. "add SQL support", "add SNS support", as well as free-form string
+inputs, e.g. "short service name". Templates without a manifest behave exactly as
+before — this feature is fully backward-compatible.
+
+A manifest option or variable becomes available in Go templates as
+`.Features.<key>` and can gate whole files/directories via `files.include`/
+`files.exclude` rules with a `when` condition (a small expression language
+supporting `&&`, `||`, `!`, `==`, `!=`, and bare truthy option lookups). Files and
+directories that are gated off by a rule are skipped entirely.
+
+Example `template.yaml`:
+
+```yaml
+schema: 2
+metadata:
+  name: go-service-template
+  description: Go HTTP microservice template
+  version: "1.0.0"
+options:
+  - key: sqs
+    type: bool
+    prompt: "Include SQS support?"
+    description: "Adds SQS queue wiring and related infrastructure."
+    default: false
+  - key: sns
+    type: bool
+    prompt: "Include SNS support?"
+    description: "Adds SNS publisher wiring and related infrastructure."
+    default: false
+  - key: s3
+    type: bool
+    prompt: "Include S3 support?"
+    description: "Adds S3 bucket infrastructure."
+    default: false
+  - key: dynamo
+    type: bool
+    prompt: "Include DynamoDB support?"
+    description: "Adds DynamoDB table infrastructure and access wiring."
+    default: false
+variables:
+  - key: shortName
+    type: string
+    prompt: "Short service name (used for the API gateway listen path)?"
+    description: "A short, URL-friendly identifier for this service, e.g. \"content\"."
+    required: true
+    validate:
+      pattern: "^[a-z][a-z0-9-]*$"
+      message: "Short name must be lowercase alphanumeric, may contain hyphens, and must start with a letter."
+files:
+  include:
+    - path: "internal/events/*"
+      when: "sns"
+    - path: "internal/queue/*"
+      when: "sqs"
+```
+
+### Options vs. Variables
+
+The manifest supports two kinds of user input, both merged into the same
+`.Features.<key>` map so templates reference them identically:
+
+- **`options`** — Fixed-choice inputs, meant for feature toggles. Supported
+  `type` values:
+  - `bool` / `boolean` — yes/no prompt, rendered as a select list
+  - `select` — prompt with a list of `choices` (each with a `value` and
+    optional `label`)
+- **`variables`** — Free-form inputs for values that don't have a fixed set of
+  choices, e.g. a short name, a listen path, a default port. Currently rendered
+  as a text prompt (`type: string`).
+
+Both support the following common fields:
+
+| Field | Description |
+|-------|-------------|
+| `key` | Identifier used as `.Features.<key>` in templates and with `--set key=value` |
+| `type` | `bool`/`boolean`, `select` (options only), or `string` (variables) |
+| `prompt` | Question shown to the user |
+| `description` | Extra context shown alongside the prompt/in `vip template options` |
+| `default` | Value used when not prompting (`--no-input`) or when the user presses enter |
+| `required` | If `true`, omitting the value (empty input, or missing `--set` under `--no-input`) is an error |
+| `choices` | (`options` with `type: select` only) list of `{value, label}` entries |
+
+### Validating variable input
+
+`variables` can declare a `validate` block to enforce a regular expression on
+the value, whether it comes from an interactive prompt, a `--set` override, or
+a manifest `default`:
+
+```yaml
+variables:
+  - key: shortName
+    type: string
+    validate:
+      pattern: "^[a-z][a-z0-9-]*$"
+      message: "Short name must be lowercase alphanumeric, may contain hyphens, and must start with a letter."
+```
+
+- `pattern` — a Go [`regexp`](https://pkg.go.dev/regexp/syntax) pattern the
+  value must match
+- `message` — shown when validation fails; falls back to a generic message
+  naming the pattern if omitted
+
+Validation is enforced everywhere a value can come from:
+- **Interactive prompts** re-prompt inline until a valid value is entered.
+- **`--set key=value` overrides** fail fast with an error before scaffolding starts.
+- **Manifest `default` values** are validated too (surfaced under `--no-input`),
+  so a bad default is caught early rather than silently scaffolded into every
+  project.
+
+Using it in a template file, e.g. `Taskfile.yml`:
+
+```yaml
+env:
+  SHORT_NAME: {{.Features.shortName}}
+```
+
+Use `vip template options` to inspect a template's manifest, and `--set key=value` /
+`--no-input` with `vip project create` or `vip template test` to set options and
+variables non-interactively. See [Template Commands](cli/template.md) for full
+command reference.
+
+---
+
 ## Template Variables
 
 Template variables are replaced with actual values during project scaffolding. Use the syntax `{{ .Namespace.VarName }}` (double braces, leading dot) in your template files.

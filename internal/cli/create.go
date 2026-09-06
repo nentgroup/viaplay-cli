@@ -48,6 +48,8 @@ type CreateCommandOptions struct {
 	BinaryName     string
 	NoHooks        bool
 	NoCache        bool // Force template cache update
+	TemplateSet    []string
+	NoInput        bool
 
 	// Error handling options
 	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur
@@ -70,6 +72,8 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 	cmd.Flags().BoolVar(&opts.ApplyRulesets, "apply-rulesets", false, "Apply rulesets from team configuration")
 	cmd.Flags().BoolVar(&opts.ApplySecrets, "apply-secrets", false, "Apply secrets from team configuration")
 	cmd.Flags().BoolVar(&opts.CleanupOnError, "cleanup-on-error", false, "Clean up resources on error")
+	cmd.Flags().StringArrayVar(&opts.TemplateSet, "set", nil, "Set a template option using key=value")
+	cmd.Flags().BoolVar(&opts.NoInput, "no-input", false, "Do not prompt for template options")
 
 	// Add a PreRun hook to set the defaults from Viper at runtime
 	originalPreRun := cmd.PreRunE
@@ -382,6 +386,8 @@ func executeProjectCreation(ctx context.Context, ghClient *gh.GitHubClient, cfg 
 		Scaffold:       withScaffolding, // Always true for project, false for repo
 		OutputDir:      opts.OutputDir,
 		NoCache:        opts.NoCache, // Force update of template cache if flag is set
+		TemplateSet:    opts.TemplateSet,
+		NoInput:        opts.NoInput,
 
 		// Error handling options
 		CleanupOnError: opts.CleanupOnError, // Pass the cleanup flag to the creator

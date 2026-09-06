@@ -13,3 +13,5 @@
 *.pfx
 /coverage/
 vip
+/graphify-rs-out/
+/graphify-out/

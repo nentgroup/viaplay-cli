@@ -20,6 +20,7 @@ const (
 	DefaultSourceRoot     = "."
 	SharedConfigRepoName  = "vip-shared-configs"
 	sourceCheckoutDirName = "source"
+	yamlStrTag            = "!!str"
 )
 
 // SourceConfig defines the shared config repository used for pull operations.
@@ -414,7 +415,7 @@ func ensureMappingValue(root *yaml.Node, key string) *yaml.Node {
 		}
 	}
 
-	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
+	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: yamlStrTag, Value: key}
 	valueNode := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 	root.Content = append(root.Content, keyNode, valueNode)
 	return valueNode
@@ -424,7 +425,7 @@ func setMappingString(root *yaml.Node, key, value string) {
 	for i := 0; i < len(root.Content)-1; i += 2 {
 		if root.Content[i].Value == key {
 			root.Content[i+1].Kind = yaml.ScalarNode
-			root.Content[i+1].Tag = "!!str"
+			root.Content[i+1].Tag = yamlStrTag
 			root.Content[i+1].Value = value
 			root.Content[i+1].Style = 0
 			return
@@ -432,8 +433,8 @@ func setMappingString(root *yaml.Node, key, value string) {
 	}
 
 	root.Content = append(root.Content,
-		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
-		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: yamlStrTag, Value: key},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: yamlStrTag, Value: value},
 	)
 }
 

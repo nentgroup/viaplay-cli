@@ -11,6 +11,12 @@ import (
 	"github.com/spf13/afero"
 )
 
+const (
+	testGoVersion    = "1.21"
+	testProjectName  = "TestProject"
+	testProjectName2 = "MyProject"
+)
+
 func TestRenderer_VariableSubstitution(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -45,7 +51,7 @@ func TestRenderer_VariableSubstitution(t *testing.T) {
 			tmpl: "Go version: {{.Go.Version}}, Module: {{.Go.ModulePath}}",
 			vars: &Variables{
 				Go: GoInfo{
-					Version:    "1.21",
+					Version:    testGoVersion,
 					ModulePath: "github.com/example/app",
 				},
 			},
@@ -97,14 +103,14 @@ func TestRenderer_RenderString(t *testing.T) {
 	r := &Renderer{
 		Variables: &Variables{
 			Project: ProjectInfo{
-				Name:        "TestProject",
+				Name:        testProjectName,
 				Description: "A sample project",
 			},
 			Service: ServiceInfo{
 				Port: "8080",
 			},
 			Go: GoInfo{
-				Version: "1.21",
+				Version: testGoVersion,
 			},
 			Cloud: CloudInfo{
 				AWSRegion: "us-east-1",
@@ -129,7 +135,7 @@ func TestRenderer_RenderString(t *testing.T) {
 		{
 			name:     "ProjectName variable",
 			input:    "{{.Project.Name}}",
-			expected: "TestProject",
+			expected: testProjectName,
 		},
 		{
 			name:     "Multiple variables",
@@ -186,7 +192,7 @@ func TestRenderer_AllTemplateVariables(t *testing.T) {
 	r := &Renderer{
 		Variables: &Variables{
 			Project: ProjectInfo{
-				Name:        "MyProject",
+				Name:        testProjectName2,
 				Description: "A sample project",
 				Language:    "go",
 				Type:        "service",
@@ -208,7 +214,7 @@ func TestRenderer_AllTemplateVariables(t *testing.T) {
 			Go: GoInfo{
 				BinaryName: "myproject",
 				ModulePath: "github.com/octocat/myproject",
-				Version:    "1.21",
+				Version:    testGoVersion,
 			},
 			Node: NodeInfo{
 				Version:           "18.0.0",
@@ -331,7 +337,7 @@ func TestRenderer_GitHubActionsSyntaxIsIgnored(t *testing.T) {
 	r := &Renderer{
 		Variables: &Variables{
 			Project: ProjectInfo{
-				Name: "MyProject",
+				Name: testProjectName2,
 			},
 		},
 	}
@@ -393,7 +399,7 @@ func TestRenderer_RenderDirectoryPath(t *testing.T) {
 	r := &Renderer{
 		Variables: &Variables{
 			Project: ProjectInfo{
-				Name: "MyProject",
+				Name: testProjectName2,
 			},
 			Service: ServiceInfo{
 				Port: "8080",
@@ -421,6 +427,11 @@ func TestRenderer_RenderDirectoryPath(t *testing.T) {
 			input:    "services/{{.Service.Port}}/api",
 			expected: "services/8080/api",
 		},
+		{
+			name:     "pascal case filter in filename",
+			input:    "infra/{{.Project.Name | pascal}}Service.py",
+			expected: "infra/MyProjectService.py",
+		},
 	}
 
 	for _, tt := range tests {
@@ -445,7 +456,7 @@ func TestRenderer_RenderFile_MockFS(t *testing.T) {
 		t.Fatalf("WriteFile plain.txt error: %v", err)
 	}
 	r := &Renderer{
-		Variables:  &Variables{Project: ProjectInfo{Name: "TestProject"}},
+		Variables:  &Variables{Project: ProjectInfo{Name: testProjectName}},
 		FileSystem: memFS,
 	}
 

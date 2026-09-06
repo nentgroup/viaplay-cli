@@ -343,19 +343,19 @@ func (m *Manager) buildTemplateFromDir(ctx context.Context, path string, info os
 		// If we can't determine the source, use a default
 		source = Source{
 			Type:     SourceTypeGitHub,
-			Location: "unknown",
+			Location: unknownVersion,
 		}
 	}
 
 	// Derive version information from git
 	version, err := git.DescribeVersion(ctx, path)
 	if err != nil {
-		version = "unknown"
+		version = unknownVersion
 	}
 
 	// Get repository info to extract remote URL
 	repoInfo, err := git.GetRepositoryInfo(ctx, path)
-	remoteURL := "unknown"
+	remoteURL := unknownVersion
 	if err == nil && repoInfo != nil && repoInfo.RemoteURL != "" {
 		remoteURL = repoInfo.RemoteURL
 

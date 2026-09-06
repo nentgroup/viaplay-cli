@@ -58,6 +58,8 @@ type Options struct {
 	Scaffold       bool   // Wether to scaffold the project, always true for project creation
 	OutputDir      string // Local directory for the project (if Scaffold is true)
 	NoCache        bool   // Force update of template cache before using it
+	TemplateSet    []string
+	NoInput        bool
 
 	// Error handling options
 	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur

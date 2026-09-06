@@ -242,11 +242,11 @@ func loadRepoSecretsInput(opts *RepoApplyOptions) (string, error) {
 
 func buildRepoApplyScopes(opts *RepoApplyOptions, hasRepoSecrets bool) map[string]bool {
 	scopesToApply := map[string]bool{
-		"envs":         true,
-		"rulesets":     true,
-		"secrets":      true,
-		"variables":    true,
-		"repo-secrets": hasRepoSecrets,
+		scopeEnvs:        true,
+		scopeRulesets:    true,
+		scopeSecrets:     true,
+		scopeVariables:   true,
+		scopeRepoSecrets: hasRepoSecrets,
 	}
 	applyScopeList(scopesToApply, opts.OnlyScopes, true)
 	applyScopeList(scopesToApply, opts.SkipScopes, false)
@@ -274,10 +274,10 @@ func buildRepoApplyProjectOptions(opts *RepoApplyOptions, configDir, repoSecrets
 		RepoDescription: fmt.Sprintf("Repository for %s", opts.Repo),
 		Team:            opts.Team,
 		ConfigDir:       configDir,
-		ApplyEnvs:       scopes["envs"],
-		ApplyRulesets:   scopes["rulesets"],
-		ApplySecrets:    scopes["secrets"],
-		ApplyVariables:  scopes["variables"],
+		ApplyEnvs:       scopes[scopeEnvs],
+		ApplyRulesets:   scopes[scopeRulesets],
+		ApplySecrets:    scopes[scopeSecrets],
+		ApplyVariables:  scopes[scopeVariables],
 		RepoSecrets:     repoSecretsStr,
 	}
 }
@@ -293,7 +293,7 @@ func printRepoApplyDryRun(ctx context.Context, ghClient *gh.GitHubClient, cfg *c
 		fmt.Printf("Config directory: %s\n", configDir)
 	}
 	fmt.Println("Plan:")
-	for _, scope := range []string{"envs", "rulesets", "secrets", "variables", "repo-secrets"} {
+	for _, scope := range []string{scopeEnvs, scopeRulesets, scopeSecrets, scopeVariables, scopeRepoSecrets} {
 		if scopesToApply[scope] {
 			printRepoApplyScopePlan(scope, configDir, repoSecretsStr)
 		}
@@ -320,25 +320,25 @@ func determineRepoApplyConfigDir(ctx context.Context, ghClient *gh.GitHubClient,
 func printRepoApplyScopePlan(scope, configDir, repoSecretsStr string) {
 	fmt.Printf("  - %s\n", scope)
 	switch scope {
-	case "envs":
+	case scopeEnvs:
 		printRepoApplyEnvPlan(configDir)
-	case "rulesets":
+	case scopeRulesets:
 		printRepoApplyRulesetPlan(configDir)
-	case "secrets":
+	case scopeSecrets:
 		printRepoApplySecretsPlan(configDir, false)
-	case "variables":
+	case scopeVariables:
 		printRepoApplySecretsPlan(configDir, true)
-	case "repo-secrets":
+	case scopeRepoSecrets:
 		printRepoApplyRepoSecretsPlan(repoSecretsStr)
 	}
 }
 
 func printRepoApplyEnvPlan(configDir string) {
-	printRepoApplyFileList(filepath.Join(configDir, "envs"), []string{".yaml"}, "environment")
+	printRepoApplyFileList(filepath.Join(configDir, scopeEnvs), []string{yamlExt}, "environment")
 }
 
 func printRepoApplyRulesetPlan(configDir string) {
-	printRepoApplyFileList(filepath.Join(configDir, "rulesets"), []string{".yaml", ".yml"}, "ruleset")
+	printRepoApplyFileList(filepath.Join(configDir, scopeRulesets), []string{yamlExt, ".yml"}, "ruleset")
 }
 
 func printRepoApplyFileList(dir string, exts []string, label string) {

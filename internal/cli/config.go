@@ -351,7 +351,7 @@ var pullTeamCmd = &cobra.Command{
 }
 
 var pullHooksCmd = &cobra.Command{
-	Use:          "hooks",
+	Use:          pathHooks,
 	Short:        "Pull hooks for the active team from the shared config source",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -843,11 +843,11 @@ func showConfigPaths() {
 
 func resolveConfigPath(cmd *cobra.Command, cfg *config.Configuration, pathType string) (string, error) {
 	switch pathType {
-	case "team":
+	case configTargetTeam:
 		return resolveTeamConfigPath(cmd, cfg)
-	case "user":
+	case configTargetUser:
 		return resolveUserConfigPath(cmd, cfg)
-	case "hooks":
+	case pathHooks:
 		return cfg.GetHooksDir(), nil
 	case "templates":
 		return cfg.CacheDir, nil
@@ -860,7 +860,7 @@ func resolveEditTargetPath(cmd *cobra.Command, cfg *config.Configuration, target
 	switch target {
 	case configTargetMain:
 		return configuredConfigFilePath(), nil
-	case configTargetTeam, "user", "hooks", "templates":
+	case configTargetTeam, configTargetUser, pathHooks, "templates":
 		return resolveConfigPath(cmd, cfg, target)
 	default:
 		return "", fmt.Errorf("unsupported edit target %q (expected main, team, user, hooks, or templates)", target)
@@ -1169,7 +1169,7 @@ func resolveExplicitOrDefaultTeamValidationTarget(cmd *cobra.Command, cfg *confi
 	return &configValidationTarget{
 		label: label,
 		path:  cfg.GetTeamDir(teamName, organization),
-		kind:  "team",
+		kind:  configTargetTeam,
 	}, nil
 }
 
@@ -1465,16 +1465,16 @@ func renderConfigTemplate(data []byte) (string, error) {
 	vars.Org.Name = "org"
 	vars.Org.Team = "team"
 	vars.Org.TeamID = 1
-	vars.Repo.Owner = "owner"
+	vars.Repo.Owner = flagOwner
 	vars.Repo.Name = "repo"
-	vars.Project.Name = "project"
+	vars.Project.Name = defaultProjectName
 
 	return templatepkg.NewRenderer(vars).RenderString(string(data))
 }
 
 func isYAMLFile(name string) bool {
 	extension := strings.ToLower(filepath.Ext(name))
-	return extension == ".yaml" || extension == ".yml"
+	return extension == yamlExt || extension == ".yml"
 }
 
 func printConfigValidationReport(report *configValidationReport) {
