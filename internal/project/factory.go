@@ -274,15 +274,22 @@ func (c *Factory) scaffoldIfNeeded(ctx context.Context, cctx *creationContext) e
 	}
 
 	c.Reporter.Start("Scaffolding project", "")
+	// Set CreatedProjectDir before attempting to scaffold (rather than only on
+	// success) so Cleanup can remove any partially-created output directory if
+	// setUp fails partway through (e.g. a file-copy error after the directory
+	// was already created). os.RemoveAll on a path that was never created is a
+	// harmless no-op, so this is safe even when setUp fails before creating
+	// anything on disk.
+	cctx.CreatedProjectDir = cctx.ProjectPath
 	if err := c.setUp(ctx, cctx.opts, cctx.TemplateVars); err != nil {
 		if cctx.opts.CleanupOnError {
 			cctx.Cleanup()
 			cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to scaffold project: %v", err))
 			return fmt.Errorf("failed to scaffold project: %w", err)
 		}
+		cctx.CreatedProjectDir = ""
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
-	cctx.CreatedProjectDir = cctx.ProjectPath
 	c.Reporter.Complete("Scaffolding project", "complete!")
 	return nil
 }

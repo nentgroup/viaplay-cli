@@ -114,7 +114,8 @@ formatters:
         - github.com/nentgroup/viaplay-cli
     gofumpt:
       module-path: github.com/nentgroup/viaplay-cli
-      extra-rules: true
+      extra:
+        group-params: true
   exclusions:
     generated: lax
     paths:

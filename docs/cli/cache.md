@@ -2,7 +2,7 @@
 
 Manage the local cache of project templates.
 
-> **Deprecated:** Use `vip template list`, `vip template info`, `vip template update`, `vip template prune`, and `vip template clean` instead.
+> **Deprecated:** Use `vip template list`, `vip template update`, `vip template prune`, and `vip template clean` instead.
 
 ---
 
@@ -26,6 +26,7 @@ List all templates currently stored in the cache.
 ### `vip cache info`
 Show detailed information about the template cache, including size and statistics.
 - No arguments or flags.
+- **Deprecated:** merged into `vip cache list` / `vip template list`.
 
 ---
 

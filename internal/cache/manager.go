@@ -116,7 +116,14 @@ func NewManagerFromConfig(cfg *config.Configuration) *Manager {
 // - Local path: "local@/path/to/template"
 // - Tarball URL: "url@https://example.com/template.tar.gz"
 // - Git SSH URL: "git@github.com:<owner>/<repo>.git" or "git@github.com/<owner>/<repo>.git"
+//
+// For convenience, a few common shorthand forms are also accepted and expanded
+// before parsing (see normalizeSourceShorthand): plain GitHub URLs/addresses
+// (e.g. "https://github.com/owner/repo" or "github.com/owner/repo"), and bare
+// strings with no recognised "type@" prefix, which are treated as local paths.
 func ParseSource(sourceStr string) (Source, error) {
+	sourceStr = normalizeSourceShorthand(sourceStr)
+
 	// Special handling for git@github.com: format with colon
 	if strings.HasPrefix(sourceStr, "git@github.com:") {
 		// For SSH URLs, store the full URL as is
@@ -179,19 +186,113 @@ func ParseSource(sourceStr string) (Source, error) {
 			Location: location,
 		}, nil
 	case "git":
-		// Handle git URLs explicitly as SSH type
+		// A colon in the location means it's already a complete SSH remote for
+		// some host (e.g. "git@bitbucket.org:owner/repo.git"), so it can be
+		// used verbatim as the clone URL.
+		if strings.Contains(location, ":") {
+			return Source{
+				Type:     SourceTypeSSH,
+				Location: sourceStr,
+			}, nil
+		}
+		// Otherwise, this is the "git@owner/repo[@ref]" shorthand documented
+		// alongside local@/url@ (no host given), matching the convenience
+		// "github@owner/repo" syntax. Expand it to a full GitHub SSH URL.
+		if idx := strings.LastIndex(location, "@"); idx != -1 {
+			reference = location[idx+1:]
+			location = location[:idx]
+		}
+		location = strings.TrimSuffix(location, ".git")
 		return Source{
-			Type:     SourceTypeSSH,
-			Location: sourceStr,
+			Type:      SourceTypeSSH,
+			Location:  "git@github.com:" + location + ".git",
+			Reference: reference,
 		}, nil
 	default:
 		return Source{}, fmt.Errorf("unknown template source type: %s", sourceType)
 	}
 }
 
+// normalizeSourceShorthand expands convenient shorthand forms of a template
+// source into the explicit "type@value" syntax required by the rest of
+// ParseSource, so users don't need to memorise or hand-construct the
+// "github@owner/repo" syntax:
+//   - A GitHub repository address copy-pasted from a browser or git remote
+//     (e.g. "https://github.com/owner/repo", "http://github.com/owner/repo" or
+//     the bare "github.com/owner/repo", each optionally suffixed with ".git"
+//     and/or "@branch-or-tag") is expanded to "github@owner/repo[@ref]".
+//   - Any other string without a recognised "type@" prefix is treated as a
+//     local path, matching the CLI's historical default behaviour.
+func normalizeSourceShorthand(sourceStr string) string {
+	trimmed := strings.TrimSpace(sourceStr)
+	if trimmed == "" {
+		return trimmed
+	}
+
+	for _, prefix := range []string{"https://github.com/", "http://github.com/", "github.com/"} {
+		if !strings.HasPrefix(trimmed, prefix) {
+			continue
+		}
+		rest := strings.TrimSuffix(strings.TrimPrefix(trimmed, prefix), "/")
+		rest = strings.TrimSuffix(rest, ".git")
+		return "github@" + rest
+	}
+
+	if !strings.Contains(trimmed, "@") {
+		return "local@" + trimmed
+	}
+
+	return trimmed
+}
+
 // GetTemplatePath returns the cache path for a specific template
 func (m *Manager) GetTemplatePath(language, templateType string) string {
 	return filepath.Join(m.BaseCacheDir, language, templateType)
+}
+
+// EnsureEphemeralTemplate resolves an ad-hoc template source (one not tied to
+// a configured language/type, as used by `template inspect` and
+// `template test --template-path`) for one-off, read-only use. Unlike
+// EnsureTemplate, it never reads from or writes to the persistent template
+// cache: local sources are returned as-is, and remote sources are cloned into
+// a fresh temporary directory on every call. This guarantees inspecting or
+// test-scaffolding a template always reflects its current state and never
+// mutates cache state shared with real project creation.
+//
+// The returned cleanup function removes any temporary clone and must be
+// called once the caller is done reading the template; it is a no-op for
+// local sources.
+func (m *Manager) EnsureEphemeralTemplate(ctx context.Context, sourceStr string) (path string, cleanup func(), err error) {
+	noopCleanup := func() {}
+
+	source, err := ParseSource(sourceStr)
+	if err != nil {
+		return "", noopCleanup, fmt.Errorf("failed to parse template source: %w", err)
+	}
+
+	// Local templates are used directly from their existing path; nothing to
+	// clone or clean up.
+	if source.Type == SourceTypeLocal {
+		path, err := handleLocalTemplate(source)
+		return path, noopCleanup, err
+	}
+
+	tempDir, err := os.MkdirTemp("", "vip-template-source-*")
+	if err != nil {
+		return "", noopCleanup, fmt.Errorf("failed to create temporary directory for template source: %w", err)
+	}
+	cleanup = func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			output.VerboseMessage(fmt.Sprintf("failed to clean up temporary template clone at %s: %v", tempDir, err))
+		}
+	}
+
+	if _, err := handleNewTemplate(ctx, tempDir, source); err != nil {
+		cleanup()
+		return "", noopCleanup, err
+	}
+
+	return tempDir, cleanup, nil
 }
 
 // EnsureTemplate ensures a template is available in the cache

@@ -84,20 +84,25 @@ Run `task setup:lefthook` to install hooks locally.
 
 ## Codebase navigation
 
-This repository is indexed with graphify-rs.
+### graphify-rs knowledge graph
 
-For questions involving codebase structure, dependencies, call relationships,
-architecture, or locating relevant implementation:
+This repo has a `graphify-rs-out/` knowledge graph (nodes/edges/communities extracted from the
+codebase) used to answer architecture questions and speed up navigation. Key files:
+`graphify-rs-out/graph.json` (GraphRAG-ready data), `graphify-rs-out/GRAPH_REPORT.md`
+(god nodes, surprising connections, suggested questions), `graphify-rs-out/graph.html`
+(interactive visualization).
 
-1. Use `graphify-rs query "<question>"` from the repository root first.
-2. Use Graphify results to identify relevant symbols and files.
-3. Inspect the actual source files before making changes or drawing conclusions.
-4. Prefer Graphify for broad codebase discovery instead of repeatedly using
-   grep/find/glob across the entire repository.
-5. Graphify's generated data is stored in its default per-project location
-   under `~/.graphify-rs/`; do not assume generated graph files are in this repo.
-
-After significant structural code changes, refresh the graph with the
-appropriate graphify-rs update/build command.
-
-`.graphifyignore` defines paths that should not be indexed.
+- **Querying**: `graphify-rs query "<question>" --graph graphify-rs-out/graph.json` (add `--dfs`
+  to trace a specific path instead of broad BFS context). Prefer this over re-reading the whole
+  tree when you need architecture/relationship context.
+- **After modifying code**: rebuild so the graph doesn't go stale before answering questions about
+  the changed code. Batch changes, then rebuild once (not after every one-line edit):
+  ```console
+  graphify-rs build --path . --output graphify-rs-out --no-llm --update
+  ```
+  `--update` only re-extracts changed files (SHA256 cache); `--no-llm` keeps it AST-only, free,
+  and fast (~2-5s).
+- **Stats/diff**: `graphify-rs stats graphify-rs-out/graph.json` and
+  `graphify-rs diff <old-graph.json> <new-graph.json>` for comparing snapshots.
+- Treat edge confidence honestly: edges are tagged EXTRACTED, INFERRED, or AMBIGUOUS in the
+  graph — don't present INFERRED/AMBIGUOUS relationships as verified facts.

@@ -14,6 +14,7 @@
   - [Config](cli/config.md)
   - [Hooks](cli/hooks.md)
   - [Template](cli/template.md)
+  - [Skills](cli/skills.md)
   - [Secrets](cli/secrets.md)
   - [Auth](cli/auth.md)
   - [Cache](cli/cache.md)

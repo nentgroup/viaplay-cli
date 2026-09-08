@@ -34,24 +34,30 @@ func (ps *ProjectScaffolder) ScaffoldProject(ctx context.Context, destPath, lang
 func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(ctx context.Context, destPath, language, projectType, templateSource string,
 	opts interface{}, skipHooks, forceUpdate bool, templateSet []string, noInput bool,
 ) error {
-	templatePath, manifest, err := ps.resolveTemplateManifest(ctx, language, projectType, templateSource, forceUpdate)
+	templatePath, manifest, cleanup, err := ps.resolveTemplateManifest(ctx, language, projectType, templateSource, forceUpdate)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(destPath, 0o755); err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
-	}
+	defer cleanup()
+
 	templateVars, ok := opts.(*templ.Variables)
 	if !ok {
 		return fmt.Errorf("opts must be of type *template.Variables")
 	}
-	renderer := templ.NewRenderer(templateVars)
 
+	// Resolve manifest options/prompts before touching the filesystem, so a
+	// missing required option (e.g. under --no-input) fails fast without
+	// leaving behind an empty destination directory that would need cleanup.
 	if manifest != nil {
 		if err := templ.ResolveManifestSelections(manifest, templateVars, templateSet, noInput); err != nil {
 			return fmt.Errorf("failed to resolve template options: %w", err)
 		}
 	}
+
+	if err := os.MkdirAll(destPath, 0o755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+	renderer := templ.NewRenderer(templateVars)
 	return ps.copyTemplateFiles(templatePath, destPath, renderer, manifest)
 }
 
@@ -59,7 +65,8 @@ func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(ctx context.Context, des
 // if any, without scaffolding a project. Returns a nil manifest (and nil error) when the
 // template has no template.yaml, preserving backward compatibility for plain templates.
 func (ps *ProjectScaffolder) GetTemplateManifest(ctx context.Context, language, projectType, templateSource string, forceUpdate bool) (*templ.Manifest, error) {
-	_, manifest, err := ps.resolveTemplateManifest(ctx, language, projectType, templateSource, forceUpdate)
+	_, manifest, cleanup, err := ps.resolveTemplateManifest(ctx, language, projectType, templateSource, forceUpdate)
+	defer cleanup()
 	return manifest, err
 }
 
@@ -67,10 +74,33 @@ func (ps *ProjectScaffolder) GetTemplateManifest(ctx context.Context, language, 
 // manifest (template.yaml), checking both the template root and the "_template"
 // subdirectory since manifests live at the repository root, which may differ from
 // the rendered content root.
-func (ps *ProjectScaffolder) resolveTemplateManifest(ctx context.Context, language, projectType, templateSource string, forceUpdate bool) (string, *templ.Manifest, error) {
-	templatePath, err := ps.CacheManager.EnsureTemplate(ctx, language, projectType, templateSource, forceUpdate)
+//
+// Ad-hoc sources (language and projectType both empty, as used by
+// `template inspect` and `template test --template-path`) are resolved via
+// EnsureEphemeralTemplate: they're read-only, one-off lookups and must never
+// read from or write to the persistent template cache shared with real
+// project creation. Configured language/type sources continue to use the
+// persistent, reusable cache via EnsureTemplate.
+//
+// The returned cleanup function removes any temporary clone created for an
+// ad-hoc source and must always be called by the caller once done with the
+// template (it is a no-op otherwise).
+func (ps *ProjectScaffolder) resolveTemplateManifest(ctx context.Context, language, projectType, templateSource string, forceUpdate bool) (string, *templ.Manifest, func(), error) {
+	noopCleanup := func() {}
+
+	var (
+		templatePath string
+		cleanup      func()
+		err          error
+	)
+	if language == "" && projectType == "" {
+		templatePath, cleanup, err = ps.CacheManager.EnsureEphemeralTemplate(ctx, templateSource)
+	} else {
+		cleanup = noopCleanup
+		templatePath, err = ps.CacheManager.EnsureTemplate(ctx, language, projectType, templateSource, forceUpdate)
+	}
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to ensure template is available: %w", err)
+		return "", nil, noopCleanup, fmt.Errorf("failed to ensure template is available: %w", err)
 	}
 
 	manifestRoot := templatePath
@@ -81,9 +111,10 @@ func (ps *ProjectScaffolder) resolveTemplateManifest(ctx context.Context, langua
 	}
 	manifest, err := templ.LoadManifest(manifestRoot)
 	if err != nil {
-		return "", nil, err
+		cleanup()
+		return "", nil, noopCleanup, err
 	}
-	return templatePath, manifest, nil
+	return templatePath, manifest, cleanup, nil
 }
 
 func (ps *ProjectScaffolder) copyTemplateFiles(templatePath, destPath string, renderer *templ.Renderer, manifest *templ.Manifest) error {

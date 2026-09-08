@@ -13,6 +13,7 @@ import (
 
 	"github.com/nentgroup/viaplay-cli/internal/cache"
 	"github.com/nentgroup/viaplay-cli/internal/config"
+	"github.com/nentgroup/viaplay-cli/internal/output"
 	"github.com/nentgroup/viaplay-cli/internal/scaffolding"
 	"github.com/nentgroup/viaplay-cli/internal/template"
 )
@@ -42,12 +43,11 @@ func NewTemplateCommand() *cobra.Command {
 
 	// Add subcommands
 	templateCmd.AddCommand(newTemplateListCommand())
-	templateCmd.AddCommand(newTemplateInfoCommand())
 	templateCmd.AddCommand(newTemplateUpdateCommand())
 	templateCmd.AddCommand(newTemplatePruneCommand())
 	templateCmd.AddCommand(newTemplateCleanCommand())
 	templateCmd.AddCommand(newTemplateTestCommand())
-	templateCmd.AddCommand(newTemplateOptionsCommand())
+	templateCmd.AddCommand(newTemplateInspectCommand())
 
 	return templateCmd
 }
@@ -55,21 +55,10 @@ func NewTemplateCommand() *cobra.Command {
 func newTemplateListCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   cmdList,
-		Short: "List local template copies",
-		Long:  `List template copies currently stored locally for reuse.`,
+		Short: "List local template copies and storage information",
+		Long:  `List template copies currently stored locally for reuse, along with overall storage statistics.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			listCache(cmd.Context())
-		},
-	}
-}
-
-func newTemplateInfoCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "info",
-		Short: "Show local template storage information",
-		Long:  `Show detailed information about locally stored template copies including size and statistics.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			showCacheInfo(cmd.Context())
 		},
 	}
 }
@@ -129,19 +118,31 @@ func newTemplateTestCommand() *cobra.Command {
 	)
 
 	testCmd := &cobra.Command{
-		Use:   "test",
+		Use:   "test [source]",
 		Short: "Test template scaffolding without project creation",
 		Long: `Test templates directly without creating repos or authenticating.
 This command is useful for template developers who want to test their 
 templates during development or in CI pipelines.
 
-Templates are output to a temporary directory that is automatically created.`,
+Templates are output to a temporary directory that is automatically created.
+
+<source> accepts the same template source formats as 'project create' and
+'template inspect': a GitHub address (e.g. github.com/owner/repo,
+https://github.com/owner/repo, or github@owner/repo[@ref]), a local path, or
+an explicit local@/url@/git@ source. The --template-path flag is kept for
+backwards compatibility and is equivalent to passing <source>.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
+			templateSource, err := resolveTestTemplateSource(args, templatePath)
+			if err != nil {
+				return err
+			}
+
 			// Initialise result object for potential JSON output
 			result := TestResult{
-				TemplatePath: templatePath,
+				TemplatePath: templateSource,
 				Success:      false,
 			}
 
@@ -251,10 +252,8 @@ Templates are output to a temporary directory that is automatically created.`,
 				fmt.Fprintf(os.Stderr, "📁 Output directory: %s\n", outputPath)
 			}
 
-			templateSource := templatePath
-			if templateSource != "" && !strings.Contains(templateSource, "@") {
-				templateSource = "local@" + templateSource
-			}
+			// templateSource is expanded/normalised by cache.ParseSource (e.g. bare
+			// paths default to "local@", GitHub URLs are recognised automatically).
 
 			// Run the scaffolding. Manifest options (if any) are resolved interactively,
 			// unless overridden via --set or suppressed via --no-input.
@@ -286,15 +285,47 @@ Templates are output to a temporary directory that is automatically created.`,
 	}
 
 	// Add flags
-	testCmd.Flags().StringVar(&templatePath, "template-path", "", "Local path to a template directory")
+	testCmd.Flags().StringVar(&templatePath, "template-path", "",
+		"Template source to test (deprecated; pass <source> as a positional argument instead)")
 	testCmd.Flags().BoolVar(&forceRefresh, "force", false, "Force refresh of local template copies")
 	testCmd.Flags().StringVar(&projectName, "name", "test-project", "Project name for template variables")
 	testCmd.Flags().StringVar(&projectOwner, "owner", "test-owner", "Project owner for template variables")
 	testCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format for scripting")
 	testCmd.Flags().StringArrayVar(&templateSet, "set", nil, "Set a template option using key=value")
 	testCmd.Flags().BoolVar(&noInput, "no-input", false, "Do not prompt for template options; use defaults/--set values")
+	if err := testCmd.Flags().MarkDeprecated("template-path",
+		"pass <source> as a positional argument instead, e.g. 'vip template test <source>'"); err != nil {
+		panic(err)
+	}
+	if err := testCmd.Flags().MarkDeprecated("force",
+		"remote templates are now always fetched fresh for 'template test' and never persisted to the shared template cache"); err != nil {
+		panic(err)
+	}
 
 	return testCmd
+}
+
+// resolveTestTemplateSource determines the template source for 'template test'
+// from either the new positional <source> argument or the deprecated
+// --template-path flag, rejecting the case where both are given with
+// different values to avoid silently picking one.
+func resolveTestTemplateSource(args []string, templatePathFlag string) (string, error) {
+	var positional string
+	if len(args) > 0 {
+		positional = args[0]
+	}
+
+	switch {
+	case positional != "" && templatePathFlag != "" && positional != templatePathFlag:
+		return "", fmt.Errorf("both <source> (%q) and --template-path (%q) were given with different values; use only one",
+			positional, templatePathFlag)
+	case positional != "":
+		return positional, nil
+	case templatePathFlag != "":
+		return templatePathFlag, nil
+	default:
+		return "", fmt.Errorf("a template source is required; pass it as <source> (e.g. 'vip template test <source>')")
+	}
 }
 
 // printJSONResult outputs the test result as JSON to stdout
@@ -307,39 +338,35 @@ func printJSONResult(result TestResult) {
 	fmt.Println(string(jsonData))
 }
 
-// newTemplateOptionsCommand creates a new "options" subcommand that inspects a
+// newTemplateInspectCommand creates a new "inspect" subcommand that inspects a
 // template and lists the manifest-driven options (if any) it supports, without
 // scaffolding anything. Templates without a template.yaml are reported as having
 // no configurable options, preserving backward compatibility.
-func newTemplateOptionsCommand() *cobra.Command {
+func newTemplateInspectCommand() *cobra.Command {
 	var (
-		templatePath   string
-		templateSource string
-		forceRefresh   bool
-		jsonOutput     bool
+		forceRefresh bool
+		jsonOutput   bool
 	)
 
-	optionsCmd := &cobra.Command{
-		Use:   "options",
-		Short: "List the manifest-defined options a template supports",
+	inspectCmd := &cobra.Command{
+		Use:   "inspect <source>",
+		Short: "Inspect a template and list the manifest-defined options it supports",
 		Long: `Inspect a template's manifest (template.yaml), if present, and print the
 options and variables it exposes (key, type, prompt, default, choices).
 
+<source> accepts the same template source formats as 'project create' and
+'template test': a GitHub address (e.g. github.com/owner/repo,
+https://github.com/owner/repo, or github@owner/repo[@ref]), a local path, or
+an explicit local@/url@/git@ source.
+
 Use --set key=value with 'project create' or 'template test' to set these
 options non-interactively. Templates without a manifest report no options.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-
-			source := templateSource
-			if source == "" {
-				source = templatePath
-			}
-			if source == "" {
-				return fmt.Errorf("either --template-path or --template-source must be provided")
-			}
-			if !strings.Contains(source, "@") {
-				source = "local@" + source
-			}
+			source := args[0]
+			// source is expanded/normalised by cache.ParseSource (e.g. bare paths
+			// default to "local@", GitHub URLs are recognised automatically).
 
 			cfg, err := config.LoadConfig()
 			if err != nil {
@@ -354,25 +381,27 @@ options non-interactively. Templates without a manifest report no options.`,
 			}
 
 			if jsonOutput {
-				printTemplateOptionsJSON(manifest)
+				printTemplateManifestJSON(manifest)
 				return nil
 			}
-			printTemplateOptionsHuman(manifest)
+			printTemplateManifestHuman(manifest)
 			return nil
 		},
 	}
 
-	optionsCmd.Flags().StringVar(&templatePath, "template-path", "", "Local path to a template directory")
-	optionsCmd.Flags().StringVar(&templateSource, "template-source", "", "Template source (e.g. local@/path, github@owner/repo)")
-	optionsCmd.Flags().BoolVar(&forceRefresh, "force", false, "Force refresh of local template copies")
-	optionsCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format for scripting")
+	inspectCmd.Flags().BoolVar(&forceRefresh, "force", false, "Force refresh of local template copies")
+	inspectCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format for scripting")
+	if err := inspectCmd.Flags().MarkDeprecated("force",
+		"templates are now always fetched fresh for 'template inspect' and never persisted to the shared template cache"); err != nil {
+		panic(err)
+	}
 
-	return optionsCmd
+	return inspectCmd
 }
 
-// printTemplateOptionsJSON prints the manifest options/variables as JSON, or an
+// printTemplateManifestJSON prints the manifest options/variables as JSON, or an
 // empty/null manifest when the template has none.
-func printTemplateOptionsJSON(manifest *template.Manifest) {
+func printTemplateManifestJSON(manifest *template.Manifest) {
 	jsonData, err := json.Marshal(manifest)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error marshaling JSON: %v\n", err)
@@ -381,58 +410,115 @@ func printTemplateOptionsJSON(manifest *template.Manifest) {
 	fmt.Println(string(jsonData))
 }
 
-// printTemplateOptionsHuman prints a human-readable summary of the manifest's
-// options and variables.
-func printTemplateOptionsHuman(manifest *template.Manifest) {
+// printTemplateManifestHuman prints a human-readable summary of the manifest's
+// options and variables, styled consistently with 'template list' (section
+// headers, tables, and shared colour helpers from internal/output).
+func printTemplateManifestHuman(manifest *template.Manifest) {
 	if manifest == nil {
-		fmt.Println("This template has no manifest (template.yaml) — no configurable options.")
+		output.InfoMessage("This template has no manifest (template.yaml) — no configurable options.")
 		return
 	}
 
-	if manifest.Metadata.Name != "" || manifest.Metadata.Description != "" {
-		fmt.Printf("📦 %s\n", strings.TrimSpace(manifest.Metadata.Name+" "+manifest.Metadata.Description))
+	title := strings.TrimSpace(manifest.Metadata.Name)
+	if title == "" {
+		title = "Template Options"
+	}
+	output.Section(title)
+
+	if manifest.Metadata.Description != "" {
+		fmt.Println(manifest.Metadata.Description)
 	}
 	if !manifest.IsSupported() {
-		fmt.Printf("⚠ Warning: manifest schema %d is not supported by this version of vip\n", manifest.Schema)
+		output.WarningMessage(fmt.Sprintf("manifest schema %d is not supported by this version of vip", manifest.Schema))
 	}
 
 	if len(manifest.Options) == 0 && len(manifest.Variables) == 0 {
-		fmt.Println("This template defines a manifest but no options or variables.")
+		output.InfoMessage("This template defines a manifest but no options or variables.")
 		return
 	}
 
+	headers := []string{"Key", colType, "Required", "Default", "Description"}
 	if len(manifest.Options) > 0 {
-		fmt.Println("Options (use --set key=value):")
-		for _, opt := range manifest.Options {
-			printManifestOptionLine(opt.Key, opt.Type, opt.Description, opt.Default, opt.Required, opt.Choices)
-		}
+		printManifestTable("Options (use --set key=value)", headers, manifestOptionRows(manifest.Options))
 	}
-
 	if len(manifest.Variables) > 0 {
-		fmt.Println("Variables (use --set key=value):")
-		for _, v := range manifest.Variables {
-			printManifestOptionLine(v.Key, v.Type, v.Description, v.Default, v.Required, nil)
-		}
+		printManifestTable("Variables (use --set key=value)", headers, manifestVariableRows(manifest.Variables))
 	}
 }
 
-func printManifestOptionLine(key, typ, description string, def any, required bool, choices []template.ManifestChoice) {
-	line := fmt.Sprintf("  - %s (%s)", key, typ)
+// printManifestTable prints a titled table of manifest options or variables.
+func printManifestTable(title string, headers []string, rows [][]string) {
+	fmt.Printf("\n%s\n", output.Bold(title))
+	fmt.Print(output.Table(headers, rows, 2))
+}
+
+// manifestOptionRows builds table rows for manifest options, folding each
+// option's choices into the description column since they don't fit their
+// own column alongside free-form variables.
+func manifestOptionRows(options []template.ManifestOption) [][]string {
+	rows := make([][]string, 0, len(options))
+	for _, opt := range options {
+		rows = append(rows, []string{
+			output.Bold(opt.Key),
+			opt.Type,
+			requiredCell(opt.Required),
+			defaultCell(opt.Default),
+			descriptionWithChoices(opt.Description, opt.Choices),
+		})
+	}
+	return rows
+}
+
+// manifestVariableRows builds table rows for manifest variables.
+func manifestVariableRows(vars []template.ManifestVariable) [][]string {
+	rows := make([][]string, 0, len(vars))
+	for _, v := range vars {
+		rows = append(rows, []string{
+			output.Bold(v.Key),
+			v.Type,
+			requiredCell(v.Required),
+			defaultCell(v.Default),
+			v.Description,
+		})
+	}
+	return rows
+}
+
+// requiredCell renders the "Required" column, colour-coded for quick scanning.
+func requiredCell(required bool) string {
 	if required {
-		line += " [required]"
+		return output.Warning("yes")
 	}
-	if def != nil {
-		line += fmt.Sprintf(" default=%v", def)
+	return output.Faint("no")
+}
+
+// defaultCell renders the "Default" column, using a placeholder when unset.
+func defaultCell(def any) string {
+	if def == nil {
+		return output.Faint("-")
 	}
-	fmt.Println(line)
-	if description != "" {
-		fmt.Printf("      %s\n", description)
+	return fmt.Sprintf("%v", def)
+}
+
+// descriptionWithChoices appends an option's choices (value and, if
+// different, label) to its description for display in a single column.
+func descriptionWithChoices(description string, choices []template.ManifestChoice) string {
+	if len(choices) == 0 {
+		return description
 	}
+
+	labels := make([]string, 0, len(choices))
 	for _, c := range choices {
-		label := c.Label
-		if label == "" {
-			label = c.Value
+		if c.Label == "" || c.Label == c.Value {
+			labels = append(labels, c.Value)
+		} else {
+			labels = append(labels, fmt.Sprintf("%s (%s)", c.Value, c.Label))
 		}
-		fmt.Printf("      • %s: %s\n", c.Value, label)
 	}
+
+	choicesNote := output.Faint(fmt.Sprintf("[choices: %s]", strings.Join(labels, ", ")))
+	if description == "" {
+		return choicesNote
+	}
+	return description + " " + choicesNote
 }

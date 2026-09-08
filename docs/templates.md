@@ -21,15 +21,22 @@ More templates are planned. You can also add your own templates in your `config.
 
 ## Template Sources
 
-- **Remote Git:** Use a Git URL (e.g., `git@github.com:nentgroup/go-service-template.git`).
+- **Remote Git:** Use a Git URL (e.g., `git@github.com:nentgroup/go-service-template.git`), a
+  GitHub address (`github.com/owner/repo` or `https://github.com/owner/repo`), or the explicit
+  `github@owner/repo[@branch-or-tag]` form.
 - **Local Directory:** Use a local path for custom templates.
 
 ### Using a Custom Template Source
 
-Specify the template source when creating a project:
+Specify the template source when creating a project. GitHub addresses copied straight from your
+browser or a Git remote are recognised automatically, so you don't need to remember the
+`github@owner/repo` syntax:
 
 ```bash
-# Remote template
+# Remote template — any of these are equivalent
+vip project create my-service --language go --type service --template-source github.com/your-org/your-template
+vip project create my-service --language go --type service --template-source https://github.com/your-org/your-template
+vip project create my-service --language go --type service --template-source github@your-org/your-template
 vip project create my-service --language go --type service --template-source git@github.com:your-org/your-template.git
 
 # Local template
@@ -54,7 +61,7 @@ Example: `template.go.tmpl.raw` is copied to `template.go.tmpl` without any rend
 
 ## Template Caching
 
-Remote templates are cached locally for faster reuse. Use `vip template list`, `vip template info`, `vip template update`, `vip template prune`, or `vip template clean` to manage those local copies, or pass `--no-cache` when creating a project to force a fresh download.
+Remote templates are cached locally for faster reuse. Use `vip template list`, `vip template update`, `vip template prune`, or `vip template clean` to manage those local copies, or pass `--no-cache` when creating a project to force a fresh download.
 
 ---
 
@@ -138,7 +145,7 @@ Both support the following common fields:
 | `key` | Identifier used as `.Features.<key>` in templates and with `--set key=value` |
 | `type` | `bool`/`boolean`, `select` (options only), or `string` (variables) |
 | `prompt` | Question shown to the user |
-| `description` | Extra context shown alongside the prompt/in `vip template options` |
+| `description` | Extra context shown alongside the prompt/in `vip template inspect` |
 | `default` | Value used when not prompting (`--no-input`) or when the user presses enter |
 | `required` | If `true`, omitting the value (empty input, or missing `--set` under `--no-input`) is an error |
 | `choices` | (`options` with `type: select` only) list of `{value, label}` entries |
@@ -177,7 +184,7 @@ env:
   SHORT_NAME: {{.Features.shortName}}
 ```
 
-Use `vip template options` to inspect a template's manifest, and `--set key=value` /
+Use `vip template inspect <source>` to inspect a template's manifest, and `--set key=value` /
 `--no-input` with `vip project create` or `vip template test` to set options and
 variables non-interactively. See [Template Commands](cli/template.md) for full
 command reference.

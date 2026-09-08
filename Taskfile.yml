@@ -150,8 +150,33 @@ tasks:
       - go run ./cmd/{{.APP_NAME}} repo apply variable {{.CLI_ARGS}}
 
   install:local:
-    desc: Install the CLI tool locally
+    desc: Build and install a vip-dev binary locally (separate from a real 'vip' release install)
+    vars:
+      GIT_COMMIT:
+        sh: git rev-parse --short HEAD
+      BUILD_DATE:
+        sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+      GOBIN:
+        sh: go env GOBIN
+      GOPATH:
+        sh: go env GOPATH
+      INSTALL_DIR: '{{if .GOBIN}}{{.GOBIN}}{{else}}{{.GOPATH}}/bin{{end}}'
     cmds:
-      - echo "Installing viaplay-cli locally"
-      - go install ./cmd/{{.APP_NAME}}
-      - echo "✅ Installed successfully. Run '{{.APP_NAME}}' to use the tool."
+      - mkdir -p {{.INSTALL_DIR}}
+      - echo "Building viaplay-cli (dev-{{.GIT_COMMIT}}) as '{{.APP_NAME}}-dev' in {{.INSTALL_DIR}}"
+      - >-
+        go build -o {{.INSTALL_DIR}}/{{.APP_NAME}}-dev -ldflags="
+        -X github.com/nentgroup/viaplay-cli/internal/cli.Version=dev-{{.GIT_COMMIT}}
+        -X github.com/nentgroup/viaplay-cli/internal/cli.BuildDate={{.BUILD_DATE}}
+        -X github.com/nentgroup/viaplay-cli/internal/cli.Commit={{.GIT_COMMIT}}"
+        ./cmd/{{.APP_NAME}}
+      - echo "✅ Installed successfully. Run '{{.APP_NAME}}-dev version' to confirm, then '{{.APP_NAME}}-dev' to use the tool."
+
+  graphify:build:
+    desc: Build/refresh the graphify-rs knowledge graph for this repo
+    cmds:
+      - graphify-rs build --no-llm --output graphify-rs-out
+  graphify:serve:
+    desc: Start the graphify-rs MCP server for agentic coding tools
+    cmds:
+      - graphify-rs serve --graph graphify-rs-out/graph.json
