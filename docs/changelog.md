@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/nentgroup/viaplay-cli/compare/v2.9.0...v3.0.0) (2026-09-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* `vip template remove` now deletes the cached template clone by default (use --keep-cache to preserve it) and resolves team-first when a team is configured, falling back to personal config only if the team has none. Manifest structure is now validated on template add/inspect/test/project create; previously-malformed manifests that used to silently work may now fail.
+
+### Features
+
+* add skills command and extend template ([#194](https://github.com/nentgroup/viaplay-cli/issues/194)) ([b50608a](https://github.com/nentgroup/viaplay-cli/commit/b50608a9a901b13ce7573e6c68cbceda46c55765))
+
 ## [2.9.0](https://github.com/nentgroup/viaplay-cli/compare/v2.8.2...v2.9.0) (2026-09-06)
 
 
