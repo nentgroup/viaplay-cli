@@ -17,7 +17,6 @@ prefer the more detailed skill pack listed for each area when actually performin
 | Initialise/inspect/pull viaplay-cli config or team config | `vip config` | `config-manage` |
 | Explore/test templates, preview or debug hooks | `vip template`, `vip hooks` | `template-explore` |
 | Authenticate with GitHub | `vip auth` | _(see below)_ |
-| Manage the local template cache (legacy) | `vip cache` | superseded by `vip template` |
 | Install these skill packs for an agent | `vip skills` | _(this feature)_ |
 | Show CLI version | `vip version` | _(no pack needed)_ |
 

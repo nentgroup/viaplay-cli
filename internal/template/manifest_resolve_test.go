@@ -13,6 +13,9 @@ const (
 	kebabCaseTypeString = "string"
 	kebabCaseMessage    = "must be lowercase kebab-case"
 	regionKey           = "region"
+	boolTypeString      = "bool"
+	sqsKey              = "sqs"
+	selectTypeString    = "select"
 )
 
 func TestValidateManifestVariable(t *testing.T) {
@@ -135,7 +138,7 @@ func TestResolveManifestSelections_NoInputDefaultValidation(t *testing.T) {
 func TestResolveManifestSelections_NoInputCollectsAllMissingRequired(t *testing.T) {
 	manifest := &Manifest{
 		Options: []ManifestOption{
-			{Key: "sqs", Required: true},
+			{Key: sqsKey, Type: boolTypeString, Required: true},
 		},
 		Variables: []ManifestVariable{
 			{Key: shortNameKey, Required: true},
@@ -147,7 +150,7 @@ func TestResolveManifestSelections_NoInputCollectsAllMissingRequired(t *testing.
 	if err == nil {
 		t.Fatalf("expected an error, got nil")
 	}
-	for _, want := range []string{"sqs", shortNameKey, regionKey} {
+	for _, want := range []string{sqsKey, shortNameKey, regionKey} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("expected error to mention %q, got: %v", want, err)
 		}
@@ -171,5 +174,21 @@ func TestResolveManifestSelections_NoInputPartialSetStillReportsRemaining(t *tes
 	}
 	if !strings.Contains(err.Error(), regionKey) {
 		t.Fatalf("expected error to mention %q, got: %v", regionKey, err)
+	}
+}
+
+func TestResolveManifestSelections_RejectsInvalidManifestBeforeResolving(t *testing.T) {
+	manifest := &Manifest{
+		Options: []ManifestOption{
+			{Key: sqsKey, Type: "not-a-real-type"},
+		},
+	}
+	vars := &Variables{}
+	err := ResolveManifestSelections(manifest, vars, nil, true)
+	if err == nil {
+		t.Fatalf("expected an error for an invalid manifest, got nil")
+	}
+	if !strings.Contains(err.Error(), "unrecognised type") {
+		t.Fatalf("expected error to mention the manifest validation issue, got: %v", err)
 	}
 }

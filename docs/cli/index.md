@@ -12,7 +12,6 @@ This section provides documentation for the most important viaplay-cli commands.
 - [Skills](../cli/skills.md): Install skill packs teaching AI coding agents to drive viaplay-cli workflows.
 - [Secrets](../cli/secrets.md): Securely manage secrets for your projects and teams.
 - [Auth](../cli/auth.md): Authenticate with GitHub for repository and secret management.
-- [Cache](../cli/cache.md): Manage the local template cache (update or clear cached templates).
 - [Version](../cli/version.md): Show the current version of viaplay-cli.
 
 ---

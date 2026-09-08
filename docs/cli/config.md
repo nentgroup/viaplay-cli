@@ -96,7 +96,7 @@ Pull all shared hooks and all shared team config directories from the configured
 
 ## Example Config File
 
-Below is an example of a real viaplay-cli config file (see `internal/config/blueprints/config.yaml`):
+Below is an example of a real viaplay-cli config file:
 
 ```yaml
 # viaplay-cli Configuration

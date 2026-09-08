@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/nentgroup/viaplay-cli/internal/cache"
 	"github.com/nentgroup/viaplay-cli/internal/config"
@@ -48,6 +49,8 @@ func NewTemplateCommand() *cobra.Command {
 	templateCmd.AddCommand(newTemplateCleanCommand())
 	templateCmd.AddCommand(newTemplateTestCommand())
 	templateCmd.AddCommand(newTemplateInspectCommand())
+	templateCmd.AddCommand(newTemplateAddCommand())
+	templateCmd.AddCommand(newTemplateRemoveCommand())
 
 	return templateCmd
 }
@@ -340,7 +343,7 @@ func printJSONResult(result TestResult) {
 
 // newTemplateInspectCommand creates a new "inspect" subcommand that inspects a
 // template and lists the manifest-driven options (if any) it supports, without
-// scaffolding anything. Templates without a template.yaml are reported as having
+// scaffolding anything. Templates without a manifest file are reported as having
 // no configurable options, preserving backward compatibility.
 func newTemplateInspectCommand() *cobra.Command {
 	var (
@@ -351,7 +354,7 @@ func newTemplateInspectCommand() *cobra.Command {
 	inspectCmd := &cobra.Command{
 		Use:   "inspect <source>",
 		Short: "Inspect a template and list the manifest-defined options it supports",
-		Long: `Inspect a template's manifest (template.yaml), if present, and print the
+		Long: `Inspect a template's manifest (.vip.yaml), if present, and print the
 options and variables it exposes (key, type, prompt, default, choices).
 
 <source> accepts the same template source formats as 'project create' and
@@ -399,6 +402,217 @@ options non-interactively. Templates without a manifest report no options.`,
 	return inspectCmd
 }
 
+// newTemplateAddCommand registers a template source under
+// templates.<language>.<type> in the user's personal config file.
+func newTemplateAddCommand() *cobra.Command {
+	var (
+		language  string
+		typeFlag  string
+		team      string
+		force     bool
+		skipCache bool
+	)
+
+	addCmd := &cobra.Command{
+		Use:   "add <source>",
+		Short: "Register a template source under templates.<language>.<type>",
+		Long: `Register a template source under templates.<language>.<type> and cache it
+locally, so it can be used with 'vip project create --language <language>
+--type <type>'. Registers under your team's config if one is set up
+(--team/default_team), otherwise your personal config.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			source := args[0]
+
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				return fmt.Errorf("failed to load configuration: %w", err)
+			}
+			cacheManager := cache.NewManager(cfg)
+			scaffolder := scaffolding.NewProjectScaffolder(cacheManager, cfg)
+
+			manifest, err := scaffolder.GetTemplateManifest(ctx, "", "", source, false)
+			if err != nil {
+				return fmt.Errorf("failed to inspect template: %w", err)
+			}
+			if issues := template.ValidateManifest(manifest); len(issues) > 0 {
+				return fmt.Errorf("refusing to register %q: template manifest (.vip.yaml) is invalid:\n  - %s",
+					source, strings.Join(issues, "\n  - "))
+			}
+
+			resolvedLanguage := strings.TrimSpace(language)
+			resolvedType := strings.TrimSpace(typeFlag)
+			if manifest != nil {
+				if resolvedLanguage == "" {
+					resolvedLanguage = strings.TrimSpace(manifest.Metadata.Language)
+				}
+				if resolvedType == "" {
+					resolvedType = strings.TrimSpace(manifest.Metadata.Type)
+				}
+			}
+
+			if resolvedLanguage == "" || resolvedType == "" {
+				return fmt.Errorf(
+					"could not determine language/type for %q: pass --language and --type, "+
+						"or add metadata.language/metadata.type to the template's .vip.yaml", source)
+			}
+
+			resolvedTeam := valueOrDefault(team, viper.GetString("default_team"))
+			resolvedOrg := resolveTeamConfigOrganization(cfg, "")
+
+			targetFile := cfg.ConfigFile
+			targetDescription := fmt.Sprintf("personal config file (%s)", cfg.ConfigFile)
+			var existing *config.TemplateDefinition
+
+			teamConfigFile, err := cfg.FindTeamTemplateConfigFile(resolvedTeam, resolvedOrg)
+			if err != nil {
+				return fmt.Errorf("failed to locate team config file: %w", err)
+			}
+			if teamConfigFile != "" {
+				targetFile = teamConfigFile
+				targetDescription = fmt.Sprintf("team %q config file (%s)", resolvedTeam, teamConfigFile)
+				existing, err = cfg.GetTeamTemplateOverride(resolvedTeam, resolvedOrg, resolvedLanguage, resolvedType)
+				if err != nil {
+					return fmt.Errorf("failed to check existing team template config: %w", err)
+				}
+			} else if resolvedTeam != "" {
+				output.InfoMessage(fmt.Sprintf(
+					"Team %q has no config directory set up; registering in your personal config file instead. "+
+						"Run 'vip config init team %s' (or 'vip config pull team %s') to set one up.",
+					resolvedTeam, resolvedTeam, resolvedTeam))
+				existing = cfg.GetTemplate(resolvedLanguage, resolvedType)
+			} else {
+				existing = cfg.GetTemplate(resolvedLanguage, resolvedType)
+			}
+
+			if existing != nil && !force {
+				return fmt.Errorf("templates.%s.%s is already registered in the %s (source: %s); pass --force to overwrite",
+					resolvedLanguage, resolvedType, targetDescription, existing.Source)
+			}
+
+			if err := config.UpdateTemplateConfigFile(targetFile, resolvedLanguage, resolvedType, source); err != nil {
+				return fmt.Errorf("failed to update config file: %w", err)
+			}
+
+			output.SuccessMessage(fmt.Sprintf(
+				"Registered %s/%s -> %s in the %s", resolvedLanguage, resolvedType, source, targetDescription))
+
+			// Local sources are used directly from their path and never go through
+			// the cache (see cache.Manager.EnsureTemplate), so there's nothing to warm.
+			isLocalSource := false
+			if parsedSource, err := cache.ParseSource(source); err == nil {
+				isLocalSource = parsedSource.Type == cache.SourceTypeLocal
+			}
+
+			if !skipCache && !isLocalSource {
+				if _, err := cacheManager.EnsureTemplate(ctx, resolvedLanguage, resolvedType, source, true); err != nil {
+					output.WarningMessage(fmt.Sprintf(
+						"Failed to cache the template now: %v (it will be cloned automatically on first use)", err))
+				} else {
+					output.InfoMessage(fmt.Sprintf(
+						"Cached %s/%s locally (see 'vip template list')", resolvedLanguage, resolvedType))
+				}
+			}
+
+			fmt.Printf("Use it with: vip project create <name> --language %s --type %s\n", resolvedLanguage, resolvedType)
+			return nil
+		},
+	}
+
+	addCmd.Flags().StringVar(&language, "language", "",
+		"Programming language to register the template under (overrides manifest metadata)")
+	addCmd.Flags().StringVar(&typeFlag, "type", "",
+		"Project type to register the template under (overrides manifest metadata)")
+	addCmd.Flags().StringVar(&team, "team", "",
+		"Team to register the template under, if it has a config directory (falls back to default_team, then personal config)")
+	addCmd.Flags().BoolVar(&force, "force", false,
+		"Overwrite an existing templates.<language>.<type> entry")
+	addCmd.Flags().BoolVar(&skipCache, "skip-cache", false,
+		"Register the mapping without cloning it into the local template cache now")
+
+	return addCmd
+}
+
+// newTemplateRemoveCommand removes a templates.<language>.<type> mapping from
+// the user's personal config file, or a team's config file when --team (or
+// default_team) resolves to one, mirroring 'vip template add' targeting. It
+// also removes any locally cached clone for that language/type.
+func newTemplateRemoveCommand() *cobra.Command {
+	var (
+		team      string
+		keepCache bool
+	)
+
+	removeCmd := &cobra.Command{
+		Use:   "remove <language>/<type>",
+		Short: "Remove a registered template mapping",
+		Long: `Remove a templates.<language>.<type> entry and its cached clone. Removes
+from your team's config if --team/default_team applies, otherwise your
+personal config.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			language, projectType, err := parseHookTemplateRef(args[0])
+			if err != nil {
+				return err
+			}
+
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				return fmt.Errorf("failed to load configuration: %w", err)
+			}
+
+			resolvedTeam := valueOrDefault(team, viper.GetString("default_team"))
+			resolvedOrg := resolveTeamConfigOrganization(cfg, "")
+
+			targetFile := cfg.ConfigFile
+			targetDescription := fmt.Sprintf("personal config file (%s)", cfg.ConfigFile)
+
+			teamConfigFile, err := cfg.FindTeamTemplateConfigFile(resolvedTeam, resolvedOrg)
+			if err != nil {
+				return fmt.Errorf("failed to locate team config file: %w", err)
+			}
+			if teamConfigFile != "" {
+				targetFile = teamConfigFile
+				targetDescription = fmt.Sprintf("team %q config file (%s)", resolvedTeam, teamConfigFile)
+			} else if resolvedTeam != "" {
+				output.InfoMessage(fmt.Sprintf(
+					"Team %q has no config directory set up; looking in your personal config file instead.",
+					resolvedTeam))
+			}
+
+			removed, err := config.RemoveTemplateConfigFile(targetFile, language, projectType)
+			if err != nil {
+				return fmt.Errorf("failed to update config file: %w", err)
+			}
+			if !removed {
+				return fmt.Errorf("no templates.%s.%s entry found in the %s", language, projectType, targetDescription)
+			}
+
+			output.SuccessMessage(fmt.Sprintf("Removed %s/%s from the %s", language, projectType, targetDescription))
+
+			if !keepCache {
+				cacheManager := cache.NewManager(cfg)
+				cacheRemoved, err := cacheManager.RemoveTemplate(language, projectType)
+				if err != nil {
+					output.WarningMessage(fmt.Sprintf("Failed to remove cached template copy: %v", err))
+				} else if cacheRemoved {
+					output.InfoMessage(fmt.Sprintf("Removed cached copy of %s/%s", language, projectType))
+				}
+			}
+
+			return nil
+		},
+	}
+
+	removeCmd.Flags().StringVar(&team, "team", "",
+		"Team to remove the template from, if it has a config directory (falls back to default_team, then personal config)")
+	removeCmd.Flags().BoolVar(&keepCache, "keep-cache", false,
+		"Do not remove the locally cached clone for this language/type")
+
+	return removeCmd
+}
+
 // printTemplateManifestJSON prints the manifest options/variables as JSON, or an
 // empty/null manifest when the template has none.
 func printTemplateManifestJSON(manifest *template.Manifest) {
@@ -415,7 +629,7 @@ func printTemplateManifestJSON(manifest *template.Manifest) {
 // headers, tables, and shared colour helpers from internal/output).
 func printTemplateManifestHuman(manifest *template.Manifest) {
 	if manifest == nil {
-		output.InfoMessage("This template has no manifest (template.yaml) — no configurable options.")
+		output.InfoMessage("This template has no manifest (.vip.yaml) — no configurable options.")
 		return
 	}
 
@@ -428,8 +642,12 @@ func printTemplateManifestHuman(manifest *template.Manifest) {
 	if manifest.Metadata.Description != "" {
 		fmt.Println(manifest.Metadata.Description)
 	}
-	if !manifest.IsSupported() {
-		output.WarningMessage(fmt.Sprintf("manifest schema %d is not supported by this version of vip", manifest.Schema))
+	if issues := template.ValidateManifest(manifest); len(issues) > 0 {
+		output.WarningMessage("This template's manifest (.vip.yaml) has validation issues " +
+			"and will be rejected by 'project create'/'template test':")
+		for _, issue := range issues {
+			fmt.Printf("  - %s\n", issue)
+		}
 	}
 
 	if len(manifest.Options) == 0 && len(manifest.Variables) == 0 {

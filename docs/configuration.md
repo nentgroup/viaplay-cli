@@ -299,7 +299,13 @@ vip hooks doctor go/service
 vip hooks run go/service --path ./myservice
 ```
 
-Teams can also override template sources and hooks with a `config.yaml` file inside the team config directory. When present, the team config overlays the main config for matching `<language>/<type>` entries.
+Teams can also override template sources and hooks with a `config.yaml` file inside the team config directory. When present, the team config overlays the main config for matching `<language>/<type>` entries, and **always takes precedence** over your personal config for those entries — see [Team Config Overrides](#team-config-overrides) below.
+
+### Team Config Overrides
+
+When a `<language>/<type>` entry exists in both your personal `~/.config/viaplay/config.yaml` and a team's `config.yaml`, the team's value always wins once merged (via `--team`/`default_team`). This lets a team enforce a standard template regardless of individual config.
+
+`vip template add` is team-aware: if a team is configured (via `--team`, or `default_team`) and has a config directory set up (even without a `config.yaml` yet, e.g. via `vip config init team`/`vip config pull`), the entry is registered directly in that team's `config.yaml`. If no team is configured, or the team has no config directory at all, the entry is registered in your personal config as usual (see [`vip template add`](cli/template.md#vip-template-add-source)).
 
 ### Locating Hook Scripts
 

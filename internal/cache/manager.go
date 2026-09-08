@@ -573,6 +573,26 @@ func (m *Manager) CleanCache() error {
 	return nil
 }
 
+// RemoveTemplate deletes a single template's cached copy, identified by
+// language/type, if one exists locally. It returns whether a cached copy was
+// found and removed.
+func (m *Manager) RemoveTemplate(language, templateType string) (bool, error) {
+	path := m.GetTemplatePath(language, templateType)
+
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to inspect cached template at %s: %w", path, err)
+	}
+
+	if err := os.RemoveAll(path); err != nil {
+		return false, fmt.Errorf("failed to remove cached template at %s: %w", path, err)
+	}
+
+	return true, nil
+}
+
 // UpdateAllTemplates updates all templates in the cache
 func (m *Manager) UpdateAllTemplates(ctx context.Context) (int, int, error) {
 	templates, err := m.ListTemplates(ctx)

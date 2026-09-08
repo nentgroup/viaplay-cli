@@ -10,6 +10,14 @@ import (
 
 // Manifest represents an optional template manifest.
 type Manifest struct {
+	// Schema is the manifest format version (see docs/templates.md#manifest-schema-versioning
+	// for the user-facing behaviour). Maintainer guidance for vip contributors on
+	// when to bump this: only for changes that could make an older vip
+	// misinterpret the manifest (e.g. repurposing an existing field's meaning,
+	// changing a field's type, or making previously-optional structure required).
+	// Purely additive, optional changes (e.g. metadata.language/metadata.type)
+	// don't require a bump: older vip releases ignore unrecognised keys, and
+	// newer vip releases parsing an older manifest without them see empty defaults.
 	Schema    int                `yaml:"schema" json:"schema"`
 	Options   []ManifestOption   `yaml:"options" json:"options,omitempty"`
 	Files     ManifestFiles      `yaml:"files" json:"files,omitempty"`
@@ -26,6 +34,13 @@ type ManifestMetadata struct {
 	Name        string `yaml:"name" json:"name,omitempty"`
 	Description string `yaml:"description" json:"description,omitempty"`
 	Version     string `yaml:"version" json:"version,omitempty"`
+	// Language is the programming language this template targets (e.g. "go",
+	// "typescript"), used by 'vip template add' to register the template
+	// under 'templates.<language>.<type>' without requiring --language.
+	Language string `yaml:"language" json:"language,omitempty"`
+	// Type is the project type this template produces (e.g. "service",
+	// "lambda", "cli"), used by 'vip template add' alongside Language.
+	Type string `yaml:"type" json:"type,omitempty"`
 }
 
 // ManifestOption defines a user-selectable template option.
@@ -69,11 +84,22 @@ type ManifestFileRule struct {
 }
 
 // ManifestHooks defines hook commands.
+//
+// NOTE: reserved for future use. Not currently read/executed anywhere during
+// scaffolding -- declaring hooks in a manifest has no effect today. Executing
+// commands declared by a template's own manifest (which may come from an
+// untrusted/arbitrary source, e.g. via 'template test'/'template add') is a
+// deliberate design gap, not an oversight: it would let any template source
+// run arbitrary commands on the user's machine without explicit opt-in. Use
+// config.PostInstallHook (templates.<language>.<type>.hooks in the CLI
+// config, defined by the user/team, not the template author) for working
+// post-scaffold automation.
 type ManifestHooks struct {
 	Post []ManifestHook `yaml:"post" json:"post,omitempty"`
 }
 
-// ManifestHook defines a post-scaffold command.
+// ManifestHook defines a post-scaffold command. See ManifestHooks: not
+// currently executed by vip.
 type ManifestHook struct {
 	Name string `yaml:"name" json:"name,omitempty"`
 	Run  string `yaml:"run" json:"run"`
@@ -86,9 +112,31 @@ type ManifestValidate struct {
 	Message string `yaml:"message" json:"message,omitempty"`
 }
 
-// LoadManifest loads template.yaml from the template root if present.
+// ManifestFileNames lists the manifest filenames vip looks for in a template's
+// root directory, in priority order. template.yaml is only supported as a
+// deprecated fallback for existing templates; new templates should use
+// .vip.yaml or .vip.yml.
+var ManifestFileNames = []string{".vip.yaml", ".vip.yml", "template.yaml"}
+
+// FindManifestPath returns the path to the first manifest file found in dir
+// (per ManifestFileNames), and whether one was found.
+func FindManifestPath(dir string) (string, bool) {
+	for _, name := range ManifestFileNames {
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+// LoadManifest loads the template manifest (.vip.yaml, .vip.yml, or the
+// deprecated template.yaml) from the template root, if present.
 func LoadManifest(templateRoot string) (*Manifest, error) {
-	path := filepath.Join(templateRoot, "template.yaml")
+	path, found := FindManifestPath(templateRoot)
+	if !found {
+		return nil, nil
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

@@ -63,7 +63,7 @@ func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(ctx context.Context, des
 
 // GetTemplateManifest ensures the template is available locally and loads its manifest,
 // if any, without scaffolding a project. Returns a nil manifest (and nil error) when the
-// template has no template.yaml, preserving backward compatibility for plain templates.
+// template has no manifest file, preserving backward compatibility for plain templates.
 func (ps *ProjectScaffolder) GetTemplateManifest(ctx context.Context, language, projectType, templateSource string, forceUpdate bool) (*templ.Manifest, error) {
 	_, manifest, cleanup, err := ps.resolveTemplateManifest(ctx, language, projectType, templateSource, forceUpdate)
 	defer cleanup()
@@ -71,9 +71,9 @@ func (ps *ProjectScaffolder) GetTemplateManifest(ctx context.Context, language, 
 }
 
 // resolveTemplateManifest ensures the template is locally available and loads its
-// manifest (template.yaml), checking both the template root and the "_template"
-// subdirectory since manifests live at the repository root, which may differ from
-// the rendered content root.
+// manifest (.vip.yaml/.vip.yml, or the deprecated template.yaml), checking both
+// the template root and the "_template" subdirectory since manifests live at
+// the repository root, which may differ from the rendered content root.
 //
 // Ad-hoc sources (language and projectType both empty, as used by
 // `template inspect` and `template test --template-path`) are resolved via
@@ -104,8 +104,8 @@ func (ps *ProjectScaffolder) resolveTemplateManifest(ctx context.Context, langua
 	}
 
 	manifestRoot := templatePath
-	if _, err := os.Stat(filepath.Join(manifestRoot, "template.yaml")); err != nil {
-		if _, err := os.Stat(filepath.Join(manifestRoot, "_template", "template.yaml")); err == nil {
+	if _, found := templ.FindManifestPath(manifestRoot); !found {
+		if _, found := templ.FindManifestPath(filepath.Join(manifestRoot, "_template")); found {
 			manifestRoot = filepath.Join(manifestRoot, "_template")
 		}
 	}

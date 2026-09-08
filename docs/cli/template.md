@@ -22,6 +22,49 @@ Remove local template copies that have not been used recently.
 
 Remove all local template copies. Prompts for confirmation before deleting.
 
+## Registering Templates
+
+### `vip template add <source>`
+
+Register a template source under `templates.<language>.<type>` and cache it
+locally, so it can be used with `vip project create --language <language>
+--type <type>`. Registers under your team's config if one is set up
+(`--team`/`default_team`), otherwise your personal config.
+
+`<source>` accepts the same formats as `template inspect`/`template test`.
+`--language`/`--type` default to the template's manifest metadata.
+
+```bash
+vip template add github.com/nentgroup/go-service-template --language go --type service
+vip template add ~/my-templates/go-worker   # language/type read from .vip.yaml metadata
+vip template add github.com/nentgroup/gecko-template --language go --type worker --team gecko
+```
+
+| Flag | Description |
+|------|-------------|
+| `--language` | Language to register the template under (overrides manifest metadata) |
+| `--type` | Project type to register the template under (overrides manifest metadata) |
+| `--team` | Team to register the template under (falls back to `default_team`, then personal config) |
+| `--force` | Overwrite an existing `templates.<language>.<type>` entry |
+| `--skip-cache` | Register without cloning it into the local cache now |
+
+### `vip template remove <language>/<type>`
+
+Remove a `templates.<language>.<type>` entry and its cached clone. Removes
+from your team's config if `--team`/`default_team` applies, otherwise your
+personal config.
+
+```bash
+vip template remove go/worker
+vip template remove go/worker --team gecko
+vip template remove go/worker --keep-cache
+```
+
+| Flag | Description |
+|------|-------------|
+| `--team` | Team to remove the template from (falls back to `default_team`, then personal config) |
+| `--keep-cache` | Do not remove the locally cached clone for this language/type |
+
 ## Template Test
 
 Test and validate templates locally without creating GitHub repositories or authenticating with GitHub.
@@ -148,7 +191,7 @@ vip template test ./my-template \
 - The command outputs the path to the temporary directory for easy access
 - JSON output is available for scripting and CI/CD pipeline integration
 - Template variables are minimal by default and may need customization for complex templates
-- If the template defines a `template.yaml` manifest, `template test` prompts
+- If the template defines a `.vip.yaml` manifest, `template test` prompts
   for its options and variables interactively, unless overridden with `--set` and/or `--no-input`.
   See [Interactive Templates (Manifest)](../templates.md#interactive-templates-manifest) for
   details on manifest structure, options vs. variables, and validation.
@@ -172,8 +215,11 @@ vip template inspect github@nentgroup/go-service-template --json
 | `--force` | Force refresh of local template copies |
 | `--json` | Output the manifest as JSON |
 
-If the template has no `template.yaml`, the command reports that it has no
-configurable options.
+If the template has no `.vip.yaml`, the command reports that it has no
+configurable options. If the manifest is invalid (see
+[Manifest Validation](../templates.md#manifest-validation)), the command still
+shows the manifest but lists the validation issues alongside it — fix these
+before the template can be used with `project create`/`template test`.
 
 ### Setting options with `--set` and `--no-input`
 

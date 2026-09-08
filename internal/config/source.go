@@ -59,24 +59,16 @@ func (c *Configuration) GetSourceCheckoutDir() string {
 
 // UpdateSourceConfigFile writes config_source settings into the main config file.
 func UpdateSourceConfigFile(configFile string, source SourceConfig) error {
-	data, err := os.ReadFile(configFile)
+	doc, err := loadYAMLNodeDocument(configFile)
 	if err != nil {
-		return fmt.Errorf("failed to read config file %s: %w", configFile, err)
+		return err
 	}
 
 	source = source.normalized()
 
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("failed to parse config file %s: %w", configFile, err)
-	}
-	if len(doc.Content) == 0 {
-		doc.Content = []*yaml.Node{{Kind: yaml.MappingNode}}
-	}
-
-	root := doc.Content[0]
-	if root.Kind != yaml.MappingNode {
-		return fmt.Errorf("config file %s must contain a YAML mapping at the top level", configFile)
+	root, err := rootMappingNode(doc, configFile)
+	if err != nil {
+		return err
 	}
 
 	sourceNode := ensureMappingValue(root, "config_source")
@@ -84,10 +76,49 @@ func UpdateSourceConfigFile(configFile string, source SourceConfig) error {
 	setMappingString(sourceNode, "branch", source.Branch)
 	setMappingString(sourceNode, "root", source.Root)
 
+	return writeYAMLNodeDocument(configFile, doc)
+}
+
+// loadYAMLNodeDocument reads and parses a YAML file into a node document,
+// preserving comments/structure for later surgical edits via ensureMappingValue
+// / setMappingString / deleteMappingKey. A missing file yields an empty mapping
+// document rather than an error, so callers can use this to create a new file.
+func loadYAMLNodeDocument(configFile string) (*yaml.Node, error) {
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("failed to read config file %s: %w", configFile, err)
+		}
+		data = nil
+	}
+
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("failed to parse config file %s: %w", configFile, err)
+	}
+	if len(doc.Content) == 0 {
+		doc.Kind = yaml.DocumentNode
+		doc.Content = []*yaml.Node{{Kind: yaml.MappingNode}}
+	}
+
+	return &doc, nil
+}
+
+// rootMappingNode returns the top-level mapping node of a parsed YAML document.
+func rootMappingNode(doc *yaml.Node, configFile string) (*yaml.Node, error) {
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("config file %s must contain a YAML mapping at the top level", configFile)
+	}
+	return root, nil
+}
+
+// writeYAMLNodeDocument re-encodes and writes a YAML node document back to disk.
+func writeYAMLNodeDocument(configFile string, doc *yaml.Node) error {
 	var rendered bytes.Buffer
 	encoder := yaml.NewEncoder(&rendered)
 	encoder.SetIndent(2)
-	if err := encoder.Encode(&doc); err != nil {
+	if err := encoder.Encode(doc); err != nil {
 		return fmt.Errorf("failed to encode config file %s: %w", configFile, err)
 	}
 	if err := encoder.Close(); err != nil {
@@ -419,6 +450,36 @@ func ensureMappingValue(root *yaml.Node, key string) *yaml.Node {
 	valueNode := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 	root.Content = append(root.Content, keyNode, valueNode)
 	return valueNode
+}
+
+// findMappingValue returns the value node for key in a mapping node, or nil
+// if the mapping doesn't contain that key. Unlike ensureMappingValue, it never
+// creates or mutates the mapping.
+func findMappingValue(root *yaml.Node, key string) *yaml.Node {
+	if root == nil {
+		return nil
+	}
+	for i := 0; i < len(root.Content)-1; i += 2 {
+		if root.Content[i].Value == key {
+			return root.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// deleteMappingKey removes key (and its value) from a mapping node, reporting
+// whether the key was present.
+func deleteMappingKey(root *yaml.Node, key string) bool {
+	if root == nil {
+		return false
+	}
+	for i := 0; i < len(root.Content)-1; i += 2 {
+		if root.Content[i].Value == key {
+			root.Content = append(root.Content[:i], root.Content[i+2:]...)
+			return true
+		}
+	}
+	return false
 }
 
 func setMappingString(root *yaml.Node, key, value string) {

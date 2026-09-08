@@ -1,16 +1,15 @@
 # Skills Command
 
-The `skills` command group installs embedded "skill" packs that teach AI coding
+The `skills` command group installs "skill" packs that teach AI coding
 agents (Claude Code, GitHub Copilot, Cursor, Codex CLI, ...) how to drive
 viaplay-cli workflows — for example, creating a project/repo for a team with
 the right template and standards — instead of the agent guessing or copying
 files by hand.
 
-Skill packs are markdown files embedded in the `vip` binary. Installing a pack
-writes a `SKILL.md` file into a `vip-<pack>/` directory under the skills
-directory the target agent discovers, following the open
-[Agent Skills standard](https://agentskills.io) that all supported agents
-implement natively.
+Skill packs ship built into `vip`. Installing a pack writes a `SKILL.md` file
+into a `vip-<pack>/` directory under the skills directory the target agent
+discovers, following the open [Agent Skills standard](https://agentskills.io)
+that all supported agents implement natively.
 
 ---
 

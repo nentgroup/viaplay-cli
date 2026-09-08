@@ -31,10 +31,12 @@ Never guess the repository name or team silently — always confirm with the use
 ## Workflow
 
 1. **Check auth**: `vip auth status`. If not authenticated, run `vip auth login` first.
-2. **Discover template** (if language/type unknown): `vip template list`
+2. **Discover template** (if language/type unknown): `vip template list`. If the template the
+   user wants isn't registered yet (not in `vip template list`'s config), register it first with
+   `vip template add <source> [--language <l> --type <t>]` — see the `template-explore` skill.
 3. **Discover required template options (mandatory before every non-interactive run):**
    `vip template inspect <language>/<type> --json`
-   This lists every `--set key=value` variable the template's manifest (`template.yaml`) exposes,
+   This lists every `--set key=value` variable the template's manifest (`.vip.yaml`) exposes,
    including which are required and their defaults. Do not skip this step and rely on trial and
    error — templates commonly define custom variables (e.g. a service's `shortName`) that are
    invisible in `vip template list`/`vip hooks list` and will only surface as a runtime failure
@@ -93,6 +95,8 @@ Never guess the repository name or team silently — always confirm with the use
 
 ## Useful follow-ups
 
+- `vip template add <source>` — register a new template under `templates.<language>.<type>`
+  before using it with `--language`/`--type` (see `template-explore` skill for details)
 - `vip hooks list <language>/<type>` — preview configured post-install hooks before creating
 - `vip config get default_team` / `vip config get default_organization` — check defaults
 - `vip config get apply_envs` / `apply_rulesets` / `apply_secrets` — check whether these default

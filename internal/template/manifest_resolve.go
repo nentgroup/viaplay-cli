@@ -14,6 +14,9 @@ func ResolveManifestSelections(manifest *Manifest, vars *Variables, overrides []
 	if manifest == nil {
 		return nil
 	}
+	if issues := ValidateManifest(manifest); len(issues) > 0 {
+		return fmt.Errorf("template manifest (.vip.yaml) is invalid:\n  - %s", strings.Join(issues, "\n  - "))
+	}
 	if vars.Features == nil {
 		vars.Features = FeatureSet{}
 	}

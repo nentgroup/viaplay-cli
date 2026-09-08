@@ -13,7 +13,7 @@ The following official templates are available out of the box:
 | Go | service | [go-service-template](https://github.com/nentgroup/go-service-template) |
 | Node | service | [node-service-template](https://github.com/nentgroup/node-service-template) |
 
-More templates are planned. You can also add your own templates in your `config.yaml` under the `templates` section — see [Configuration](configuration.md) for details.
+More templates are planned. You can also register your own templates with `vip template add <source>` — see [Registering Templates](cli/template.md#registering-templates) — or add them manually in your `config.yaml` under the `templates` section — see [Configuration](configuration.md) for details.
 
 > **Built a template?** If you've created a reusable template that could benefit others, open a PR to add it to this list!
 
@@ -51,6 +51,26 @@ A template typically contains:
 - Project files (README, source code, configs)
 - Placeholders for variables using `{{ .Namespace.VarName }}` syntax
 
+### Repository Layout
+
+A template repository can lay out its files in one of two ways:
+
+- **Flat:** every file at the repository root is copied into the new project.
+- **`_template/` subdirectory:** only the contents of `_template/` are copied
+  into the new project. Everything else at the repository root (e.g. the
+  template's own `README.md`, CI workflows, license) stays out of scaffolded
+  projects.
+
+Use the `_template/` layout when the template repository needs its own
+top-level files that shouldn't end up copied into every project generated
+from it.
+
+We recommend giving every template a `.vip.yaml` manifest (see
+[Interactive Templates](#interactive-templates) below) — at minimum it lets
+`vip template add` auto-detect the language/type, and it documents the
+template's options for anyone using it. Place it at the repository root, or
+inside `_template/` if that's where the rest of the template lives.
+
 ### Raw Files (no rendering)
 
 Add the `.raw` suffix to any template file you want copied verbatim. The file is copied as-is and the `.raw` suffix is stripped in the generated project.
@@ -65,12 +85,13 @@ Remote templates are cached locally for faster reuse. Use `vip template list`, `
 
 ---
 
-## Interactive Templates (Manifest)
+## Interactive Templates
 
-Templates may optionally include a `template.yaml` manifest at the repository root declaring user-selectable
-options, e.g. "add SQL support", "add SNS support", as well as free-form string
-inputs, e.g. "short service name". Templates without a manifest behave exactly as
-before — this feature is fully backward-compatible.
+Templates may optionally include a `.vip.yaml` (or `.vip.yml`) manifest at the
+repository root declaring user-selectable options, e.g. "add SQL support",
+"add SNS support", as well as free-form string inputs, e.g. "short service
+name". Templates without a manifest behave exactly as before — this feature
+is fully backward-compatible.
 
 A manifest option or variable becomes available in Go templates as
 `.Features.<key>` and can gate whole files/directories via `files.include`/
@@ -78,7 +99,54 @@ A manifest option or variable becomes available in Go templates as
 supporting `&&`, `||`, `!`, `==`, `!=`, and bare truthy option lookups). Files and
 directories that are gated off by a rule are skipped entirely.
 
-Example `template.yaml`:
+### Manifest Schema Versioning
+
+`schema` declares the manifest format version; the current supported value is
+`2` (manifests without a `schema` field are treated as `1`). Setting `schema`
+to an unsupported value causes `project create`/`template test` to fail with
+an error, and `template inspect` reports it as a validation issue (see
+[Manifest Validation](#manifest-validation) below).
+
+### Manifest Validation
+
+Beyond the schema check above, `vip` validates a manifest's structure before
+using it: every `options`/`variables` entry must have a non-empty `key` and
+no key may be reused across both lists; `options[].type` must be `bool`,
+`boolean`, or `select`; a `select` option must declare at least one `choices`
+entry, each with a non-empty `value`; and any `validate.pattern` must compile
+as a valid regular expression.
+
+- `vip template inspect <source>` reports validation issues (if any) alongside
+  the manifest's options/variables — a manifest can be inspected even if
+  invalid, so you can see exactly what's wrong.
+- `vip template add <source>` refuses to register an invalid manifest.
+- `vip project create`/`vip template test` fail fast with the validation
+  issues before scaffolding starts.
+
+### Editor Autocomplete/Validation
+
+A <a href="schemas/vip.schema.json" target="_blank" rel="noopener">JSON Schema</a> is available for the manifest, so editors can
+autocomplete fields and flag typos as you write `.vip.yaml`.
+
+To enable it in VS Code with the
+[YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml),
+either add an inline comment at the top of `.vip.yaml`:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nentgroup/viaplay-cli/main/docs/schemas/vip.schema.json
+```
+
+or map it in your workspace `.vscode/settings.json`:
+
+```json
+{
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/nentgroup/viaplay-cli/main/docs/schemas/vip.schema.json": ".vip.yaml"
+  }
+}
+```
+
+Example `.vip.yaml`:
 
 ```yaml
 schema: 2
@@ -86,6 +154,8 @@ metadata:
   name: go-service-template
   description: Go HTTP microservice template
   version: "1.0.0"
+  language: go
+  type: service
 options:
   - key: sqs
     type: bool
@@ -123,6 +193,18 @@ files:
     - path: "internal/queue/*"
       when: "sqs"
 ```
+
+### Metadata
+
+`metadata` is optional but recommended:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Display name shown by `vip template inspect` |
+| `description` | One-line description shown by `vip template inspect` |
+| `version` | Free-form version string, informational only |
+| `language` | Programming language (e.g. `go`, `node`) — used by `vip template add` to register the template under `templates.<language>.<type>` without needing `--language` |
+| `type` | Project type (e.g. `service`, `lambda`, `worker`) — used alongside `language` by `vip template add` |
 
 ### Options vs. Variables
 

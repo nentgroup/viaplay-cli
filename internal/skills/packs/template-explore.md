@@ -15,6 +15,7 @@ Trigger this workflow when the user asks to:
 - "what templates are available" / "what options does template X support"
 - "test my template changes without creating a real project"
 - "why did my post-install hook fail" / "preview the hooks for this template"
+- "register/add this template so I can use it with project create" / "remove that template mapping"
 
 ## Template commands
 
@@ -29,6 +30,9 @@ vip template inspect github@org/repo --json
 
 vip template test <source> [--name <n>] [--owner <o>] [--json] \
   [--set key=value ...] [--no-input]
+
+vip template add <source> [--language <l>] [--type <t>] [--team <t>] [--force] [--skip-cache]
+vip template remove <language>/<type> [--team <t>] [--keep-cache]
 ```
 `<source>` accepts the same formats as `project create`'s `--template-source`: a GitHub
 address (`github.com/owner/repo`, `https://github.com/owner/repo`, `github@owner/repo[@ref]`,
@@ -44,6 +48,26 @@ repeatedly and can't corrupt or go stale relative to a real `project create` run
 test` always scaffolds into a fresh temporary directory and prints its path — it never touches
 a real project directory or creates a GitHub repository. Use `--json` when the result needs to
 be consumed by a script or CI step.
+
+`template add` also uses an ephemeral clone (same as `inspect`) to read the template's
+manifest, then registers `templates.<language>.<type>.source`. If a team is configured
+(`--team`, or `default_team`) and has a config directory set up, it registers there instead;
+otherwise it writes to the user's personal `~/.config/viaplay/config.yaml`. `--language`/
+`--type` are read from the manifest's `metadata.language`/`metadata.type` fields if present;
+pass the flags explicitly when the template has none, or to override. It fails if the mapping
+already exists unless `--force` is given. It also warms the local template cache immediately
+so the template is ready for `project create` right away — pass `--skip-cache` to skip this
+(local sources are never cached either way). `template remove <language>/<type>` undoes this
+the same team-aware way (`--team`/`default_team`, falling back to personal config) and also
+removes the cached clone by default — pass `--keep-cache` to leave it in place.
+
+`vip` validates a manifest's structure (unique/non-empty option and variable keys, a
+recognised `options[].type` of `bool`/`boolean`/`select`, non-empty `select` choices, and a
+compilable `validate.pattern` regex). `template inspect` still shows the manifest but lists
+any issues found; `template add` refuses to register an invalid manifest; `project create`/
+`template test` fail fast with the issues before scaffolding starts. When debugging a template
+that isn't behaving as expected, always run `template inspect` first — validation issues
+explain most unexpected behavior (e.g. a typo'd `type` silently becoming a free-text prompt).
 
 ## Hook commands
 

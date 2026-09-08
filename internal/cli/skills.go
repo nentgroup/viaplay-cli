@@ -15,7 +15,7 @@ func NewSkillsCommand() *cobra.Command {
 	skillsCmd := &cobra.Command{
 		Use:   "skills",
 		Short: "Install viaplay-cli skill packs for AI coding agents",
-		Long: `Install embedded "skill" packs that teach AI coding agents (Claude Code,
+		Long: `Install "skill" packs that teach AI coding agents (Claude Code,
 GitHub Copilot, Cursor, Codex CLI, ...) how to drive viaplay-cli workflows,
 such as creating a project/repo for a team with the right template and
 standards.
@@ -42,7 +42,7 @@ func newSkillsListCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   cmdList,
 		Short: "List available skill packs and supported agents",
-		Long:  `List the embedded skill packs available to install, and the AI coding agents supported as install targets.`,
+		Long:  `List the skill packs available to install, and the AI coding agents supported as install targets.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			output.Section("Skill packs")
 			rows := make([][]string, 0, len(skills.Packs))
@@ -76,7 +76,7 @@ func newSkillsInstallCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install skill packs for one or more AI coding agents",
-		Long: `Install one or more embedded skill packs into the SKILL.md skills directory of
+		Long: `Install one or more skill packs into the SKILL.md skills directory of
 one or more AI coding agents.
 
 By default, packs are installed project-locally (e.g. .claude/skills,
