@@ -81,6 +81,7 @@ func init() {
 		NewProjectCommand(),  // Project management
 		NewRepoCommand(),     // Repository management
 		NewTemplateCommand(), // Template testing
+		NewSkillsCommand(),   // Agent skill pack installation
 	)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/viaplay/config.yaml)")

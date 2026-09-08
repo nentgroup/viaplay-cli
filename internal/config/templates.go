@@ -57,6 +57,68 @@ func normalizeTemplateDefinition(raw interface{}) (*TemplateDefinition, error) {
 	}
 }
 
+// UpdateTemplateConfigFile writes/overwrites templates.<language>.<type>.source
+// in the main config file, preserving the rest of the file's structure and
+// comments. Used by 'vip template add' to register a new template mapping.
+func UpdateTemplateConfigFile(configFile, language, projectType, source string) error {
+	doc, err := loadYAMLNodeDocument(configFile)
+	if err != nil {
+		return err
+	}
+
+	root, err := rootMappingNode(doc, configFile)
+	if err != nil {
+		return err
+	}
+
+	templatesNode := ensureMappingValue(root, "templates")
+	languageNode := ensureMappingValue(templatesNode, language)
+	typeNode := ensureMappingValue(languageNode, projectType)
+	setMappingString(typeNode, "source", source)
+
+	return writeYAMLNodeDocument(configFile, doc)
+}
+
+// RemoveTemplateConfigFile removes templates.<language>.<type> from the main
+// config file, along with the language mapping if it becomes empty. It
+// reports whether an entry was actually removed. Used by 'vip template remove'.
+func RemoveTemplateConfigFile(configFile, language, projectType string) (bool, error) {
+	doc, err := loadYAMLNodeDocument(configFile)
+	if err != nil {
+		return false, err
+	}
+
+	root, err := rootMappingNode(doc, configFile)
+	if err != nil {
+		return false, err
+	}
+
+	templatesNode := findMappingValue(root, "templates")
+	if templatesNode == nil {
+		return false, nil
+	}
+
+	languageNode := findMappingValue(templatesNode, language)
+	if languageNode == nil {
+		return false, nil
+	}
+
+	removed := deleteMappingKey(languageNode, projectType)
+	if !removed {
+		return false, nil
+	}
+
+	if len(languageNode.Content) == 0 {
+		deleteMappingKey(templatesNode, language)
+	}
+
+	if err := writeYAMLNodeDocument(configFile, doc); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 // GetTemplate returns the configured template definition for language/type.
 func (c *Configuration) GetTemplate(language, projectType string) *TemplateDefinition {
 	if c == nil || c.Templates == nil {
@@ -87,22 +149,9 @@ func (c *Configuration) ApplyTeamTemplateOverrides(team, org string) error {
 		return nil
 	}
 
-	configFile, err := c.findTeamOverrideConfigFile(team, org)
-	if err != nil {
+	overrides, err := c.loadTeamOverrideConfigFile(team, org)
+	if err != nil || overrides == nil {
 		return err
-	}
-	if configFile == "" {
-		return nil
-	}
-
-	data, err := os.ReadFile(configFile)
-	if err != nil {
-		return fmt.Errorf("failed to read team override config %s: %w", configFile, err)
-	}
-
-	var overrides teamOverrideConfigFile
-	if err := yaml.Unmarshal(data, &overrides); err != nil {
-		return fmt.Errorf("failed to parse team override config %s: %w", configFile, err)
 	}
 
 	for language, types := range overrides.Templates {
@@ -119,6 +168,91 @@ func (c *Configuration) ApplyTeamTemplateOverrides(team, org string) error {
 	}
 
 	return nil
+}
+
+// FindTeamTemplateConfigFile returns the path to the team's config.yaml,
+// preferring one that already exists (see findTeamOverrideConfigFile). If none
+// exists yet but the team's config directory itself does (e.g. set up via
+// 'vip config init team' or 'vip config pull'), it returns the path where that
+// config.yaml would be created. Returns "" if the team isn't configured at all
+// (no matching team directory), or team is empty.
+//
+// Used by 'vip template add' to register new templates directly in the team's
+// config.yaml when one exists, since team overrides always take precedence over
+// personal config once merged -- registering there avoids the entry being
+// silently shadowed.
+func (c *Configuration) FindTeamTemplateConfigFile(team, org string) (string, error) {
+	if c == nil || team == "" {
+		return "", nil
+	}
+
+	if existing, err := c.findTeamOverrideConfigFile(team, org); err != nil {
+		return "", err
+	} else if existing != "" {
+		return existing, nil
+	}
+
+	for _, candidate := range c.teamOverrideConfigCandidates(team, org) {
+		dir := filepath.Dir(candidate)
+		info, err := os.Stat(dir)
+		if err == nil && info.IsDir() {
+			return candidate, nil
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("failed to stat %s: %w", dir, err)
+		}
+	}
+
+	return "", nil
+}
+
+// GetTeamTemplateOverride returns the team's templates.<language>.<type> entry,
+// if the team has a config.yaml overriding it. Returns nil (no error) if the
+// team has no override config, or doesn't override that specific language/type.
+//
+// Unlike ApplyTeamTemplateOverrides, this doesn't merge/mutate c.Templates -- it's
+// used to detect whether templates.<language>.<type> is already registered in the
+// team's config.yaml (e.g. by 'vip template add' before writing there).
+func (c *Configuration) GetTeamTemplateOverride(team, org, language, projectType string) (*TemplateDefinition, error) {
+	if c == nil || team == "" {
+		return nil, nil
+	}
+
+	overrides, err := c.loadTeamOverrideConfigFile(team, org)
+	if err != nil || overrides == nil {
+		return nil, err
+	}
+
+	types := overrides.Templates[language]
+	if types == nil {
+		return nil, nil
+	}
+
+	return types[projectType], nil
+}
+
+// loadTeamOverrideConfigFile locates and parses the team's config.yaml, if one
+// exists. Returns nil, nil if no team override config file is present.
+func (c *Configuration) loadTeamOverrideConfigFile(team, org string) (*teamOverrideConfigFile, error) {
+	configFile, err := c.findTeamOverrideConfigFile(team, org)
+	if err != nil {
+		return nil, err
+	}
+	if configFile == "" {
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read team override config %s: %w", configFile, err)
+	}
+
+	var overrides teamOverrideConfigFile
+	if err := yaml.Unmarshal(data, &overrides); err != nil {
+		return nil, fmt.Errorf("failed to parse team override config %s: %w", configFile, err)
+	}
+
+	return &overrides, nil
 }
 
 func (c *Configuration) findTeamOverrideConfigFile(team, org string) (string, error) {

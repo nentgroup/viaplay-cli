@@ -82,7 +82,7 @@ Make sure the secret exists in your keyring and is referenced correctly in your 
 
 **How do I update templates?**
 
-Use `--no-cache` when creating a project to force a fresh template download, or manage local template copies with `vip template list`, `vip template info`, `vip template prune`, and `vip template clean`.
+Use `--no-cache` when creating a project to force a fresh template download, or manage local template copies with `vip template list`, `vip template prune`, and `vip template clean`.
 
 ---
 

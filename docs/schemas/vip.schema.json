@@ -1,0 +1,226 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/nentgroup/viaplay-cli/docs/schemas/vip.schema.json",
+  "title": "vip template manifest (.vip.yaml)",
+  "description": "Schema for the optional .vip.yaml (or .vip.yml) manifest read by 'vip' when scaffolding a project. See docs/templates.md for the full reference. This schema covers structural shape only -- some rules enforced by 'vip' (e.g. no duplicate key across options/variables, select options need >=1 choice) can't be expressed here and are validated at runtime instead.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2,
+      "description": "Manifest format version. vip currently supports 1 (legacy, no metadata.language/type) and 2 (current); anything higher is rejected at runtime, matching this schema's maximum. Manifests without this field are treated as schema 1.",
+      "default": 2
+    },
+    "metadata": {
+      "$ref": "#/definitions/metadata"
+    },
+    "options": {
+      "type": "array",
+      "description": "User-selectable boolean/choice options, exposed to templates as .Features.<key>.",
+      "items": { "$ref": "#/definitions/option" }
+    },
+    "variables": {
+      "type": "array",
+      "description": "Free-form input fields, exposed to templates as .Features.<key>.",
+      "items": { "$ref": "#/definitions/variable" }
+    },
+    "files": {
+      "$ref": "#/definitions/files"
+    },
+    "hooks": {
+      "$ref": "#/definitions/hooks"
+    }
+  },
+  "definitions": {
+    "metadata": {
+      "type": "object",
+      "description": "Optional but recommended descriptive metadata.",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name shown by 'vip template inspect'."
+        },
+        "description": {
+          "type": "string",
+          "description": "One-line description shown by 'vip template inspect'."
+        },
+        "version": {
+          "type": "string",
+          "description": "Free-form version string, informational only."
+        },
+        "language": {
+          "type": "string",
+          "description": "Programming language (e.g. go, node). Used by 'vip template add' to register the template under templates.<language>.<type> without needing --language."
+        },
+        "type": {
+          "type": "string",
+          "description": "Project type (e.g. service, lambda, worker). Used alongside language by 'vip template add'."
+        }
+      }
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "type"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique key, exposed to templates as .Features.<key>. Must not be reused by another option or variable."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["bool", "boolean", "select"]
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Prompt shown to the user when this option is resolved interactively."
+        },
+        "description": {
+          "type": "string"
+        },
+        "default": {
+          "description": "Default value. Should be a boolean for bool/boolean options, or a string choice value for select options."
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "choices": {
+          "type": "array",
+          "description": "Required for type: select. Must contain at least one choice.",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/choice" }
+        }
+      },
+      "if": {
+        "properties": { "type": { "const": "select" } }
+      },
+      "then": {
+        "required": ["key", "type", "choices"]
+      }
+    },
+    "choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value"],
+      "properties": {
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "description": "Display label shown to the user. Defaults to value if omitted."
+        }
+      }
+    },
+    "variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique key, exposed to templates as .Features.<key>. Must not be reused by another option or variable."
+        },
+        "type": {
+          "type": "string",
+          "description": "Free-form input type hint (e.g. string, kebab-case). Not restricted by vip."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Prompt shown to the user when this variable is resolved interactively."
+        },
+        "description": {
+          "type": "string"
+        },
+        "default": {
+          "description": "Default value, typically a string."
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "validate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "description": "Regular expression the resolved value must match. Must compile as a valid Go regexp."
+            },
+            "message": {
+              "type": "string",
+              "description": "Error message shown when the value fails to match pattern."
+            }
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/fileRule" }
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/fileRule" }
+        }
+      }
+    },
+    "fileRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "File or directory path (glob supported) relative to the template root."
+        },
+        "when": {
+          "type": "string",
+          "description": "Expression gating this rule, e.g. \"sns\", \"sqs && !dynamo\". Supports &&, ||, !, ==, !=, and bare truthy option/variable lookups."
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Reserved for future use. Not currently executed by vip during scaffolding -- declaring hooks here has no effect. For working post-scaffold automation, define a post-install hook in your CLI config (templates.<language>.<type>.hooks) instead; see docs/configuration.md.",
+      "properties": {
+        "post": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/hook" }
+        }
+      }
+    },
+    "hook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "description": "Reserved for future use; not currently executed by vip. See the 'hooks' description above.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name shown when the hook runs."
+        },
+        "run": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Command to execute after scaffolding."
+        },
+        "when": {
+          "type": "string",
+          "description": "Expression gating whether this hook runs, e.g. \"sns\", \"sqs && !dynamo\"."
+        }
+      }
+    }
+  }
+}

@@ -21,7 +21,7 @@ pre-push:
 commit-msg:
   jobs:
     - name: commitlint
-      run: commitlint lint {1}
+      run: sed '/^#/d' {1} | commitlint lint
       fail_text: |
         ❌ Invalid commit message format!
         Please follow Conventional Commits:

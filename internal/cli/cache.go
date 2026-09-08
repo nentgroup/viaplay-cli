@@ -19,9 +19,9 @@ var cacheCmd = &cobra.Command{
 	Use:        "cache",
 	Short:      "Manage the template cache",
 	Long:       `Manage the template cache used by viaplay-cli, including pruning old templates and cleaning the cache.`,
-	Deprecated: "use 'vip template <list|info|update|prune|clean>' instead",
+	Deprecated: "use 'vip template <list|update|prune|clean>' instead",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		output.WarningMessage("'vip cache' is deprecated; use 'vip template <list|info|update|prune|clean>' instead")
+		output.WarningMessage("'vip cache' is deprecated; use 'vip template <list|update|prune|clean>' instead")
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Display help information by default
@@ -58,7 +58,7 @@ var cacheCleanCmd = &cobra.Command{
 var cacheListCmd = &cobra.Command{
 	Use:   cmdList,
 	Short: "List all templates in the cache",
-	Long:  `List all templates currently stored in the cache.`,
+	Long:  `List all templates currently stored in the cache, along with overall storage statistics.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
 		listCache(ctx)
@@ -66,12 +66,13 @@ var cacheListCmd = &cobra.Command{
 }
 
 var cacheInfoCmd = &cobra.Command{
-	Use:   "info",
-	Short: "Display information about the cache",
-	Long:  `Show detailed information about the template cache including size and statistics.`,
+	Use:        "info",
+	Short:      "Display information about the cache",
+	Long:       `Show detailed information about the template cache including size and statistics.`,
+	Deprecated: "info has been merged into 'list'; use 'vip template list' instead",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
-		showCacheInfo(ctx)
+		listCache(ctx)
 	},
 }
 
@@ -222,7 +223,7 @@ func cleanCache(ctx context.Context) {
 		output.Bold(output.Duration(duration)))
 }
 
-// listCache lists all templates in the cache
+// listCache lists all templates in the cache along with overall storage statistics.
 func listCache(ctx context.Context) {
 	output.Section("Local Templates")
 
@@ -230,6 +231,14 @@ func listCache(ctx context.Context) {
 	manager, err := getCacheManager()
 	if err != nil {
 		output.ErrorMessage(fmt.Sprintf("Failed to initialize cache manager: %v", err))
+		return
+	}
+
+	// Get cache directory and ensure it exists
+	cacheDir := manager.GetCacheDir()
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		output.InfoMessage("Local template storage directory does not exist yet")
+		fmt.Printf("Template storage directory: %s\n", cacheDir)
 		return
 	}
 
@@ -242,14 +251,25 @@ func listCache(ctx context.Context) {
 
 	if len(templates) == 0 {
 		output.InfoMessage("No local templates found")
+		fmt.Printf("Template storage directory: %s\n", cacheDir)
 		return
 	}
 
-	// Prepare data for table
+	printTemplatesTable(templates)
+
+	if err := printStorageStats(cacheDir); err != nil {
+		output.ErrorMessage(fmt.Sprintf("Failed to analyze storage directory: %v", err))
+	}
+}
+
+// printTemplatesTable renders the per-template table (language, type, size,
+// version, repository) and a summary of totals below it.
+func printTemplatesTable(templates []cache.Template) {
 	rows := [][]string{}
 	totalSize := int64(0)
 	languages := make(map[string]struct{})
 	types := make(map[string]struct{})
+	templatesByLang := make(map[string]int)
 
 	for _, t := range templates {
 		size := int64(0)
@@ -285,6 +305,7 @@ func listCache(ctx context.Context) {
 
 		languages[t.Language] = struct{}{}
 		types[t.Type] = struct{}{}
+		templatesByLang[t.Language]++
 	}
 
 	// Sort by language and type
@@ -308,101 +329,56 @@ func listCache(ctx context.Context) {
 	fmt.Printf("Total size:      %s\n", output.Bold(output.FormatSize(totalSize)))
 	fmt.Printf("Languages:       %s\n", output.Bold(fmt.Sprintf("%d", len(languages))))
 	fmt.Printf("Template types:  %s\n", output.Bold(fmt.Sprintf("%d", len(types))))
+
+	if len(templatesByLang) > 1 {
+		fmt.Println("\nTemplates by language:")
+		for lang, count := range templatesByLang {
+			fmt.Printf("  %s: %s\n", output.Bold(lang), output.Primary(fmt.Sprintf("%d", count)))
+		}
+	}
 }
 
-// showCacheInfo displays detailed information about the cache
-func showCacheInfo(ctx context.Context) {
-	output.Section("Template Storage")
-
-	// Get the cache manager
-	manager, err := getCacheManager()
-	if err != nil {
-		output.ErrorMessage(fmt.Sprintf("Failed to initialize cache manager: %v", err))
-		return
-	}
-
-	// Get cache directory and ensure it exists
-	cacheDir := manager.GetCacheDir()
-	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
-		output.InfoMessage("Template storage directory does not exist yet")
-		fmt.Printf("Template storage directory: %s\n", cacheDir)
-		return
-	}
-
-	// Calculate cache size and stats
-	var totalSize int64
-	var fileCount int
-	var dirCount int
+// printStorageStats prints directory-wide statistics for the template cache
+// (file/directory counts, oldest/newest file).
+func printStorageStats(cacheDir string) error {
+	var fileCount, dirCount int
 	oldestFile := time.Now()
 	newestFile := time.Time{}
 
-	err = filepath.Walk(cacheDir, func(_ string, info os.FileInfo, err error) error {
+	err := filepath.Walk(cacheDir, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
 		if info.IsDir() {
 			dirCount++
-		} else {
-			fileCount++
-			totalSize += info.Size()
-
-			// Track oldest and newest files
-			modTime := info.ModTime()
-			if modTime.Before(oldestFile) {
-				oldestFile = modTime
-			}
-			if modTime.After(newestFile) {
-				newestFile = modTime
-			}
+			return nil
+		}
+		fileCount++
+		modTime := info.ModTime()
+		if modTime.Before(oldestFile) {
+			oldestFile = modTime
+		}
+		if modTime.After(newestFile) {
+			newestFile = modTime
 		}
 		return nil
 	})
 	if err != nil {
-		output.ErrorMessage(fmt.Sprintf("Failed to analyze cache: %v", err))
-		return
+		return err
 	}
 
-	// Print general information
-	fmt.Printf("Template storage directory: %s\n", output.Bold(cacheDir))
-	fmt.Printf("Total size:                 %s\n", output.Bold(output.FormatSize(totalSize)))
-	fmt.Printf("Files:                      %s\n", output.Bold(fmt.Sprintf("%d", fileCount)))
-	fmt.Printf("Directories:                %s\n", output.Bold(fmt.Sprintf("%d", dirCount)))
+	fmt.Println()
+	fmt.Printf("Storage directory: %s\n", output.Bold(cacheDir))
+	fmt.Printf("Files:             %s\n", output.Bold(fmt.Sprintf("%d", fileCount)))
+	fmt.Printf("Directories:       %s\n", output.Bold(fmt.Sprintf("%d", dirCount)))
 
 	if !oldestFile.Equal(time.Now()) && !newestFile.Equal(time.Time{}) {
-		fmt.Printf("Oldest local file:          %s (%s ago)\n",
+		fmt.Printf("Oldest local file: %s (%s ago)\n",
 			output.Bold(oldestFile.Format("2006-01-02 15:04:05")),
 			output.Duration(time.Since(oldestFile)))
-		fmt.Printf("Newest local file:          %s (%s ago)\n",
+		fmt.Printf("Newest local file: %s (%s ago)\n",
 			output.Bold(newestFile.Format("2006-01-02 15:04:05")),
 			output.Duration(time.Since(newestFile)))
 	}
-
-	// Get and display template counts
-	templates, err := manager.ListTemplates(ctx)
-	if err != nil {
-		output.ErrorMessage(fmt.Sprintf("Failed to list templates: %v", err))
-		return
-	}
-
-	// Group templates by language
-	templatesByLang := make(map[string][]cache.TemplateInfo)
-	for _, t := range templates {
-		// Convert Template to TemplateInfo
-		templateInfo := cache.TemplateInfo{
-			Language: t.Language,
-			Type:     t.Type,
-			Path:     t.Path,
-			LastUsed: t.LastUsed,
-		}
-		templatesByLang[t.Language] = append(templatesByLang[t.Language], templateInfo)
-	}
-
-	// Print template counts by language
-	if len(templatesByLang) > 0 {
-		fmt.Println("\nTemplates by language:")
-		for lang, templates := range templatesByLang {
-			fmt.Printf("  %s: %s\n", output.Bold(lang), output.Primary(fmt.Sprintf("%d", len(templates))))
-		}
-	}
+	return nil
 }

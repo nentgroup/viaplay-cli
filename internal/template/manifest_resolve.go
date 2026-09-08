@@ -14,6 +14,9 @@ func ResolveManifestSelections(manifest *Manifest, vars *Variables, overrides []
 	if manifest == nil {
 		return nil
 	}
+	if issues := ValidateManifest(manifest); len(issues) > 0 {
+		return fmt.Errorf("template manifest (.vip.yaml) is invalid:\n  - %s", strings.Join(issues, "\n  - "))
+	}
 	if vars.Features == nil {
 		vars.Features = FeatureSet{}
 	}
@@ -31,13 +34,17 @@ func ResolveManifestSelections(manifest *Manifest, vars *Variables, overrides []
 		}
 		vars.SetFeature(key, value)
 	}
+
+	var missing []string
+
 	for _, opt := range manifest.Options {
 		if _, ok := vars.Features[opt.Key]; ok {
 			continue
 		}
 		if noInput {
 			if opt.Required {
-				return fmt.Errorf("missing required template option %q", opt.Key)
+				missing = append(missing, fmt.Sprintf("%s (option)", opt.Key))
+				continue
 			}
 			vars.SetFeature(opt.Key, opt.Default)
 			continue
@@ -54,7 +61,8 @@ func ResolveManifestSelections(manifest *Manifest, vars *Variables, overrides []
 		}
 		if noInput {
 			if variable.Required {
-				return fmt.Errorf("missing required template variable %q", variable.Key)
+				missing = append(missing, fmt.Sprintf("%s (variable)", variable.Key))
+				continue
 			}
 			if err := validateManifestVariable(variable, variable.Default); err != nil {
 				return fmt.Errorf("invalid default value for template variable %q: %w", variable.Key, err)
@@ -68,6 +76,14 @@ func ResolveManifestSelections(manifest *Manifest, vars *Variables, overrides []
 		}
 		vars.SetFeature(variable.Key, value)
 	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf(
+			"missing %d required template option(s)/variable(s) with --no-input: %s (pass each via --set key=value)",
+			len(missing), strings.Join(missing, ", "),
+		)
+	}
+
 	return nil
 }
 
