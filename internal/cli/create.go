@@ -78,10 +78,8 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 	// Add a PreRun hook to set the defaults from Viper at runtime
 	originalPreRun := cmd.PreRunE
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
-		// Only apply defaults if flag wasn't explicitly set by user
-		if !cmd.Flags().Changed("team") {
-			opts.Team = viper.GetString("default_team")
-		}
+		// Resolve apply-envs/rulesets/secrets defaults first, since whether we should
+		// silently fall back to default_team below depends on them.
 		if !cmd.Flags().Changed("apply-envs") {
 			opts.ApplyEnvs = viper.GetBool("apply_envs")
 		}
@@ -93,6 +91,24 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 		}
 		if !cmd.Flags().Changed("cleanup-on-error") {
 			opts.CleanupOnError = viper.GetBool("cleanup_on_error")
+		}
+
+		// Only fall back to default_team when the team is actually going to be used, i.e.
+		// when at least one of apply-envs/apply-rulesets/apply-secrets is enabled. Otherwise
+		// leave Team empty so a personal/team-independent repo doesn't get silently
+		// associated with default_team.
+		if !cmd.Flags().Changed("team") {
+			if opts.ApplyEnvs || opts.ApplyRulesets || opts.ApplySecrets {
+				if defaultTeam := viper.GetString("default_team"); defaultTeam != "" {
+					opts.Team = defaultTeam
+					output.WarningMessage(fmt.Sprintf(
+						"No --team specified; using default_team '%s' from config to apply team configuration. "+
+							"Pass --team explicitly, or disable with --apply-envs=false --apply-rulesets=false --apply-secrets=false to opt out.",
+						defaultTeam))
+				}
+			} else {
+				opts.Team = ""
+			}
 		}
 
 		// Handle repository visibility with priority order:
@@ -296,11 +312,9 @@ func validateRepoParameters(opts *CreateCommandOptions, withScaffolding bool) (r
 		params.description = fmt.Sprintf("Repository for %s", params.name)
 	}
 
-	// Get team name
+	// Get team name (already resolved, including default_team fallback, in the command's
+	// PreRunE — only when team configuration is actually going to be applied).
 	params.team = opts.Team
-	if params.team == "" {
-		params.team = viper.GetString("default_team")
-	}
 
 	return params, nil
 }
@@ -468,18 +482,22 @@ func printProjectSummary(summary *project.Summary, executionTime time.Duration) 
 		fmt.Printf("%s Team: %s\n", output.ActiveIcons.People, summary.Team)
 	}
 
-	if summary.AppliedEnvs {
-		fmt.Printf("%s Environments: Applied from team configuration\n", output.ActiveIcons.Globe)
-	} else {
-		fmt.Printf("%s Environments: Default staging environment\n", output.ActiveIcons.Globe)
-	}
+	// Only report environments/rulesets/secrets when there's an actual GitHub repository they
+	// could apply to; for --no-repo runs none of this happened.
+	if summary.RepoURL != "" {
+		if summary.AppliedEnvs {
+			fmt.Printf("%s Environments: Applied from team configuration\n", output.ActiveIcons.Globe)
+		} else {
+			fmt.Printf("%s Environments: Not applied (no team configuration requested)\n", output.ActiveIcons.Globe)
+		}
 
-	if summary.AppliedRulesets {
-		fmt.Printf("%s Rulesets: Applied from team configuration\n", output.ActiveIcons.Lock)
-	}
+		if summary.AppliedRulesets {
+			fmt.Printf("%s Rulesets: Applied from team configuration\n", output.ActiveIcons.Lock)
+		}
 
-	if summary.AppliedSecrets {
-		fmt.Printf("%s Secrets: Applied from team configuration\n", output.ActiveIcons.Key)
+		if summary.AppliedSecrets {
+			fmt.Printf("%s Secrets: Applied from team configuration\n", output.ActiveIcons.Key)
+		}
 	}
 
 	if summary.CustomSecrets {
