@@ -342,8 +342,26 @@ func (c *Factory) configureGitHub(ctx context.Context, cctx *creationContext) er
 	return nil
 }
 
-// runHooksAndPublish executes post-installation hooks and performs git publish when applicable.
+// runHooksAndPublish initialises the local git repository (if applicable), runs post-installation
+// hooks, and finally commits/pushes to GitHub. Git is initialised before hooks run so tools that
+// expect a git repository (e.g. lefthook, commitlint git-hook wiring) don't emit spurious warnings.
 func (c *Factory) runHooksAndPublish(ctx context.Context, cctx *creationContext) {
+	willPublish := cctx.opts.Scaffold && !cctx.opts.SkipRepo && cctx.CreatedRepo
+
+	// Initialise the local git repository first (if we're going to publish) so that any
+	// post-installation hooks which wire up git hooks (lefthook, commitlint, etc.) find a
+	// valid .git directory instead of warning that scaffolding isn't yet a git repository.
+	if willPublish {
+		c.Reporter.Start("Initializing Git repository", "")
+		if err := git.InitRepository(ctx, cctx.ProjectPath); err != nil {
+			c.Reporter.Failed("Git repository initialization", err, "")
+			cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to initialize Git repository: %v", err))
+			willPublish = false
+		} else {
+			c.Reporter.Complete("Git repository initialization", "")
+		}
+	}
+
 	// Run post-installation hooks if scaffolding was done and hooks aren't skipped
 	if cctx.opts.Scaffold && !cctx.opts.SkipHooks { //nolint:nestif
 		c.Reporter.Start("Running post-installation hooks \n", "")
@@ -357,9 +375,9 @@ func (c *Factory) runHooksAndPublish(ctx context.Context, cctx *creationContext)
 		c.Reporter.Skip("Running post-installation hooks", "Skipped as per user request")
 	}
 
-	// Initialise and push to GitHub repository if both scaffolding is done and repo was created
-	if cctx.opts.Scaffold && !cctx.opts.SkipRepo && cctx.CreatedRepo {
-		c.Reporter.Start("Initializing Git repository and pushing to GitHub", "")
+	// Commit and push to GitHub repository if both scaffolding is done and repo was created
+	if willPublish {
+		c.Reporter.Start("Committing and pushing to GitHub", "")
 
 		sshURL := fmt.Sprintf("git@github.com:%s/%s.git", cctx.opts.RepoOwner, cctx.KebabName)
 		c.Reporter.Debug(fmt.Sprintf("Using SSH URL for Git operations: %s", sshURL))
@@ -377,11 +395,9 @@ func (c *Factory) runHooksAndPublish(ctx context.Context, cctx *creationContext)
 	}
 }
 
-// Publish initialises a git repository in the project directory and pushes it to the remote
+// Publish commits all files in the project directory, adds the remote, and pushes to it.
+// The git repository itself must already be initialised (see runHooksAndPublish) before calling this.
 func (c *Factory) Publish(ctx context.Context, projectPath, repoURL string) error {
-	if err := git.InitRepository(ctx, projectPath); err != nil {
-		return fmt.Errorf("failed to initialize git repository: %w", err)
-	}
 	if err := git.CommitAll(ctx, projectPath, "chore: initial commit"); err != nil {
 		return fmt.Errorf("failed to commit files: %w", err)
 	}
