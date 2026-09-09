@@ -16,6 +16,7 @@ const (
 	boolTypeString      = "bool"
 	sqsKey              = "sqs"
 	selectTypeString    = "select"
+	authorName          = "Jane Doe"
 )
 
 func TestValidateManifestVariable(t *testing.T) {

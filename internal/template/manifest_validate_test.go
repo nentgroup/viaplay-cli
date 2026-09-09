@@ -113,6 +113,48 @@ func TestValidateManifest_InvalidValidatePattern(t *testing.T) {
 	}
 }
 
+func TestValidateManifest_InvalidAuthorEmail(t *testing.T) {
+	t.Parallel()
+
+	manifest := &Manifest{
+		Metadata: ManifestMetadata{
+			Authors: []ManifestAuthor{{Name: authorName, Email: "not-an-email"}},
+		},
+	}
+	issues := ValidateManifest(manifest)
+	if !containsIssue(issues, "invalid email") {
+		t.Fatalf("expected an invalid email issue, got: %v", issues)
+	}
+}
+
+func TestValidateManifest_ValidAuthorEmailHasNoIssues(t *testing.T) {
+	t.Parallel()
+
+	manifest := &Manifest{
+		Metadata: ManifestMetadata{
+			Authors: []ManifestAuthor{{Name: authorName, Email: "jane@example.com"}},
+		},
+	}
+	issues := ValidateManifest(manifest)
+	if containsIssue(issues, "invalid email") {
+		t.Fatalf("expected no invalid email issue, got: %v", issues)
+	}
+}
+
+func TestValidateManifest_AuthorWithoutEmailHasNoIssues(t *testing.T) {
+	t.Parallel()
+
+	manifest := &Manifest{
+		Metadata: ManifestMetadata{
+			Authors: []ManifestAuthor{{Name: authorName}},
+		},
+	}
+	issues := ValidateManifest(manifest)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got: %v", issues)
+	}
+}
+
 func containsIssue(issues []string, substr string) bool {
 	for _, issue := range issues {
 		if strings.Contains(issue, substr) {

@@ -41,6 +41,16 @@ type ManifestMetadata struct {
 	// Type is the project type this template produces (e.g. "service",
 	// "lambda", "cli"), used by 'vip template add' alongside Language.
 	Type string `yaml:"type" json:"type,omitempty"`
+	// Authors lists the template's maintainers. Purely informational; shown
+	// in 'template show'/'template list'.
+	Authors []ManifestAuthor `yaml:"authors" json:"authors,omitempty"`
+}
+
+// ManifestAuthor identifies a template maintainer.
+type ManifestAuthor struct {
+	Name string `yaml:"name" json:"name,omitempty"`
+	// Email is validated (RFC 5322 address) by ValidateManifest when present.
+	Email string `yaml:"email" json:"email,omitempty"`
 }
 
 // ManifestOption defines a user-selectable template option.

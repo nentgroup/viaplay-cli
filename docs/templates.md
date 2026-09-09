@@ -156,6 +156,9 @@ metadata:
   version: "1.0.0"
   language: go
   type: service
+  authors:
+    - name: Dario Fo
+      email: dario.fo@subvertia.it
 options:
   - key: sqs
     type: bool
@@ -205,6 +208,7 @@ files:
 | `version` | Free-form version string, informational only |
 | `language` | Programming language (e.g. `go`, `node`) — used by `vip template add` to register the template under `templates.<language>.<type>` without needing `--language` |
 | `type` | Project type (e.g. `service`, `lambda`, `worker`) — used alongside `language` by `vip template add` |
+| `authors` | List of `{name, email}` maintainers, shown by `vip template inspect`. `email`, if set, must be a valid address. |
 
 ### Options vs. Variables
 

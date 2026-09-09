@@ -58,6 +58,27 @@
         "type": {
           "type": "string",
           "description": "Project type (e.g. service, lambda, worker). Used alongside language by 'vip template add'."
+        },
+        "authors": {
+          "type": "array",
+          "description": "List of template maintainers, shown by 'vip template inspect'.",
+          "items": { "$ref": "#/definitions/author" }
+        }
+      }
+    },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A template maintainer.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Author's display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Author's email address, validated when present."
         }
       }
     },
