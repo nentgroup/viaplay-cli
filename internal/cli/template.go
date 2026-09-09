@@ -624,6 +624,23 @@ func printTemplateManifestJSON(manifest *template.Manifest) {
 	fmt.Println(string(jsonData))
 }
 
+// manifestAuthorNames formats each author as "Name <email>", "Name", or just
+// the email when no name is set, for display in 'template show'.
+func manifestAuthorNames(authors []template.ManifestAuthor) []string {
+	names := make([]string, 0, len(authors))
+	for _, a := range authors {
+		switch {
+		case a.Name != "" && a.Email != "":
+			names = append(names, fmt.Sprintf("%s <%s>", a.Name, a.Email))
+		case a.Name != "":
+			names = append(names, a.Name)
+		case a.Email != "":
+			names = append(names, a.Email)
+		}
+	}
+	return names
+}
+
 // printTemplateManifestHuman prints a human-readable summary of the manifest's
 // options and variables, styled consistently with 'template list' (section
 // headers, tables, and shared colour helpers from internal/output).
@@ -641,6 +658,9 @@ func printTemplateManifestHuman(manifest *template.Manifest) {
 
 	if manifest.Metadata.Description != "" {
 		fmt.Println(manifest.Metadata.Description)
+	}
+	if len(manifest.Metadata.Authors) > 0 {
+		fmt.Printf("Authors: %s\n", strings.Join(manifestAuthorNames(manifest.Metadata.Authors), ", "))
 	}
 	if issues := template.ValidateManifest(manifest); len(issues) > 0 {
 		output.WarningMessage("This template's manifest (.vip.yaml) has validation issues " +

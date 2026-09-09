@@ -2,6 +2,7 @@ package template
 
 import (
 	"fmt"
+	"net/mail"
 	"regexp"
 	"strings"
 )
@@ -20,6 +21,16 @@ func ValidateManifest(manifest *Manifest) []string {
 	if !manifest.IsSupported() {
 		issues = append(issues, fmt.Sprintf(
 			"schema %d is not supported by this version of vip (max supported: 2)", manifest.Schema))
+	}
+
+	for i, author := range manifest.Metadata.Authors {
+		if author.Email == "" {
+			continue
+		}
+		if _, err := mail.ParseAddress(author.Email); err != nil {
+			issues = append(issues, fmt.Sprintf(
+				"metadata.authors[%d]: invalid email %q", i, author.Email))
+		}
 	}
 
 	seenKeys := make(map[string]string) // key -> label of first occurrence, to catch duplicates
