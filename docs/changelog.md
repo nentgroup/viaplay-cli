@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.1.0](https://github.com/nentgroup/viaplay-cli/compare/v3.0.0...v3.1.0) (2026-09-09)
+
+
+### Features
+
+* **template:** add authors metadata to manifest  ([#200](https://github.com/nentgroup/viaplay-cli/issues/200)) ([5572177](https://github.com/nentgroup/viaplay-cli/commit/5572177bfe752cad3a94bee7e712b56a8f371d22))
+
+
+### Bug Fixes
+
+* silent team default and hook order ([#198](https://github.com/nentgroup/viaplay-cli/issues/198)) ([21411ad](https://github.com/nentgroup/viaplay-cli/commit/21411ad6c904511f6a1578b2c69a8eb810f329ae))
+
 ## [3.0.0](https://github.com/nentgroup/viaplay-cli/compare/v2.9.0...v3.0.0) (2026-09-08)
 
 
