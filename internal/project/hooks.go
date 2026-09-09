@@ -86,16 +86,10 @@ func (c *Factory) RunHooks(ctx context.Context, projectPath, language, projectTy
 	// Create a title for the TUI
 	title := fmt.Sprintf("Post-Installation Hooks for %s/%s", language, projectType)
 
-	// Display the hook output using our simplified UI
-	err := output.DisplayHookOutput(title, runHookFn)
-	// Display a simple message based on the result
-	if err != nil {
-		fmt.Printf("Hooks failed: %v\n", err)
-	} else {
-		fmt.Printf("Post-installation hooks completed successfully\n")
-	}
-
-	return err
+	// Display the hook output using our simplified UI. DisplayHookOutput already prints a
+	// "Hook completed successfully"/"Hook failed" footer, and the caller's Reporter reports
+	// completion/failure of the overall step, so we don't print a redundant result message here.
+	return output.DisplayHookOutput(title, runHookFn)
 }
 
 func (c *Factory) resolveRenderedHookScriptPath(renderer *template.Renderer, scriptPath string) (string, error) {

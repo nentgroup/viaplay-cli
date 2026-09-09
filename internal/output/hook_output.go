@@ -60,17 +60,14 @@ func DisplayHookOutput(title string, runHookFn func(stdout, stderr io.Writer) er
 
 	// Run the hook with our writer
 	err := runHookFn(writer, writer)
-
-	// Print completion message
-	fmt.Println()
-	statusStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#AAAAAA")).
-		Italic(true)
-
+	// Only report failures here; the caller's Reporter already reports success via its own
+	// "complete!" step, so printing another success line here would just be noise.
 	if err != nil {
+		fmt.Println()
+		statusStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#AAAAAA")).
+			Italic(true)
 		fmt.Println(statusStyle.Render(fmt.Sprintf("Hook failed: %v", err)))
-	} else {
-		fmt.Println(statusStyle.Render("Hook completed successfully"))
 	}
 	fmt.Println()
 
