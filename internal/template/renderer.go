@@ -91,14 +91,9 @@ func (r *Renderer) RenderDirectoryPath(path string) (string, error) {
 		return path, nil
 	}
 
-	// Create a new template for the path, with the same case-conversion helpers
-	// available to file contents (e.g. {{.Service.Name | pascal}}) so filenames can
-	// be derived from template variables too.
-	funcMap := template.FuncMap{
-		"pascal": tmpl.ToPascalCase,
-		"kebab":  tmpl.ToKebabCase,
-		"title":  tmpl.ToTitleCase,
-	}
+	// Create a new template for the path, using the shared helper set so path and
+	// file content rendering behave consistently.
+	funcMap := tmpl.FuncMap()
 	tmplPath, err := template.New("path").
 		Option("missingkey=invalid").
 		Funcs(funcMap).

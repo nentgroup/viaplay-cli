@@ -286,6 +286,30 @@ Variables can be used in:
 - **Filenames** (e.g., `{{.Project.Name}}.md`, `{{.Service.Name}}-config.yaml`)
 - **Folder names** (e.g., `src/{{.Service.Name}}`, `{{kebab .Project.Name}}/lib`)
 
+### Helper functions
+
+Template rendering includes a small, explicit helper set for common string and ID generation tasks. These are available everywhere templates are rendered, including path templates:
+
+- `{{ lower .Project.Name }}` / `{{ upper .Project.Name }}` — normalize case
+- `{{ camel "my-service-name" }}` / `{{ snake "MyService" }}` — common codegen conventions
+- `{{ pascal .Project.Name }}` / `{{ kebab .Project.Name }}` / `{{ title .Project.Name }}` — casing helpers
+- `{{ slug "My Service!!!" }}` — slugify to `my-service`
+- `{{ replace "." "-" .Service.Name }}` — string replacement, e.g. `my.service -> my-service`
+- `{{ default "fallback" .Optional.Value }}` / `{{ coalesce .Optional.Value .Fallback }}` — fallback values
+- `{{ join "," .Tags }}` / `{{ split "," .CsvValue }}` — list/CSV handling
+- `{{ trim "  value  " }}` / `{{ trimSuffix "-" .Value }}` / `{{ trimPrefix "pre-" .Value }}` — cleanup helpers
+- `{{ uuid }}` / `{{ uuidv4 }}` / `{{ ulid }}` — UUID and ULID generation
+
+Example:
+
+```go
+serviceName: {{ .Service.Name }}
+slugged: {{ slug .Project.Name }}
+accountId: {{ default "unknown" .Account.ID }}
+resource: {{ replace "." "-" .Project.Name }}
+uniqueId: {{ uuid }}
+```
+
 ### Project Information
 - `{{ .Project.Name }}` — Name of the project/repository
 - `{{ .Project.Description }}` — Description of the project

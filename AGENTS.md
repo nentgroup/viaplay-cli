@@ -55,6 +55,9 @@ suite when necessary.
   (max cyclomatic complexity 20, dupl threshold 250, line length 120).
 - Follow existing package conventions (exported symbols documented per `revive`
   `exported` rule).
+- All code changes must be compatible with the repository's `golangci-lint` rules.
+  Before finalizing a patch, agents should check their changes against the enabled
+  linters and fix or avoid lint violations rather than bypassing them.
 
 ## Commit conventions
 
