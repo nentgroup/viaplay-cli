@@ -5,4 +5,5 @@ in this repository.
 
 See [AGENTS.md](./AGENTS.md) for the full set of instructions (project overview,
 build/test/lint commands, code style, commit conventions, and git hooks). Follow
-those instructions when working in this repository.
+those instructions when working in this repository, including the repository's
+`golangci-lint` rules and lint compliance expectations for all code changes.

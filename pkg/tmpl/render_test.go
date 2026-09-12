@@ -321,3 +321,146 @@ func TestFieldExists(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplateCaseHelpers(t *testing.T) {
+	funcs := FuncMap()
+
+	lower, ok := funcs["lower"].(func(string) string)
+	if !ok {
+		t.Fatal("lower helper is not registered")
+	}
+	if got := lower("Hello World"); got != "hello world" {
+		t.Fatalf("lower helper = %q, want %q", got, "hello world")
+	}
+
+	upper, ok := funcs["upper"].(func(string) string)
+	if !ok {
+		t.Fatal("upper helper is not registered")
+	}
+	if got := upper("Hello World"); got != "HELLO WORLD" {
+		t.Fatalf("upper helper = %q, want %q", got, "HELLO WORLD")
+	}
+
+	camel, ok := funcs["camel"].(func(string) string)
+	if !ok {
+		t.Fatal("camel helper is not registered")
+	}
+	if got := camel("my-service_name"); got != "myServiceName" {
+		t.Fatalf("camel helper = %q, want %q", got, "myServiceName")
+	}
+
+	snake, ok := funcs["snake"].(func(string) string)
+	if !ok {
+		t.Fatal("snake helper is not registered")
+	}
+	if got := snake("MyService"); got != "my_service" {
+		t.Fatalf("snake helper = %q, want %q", got, "my_service")
+	}
+}
+
+func TestTemplateSlugAndReplaceHelpers(t *testing.T) {
+	funcs := FuncMap()
+	const expectedSlug = "my-service"
+	const expectedResult = "my-service"
+
+	slug, ok := funcs["slug"].(func(string) string)
+	if !ok {
+		t.Fatal("slug helper is not registered")
+	}
+	if got := slug("My Service!!!"); got != expectedSlug {
+		t.Fatalf("slug helper = %q, want %q", got, expectedSlug)
+	}
+
+	replace, ok := funcs["replace"].(func(string, string, ...string) string)
+	if !ok {
+		t.Fatal("replace helper is not registered")
+	}
+	if got := replace(".", "-", "my.service"); got != expectedResult {
+		t.Fatalf("replace helper = %q, want %q", got, expectedResult)
+	}
+}
+
+func TestTemplateFallbackAndCollectionHelpers(t *testing.T) {
+	funcs := FuncMap()
+
+	defaultValue, ok := funcs["default"].(func(string, ...string) string)
+	if !ok {
+		t.Fatal("default helper is not registered")
+	}
+	if got := defaultValue("fallback", ""); got != "fallback" {
+		t.Fatalf("default helper = %q, want %q", got, "fallback")
+	}
+
+	coalesce, ok := funcs["coalesce"].(func(...string) string)
+	if !ok {
+		t.Fatal("coalesce helper is not registered")
+	}
+	if got := coalesce("", "value"); got != "value" {
+		t.Fatalf("coalesce helper = %q, want %q", got, "value")
+	}
+
+	join, ok := funcs["join"].(func(string, interface{}) string)
+	if !ok {
+		t.Fatal("join helper is not registered")
+	}
+	if got := join(",", []string{"a", "b"}); got != "a,b" {
+		t.Fatalf("join helper = %q, want %q", got, "a,b")
+	}
+
+	split, ok := funcs["split"].(func(string, string) []string)
+	if !ok {
+		t.Fatal("split helper is not registered")
+	}
+	if got := split(",", "a,b,c"); len(got) != 3 || got[0] != "a" || got[1] != "b" || got[2] != "c" {
+		t.Fatalf("split helper = %#v, want [a b c]", got)
+	}
+}
+
+func TestTemplateTrimHelpers(t *testing.T) {
+	funcs := FuncMap()
+	const expectedResult = "my-service"
+
+	trim, ok := funcs["trim"].(func(string) string)
+	if !ok {
+		t.Fatal("trim helper is not registered")
+	}
+	if got := trim("  hi  "); got != "hi" {
+		t.Fatalf("trim helper = %q, want %q", got, "hi")
+	}
+
+	trimSuffix, ok := funcs["trimSuffix"].(func(string, string) string)
+	if !ok {
+		t.Fatal("trimSuffix helper is not registered")
+	}
+	if got := trimSuffix("-", "my-service-"); got != expectedResult {
+		t.Fatalf("trimSuffix helper = %q, want %q", got, expectedResult)
+	}
+
+	trimPrefix, ok := funcs["trimPrefix"].(func(string, string) string)
+	if !ok {
+		t.Fatal("trimPrefix helper is not registered")
+	}
+	if got := trimPrefix("pre-", "pre-my-service"); got != expectedResult {
+		t.Fatalf("trimPrefix helper = %q, want %q", got, expectedResult)
+	}
+}
+
+func TestTemplateIDHelpers(t *testing.T) {
+	funcs := FuncMap()
+
+	uuid, ok := funcs["uuid"].(func() string)
+	if !ok {
+		t.Fatal("uuid helper is not registered")
+	}
+	if got := uuid(); len(got) != 36 {
+		t.Fatalf("uuid helper len = %d, want 36", len(got))
+	}
+
+	ulid, ok := funcs["ulid"].(func() string)
+	if !ok {
+		t.Fatal("ulid helper is not registered")
+	}
+	if got := ulid(); len(got) != 26 {
+		t.Fatalf("ulid helper len = %d, want 26", len(got))
+	}
+}
