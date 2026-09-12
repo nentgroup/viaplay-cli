@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.2.0](https://github.com/nentgroup/viaplay-cli/compare/v3.1.0...v3.2.0) (2026-09-12)
+
+
+### Features
+
+* **template:** add shared string and ID helpers ([#202](https://github.com/nentgroup/viaplay-cli/issues/202)) ([59c3453](https://github.com/nentgroup/viaplay-cli/commit/59c3453dc6a4006391bebbb19430fb128ff167c2))
+
+
+### Dependencies
+
+* **deps:** update module golang.org/x/crypto to v0.57.0 ([#196](https://github.com/nentgroup/viaplay-cli/issues/196)) ([292dc47](https://github.com/nentgroup/viaplay-cli/commit/292dc473ac812b183188a4d4e5ef7f1d108e8ab3))
+* **deps:** update module golang.org/x/oauth2 to v0.37.0 ([#193](https://github.com/nentgroup/viaplay-cli/issues/193)) ([df7f9dc](https://github.com/nentgroup/viaplay-cli/commit/df7f9dcd5085b4558fdee5762a7295ecdd694846))
+
 ## [3.1.0](https://github.com/nentgroup/viaplay-cli/compare/v3.0.0...v3.1.0) (2026-09-09)
 
 
