@@ -7,9 +7,11 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/fatih/color v1.19.0
 	github.com/google/go-github/v74 v74.0.0
+	github.com/google/go-github/v91 v91.0.0
 	github.com/invopop/yaml v0.3.1
 	github.com/manifoldco/promptui v0.9.0
 	github.com/muesli/termenv v0.16.0
+	github.com/oklog/ulid/v2 v2.1.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
@@ -41,7 +43,6 @@ require (
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.28 // indirect
-	github.com/oklog/ulid/v2 v2.1.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
