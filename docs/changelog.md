@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.0](https://github.com/nentgroup/viaplay-cli/compare/v3.2.0...v3.3.0) (2026-09-13)
+
+
+### Features
+
+* prepare for public release ([#203](https://github.com/nentgroup/viaplay-cli/issues/203)) ([ffb89a8](https://github.com/nentgroup/viaplay-cli/commit/ffb89a8b2f5175a1f01a260651d852342bf374e7))
+
 ## [3.2.0](https://github.com/nentgroup/viaplay-cli/compare/v3.1.0...v3.2.0) (2026-09-12)
 
 
