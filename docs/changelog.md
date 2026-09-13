@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.3.1](https://github.com/nentgroup/viaplay-cli/compare/v3.3.0...v3.3.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* **homebrew:** skip macOS-only xattr postflight step on Linux ([8d1252f](https://github.com/nentgroup/viaplay-cli/commit/8d1252f687099e0ffc1e96c7776f5a5fc5795176))
+
+
+### Documentation
+
+* update documentation ([126d9ac](https://github.com/nentgroup/viaplay-cli/commit/126d9ac09ed9ab1932d504d3d8ca2c9f41eada69))
+
 ## [3.3.0](https://github.com/nentgroup/viaplay-cli/compare/v3.2.0...v3.3.0) (2026-09-13)
 
 
