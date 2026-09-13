@@ -19,7 +19,16 @@ brew install --cask nentgroup/viaplay-cli/vip
 
 You can install `vip` on Linux in several ways:
 
-### Option 1: Install from a package manager
+### Option 1: Install via Homebrew (Linuxbrew)
+
+If you have [Homebrew on Linux](https://docs.brew.sh/Homebrew-on-Linux) installed:
+
+```bash
+brew tap nentgroup/viaplay-cli https://github.com/nentgroup/viaplay-cli
+brew install --cask nentgroup/viaplay-cli/vip
+```
+
+### Option 2: Install from a package manager
 
 Download a package built by GoReleaser from the [GitHub Releases page](https://github.com/nentgroup/viaplay-cli/releases):
 
@@ -34,13 +43,13 @@ sudo rpm -i vip_*.rpm
 sudo apk add --allow-untrusted vip_*.apk
 ```
 
-### Option 2: Install from source
+### Option 3: Install from source
 
 ```bash
 go install github.com/nentgroup/viaplay-cli/cmd/vip@latest
 ```
 
-### Option 3: Install a downloaded binary
+### Option 4: Install a downloaded binary
 
 ```bash
 chmod +x ./vip

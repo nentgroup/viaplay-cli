@@ -34,7 +34,7 @@ cask "vip" do
   binary "vip"
 
   postflight do
-    if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+    if OS.mac? && system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
       system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/vip"]
     end
   end
