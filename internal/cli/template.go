@@ -219,17 +219,10 @@ backwards compatibility and is equivalent to passing <source>.`,
 				Node: template.NodeInfo{
 					Version: "20",
 				},
-				Lambda: template.LambdaInfo{
-					Timeout:      30,
-					MemorySize:   512,
-					Architecture: "arm64",
-					Runtime:      "nodejs22.x",
-				},
 				Cloud: template.CloudInfo{
-					Provider: "aws",
+					Provider: template.DefaultCloudProvider,
 				},
 				Docker: template.DockerInfo{
-					Registry:  "ghcr.io",
 					ImageName: projectName,
 					ImageTag:  "latest",
 				},
@@ -675,7 +668,7 @@ func printTemplateManifestHuman(manifest *template.Manifest) {
 		return
 	}
 
-	headers := []string{"Key", colType, "Required", "Default", "Description"}
+	headers := []string{tableKeyHeader, colType, "Required", "Default", "Description"}
 	if len(manifest.Options) > 0 {
 		printManifestTable("Options (use --set key=value)", headers, manifestOptionRows(manifest.Options))
 	}

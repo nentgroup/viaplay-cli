@@ -1,14 +1,14 @@
-# FAQ — viaplay-cli
+# FAQ — vip
 
 ## General
 
-**What is viaplay-cli?**
+**What is vip?**
 
-viaplay-cli is a command-line tool for scaffolding projects, managing GitHub repositories, and enforcing team standards (rulesets, secrets, environments) in a secure and automated way.
+vip is a command-line tool for scaffolding projects, managing GitHub repositories, and enforcing team standards (rulesets, secrets, environments) in a secure and automated way.
 
 **Which platforms are supported?**
 
-viaplay-cli works on macOS, Linux, and Windows.
+vip works on macOS, Linux, and Windows.
 
 **What languages and project types are supported?**
 
@@ -20,7 +20,7 @@ You can scaffold Go, Rust, TypeScript, and other project types, depending on the
 
 **How does authentication work?**
 
-viaplay-cli uses GitHub's device flow for authentication. Your token is stored securely in your OS keyring.
+vip uses GitHub's device flow for authentication. Your token is stored securely in your OS keyring.
 
 **How do I log out?**
 
@@ -74,7 +74,7 @@ managed at the team/global level.
 
 **I get an error about missing GitHub client ID. What do I do?**
 
-Set the `GITHUB_CLIENT_ID` environment variable or build viaplay-cli with an embedded client ID.
+Set the `GITHUB_CLIENT_ID` environment variable or build vip with an embedded client ID.
 
 **My secret isn't being injected. Why?**
 
@@ -88,9 +88,9 @@ Use `--no-cache` when creating a project to force a fresh template download, or 
 
 ## Comparison to Other Tools
 
-**Why use viaplay-cli instead of tools like Yeoman, Cookiecutter, or Plop?**
+**Why use vip instead of tools like Yeoman, Cookiecutter, or Plop?**
 
-While tools like Yeoman, Cookiecutter, and Plop are great for generic project scaffolding, viaplay-cli focuses on teams and organizations that also need:
+While tools like Yeoman, Cookiecutter, and Plop are great for generic project scaffolding, vip focuses on teams and organizations that also need:
 
 - **GitHub integration:** Automated repository creation, configuration, and management (rulesets, environments, secrets) via the GitHub API.
 - **Team and org standards:** Enforce team-specific rulesets, secrets, and environment configs out of the box.
@@ -98,7 +98,7 @@ While tools like Yeoman, Cookiecutter, and Plop are great for generic project sc
 - **Unified workflow:** Combine project scaffolding, repository setup, and configuration in a single CLI.
 - **YAML/JSON-driven config:** Centralise and version your team/project settings.
 
-If you only need file scaffolding, generic tools may be enough. If you also want automated repo creation, configuration, and team standards, viaplay-cli covers that.
+If you only need file scaffolding, generic tools may be enough. If you also want automated repo creation, configuration, and team standards, vip covers that.
 
 ---
 

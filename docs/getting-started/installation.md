@@ -1,73 +1,110 @@
 # Installation
 
-To install viaplay-cli, you need Go 1.25+ installed on your system.
+To install vip, you need Go 1.25+ installed on your system.
 
 ---
 
-## Install via Homebrew (Recommended)
+## Install via Homebrew (macOS)
 
-If you are on macOS <i class="fa-brands fa-apple" style="color:#888;"></i> or Linux <i class="fa-brands fa-linux" style="color:#888;"></i> and use Homebrew, you can install viaplay-cli with:
-
-> **Note:** If the repository is private, you must set your GitHub API token for Homebrew to access it:
->
-> ```bash
-> export HOMEBREW_GITHUB_API_TOKEN=your_github_token
-> ```
+If you use Homebrew on macOS, install `vip` with:
 
 ```bash
-# Tap the repository and install
 brew tap nentgroup/viaplay-cli https://github.com/nentgroup/viaplay-cli
-brew install --cask vip
+brew install --cask nentgroup/viaplay-cli/vip
 ```
 
 ---
 
-## Install with Go
+## Install on Linux
+
+You can install `vip` on Linux in several ways:
+
+### Option 1: Install from a package manager
+
+Download a package built by GoReleaser from the [GitHub Releases page](https://github.com/nentgroup/viaplay-cli/releases):
+
+```bash
+# Debian / Ubuntu
+sudo dpkg -i vip_*.deb
+
+# RPM-based distros
+sudo rpm -i vip_*.rpm
+
+# Alpine / APK-based distros
+sudo apk add --allow-untrusted vip_*.apk
+```
+
+### Option 2: Install from source
 
 ```bash
 go install github.com/nentgroup/viaplay-cli/cmd/vip@latest
 ```
 
----
-
-## Build from Source
+### Option 3: Install a downloaded binary
 
 ```bash
-git clone https://github.com/nentgroup/viaplay-cli.git
-cd viaplay-cli/cmd/vip
-go build -o vip
+chmod +x ./vip
+sudo install ./vip /usr/local/bin/vip
 ```
-
-Place the resulting `vip` binary in your PATH.
 
 ---
 
 ## Install on Windows
 
-You can install viaplay-cli on Windows <i class="fa-brands fa-windows" style="color:#888;"></i> by downloading a prebuilt binary or building from source.
+You can install `vip` on Windows in several ways:
 
-### Option 1: Download Prebuilt Binary
+### Option 1: Install via winget
 
-1. Go to the [GitHub Releases page](https://github.com/nentgroup/viaplay-cli/releases).
-2. Download the latest `vip.exe` for Windows.
-3. Place `vip.exe` in a directory included in your PATH (e.g., `C:\Tools` or `%USERPROFILE%\bin`).
-4. Open a new terminal and run:
-
-```cmd
-vip --version
+```powershell
+winget install nentgroup.viaplay-cli
 ```
 
-### Option 2: Build from Source
+### Option 2: Download a release binary
 
-If you have Go 1.25+ installed:
+Download the latest `vip.exe` from the [GitHub Releases page](https://github.com/nentgroup/viaplay-cli/releases) and place it in a directory already on your `PATH`.
+
+### Option 3: Build from source
 
 ```powershell
 git clone https://github.com/nentgroup/viaplay-cli.git
-cd viaplay-cli/cmd/vip
-go build -o vip.exe
+cd viaplay-cli
+go build -o vip.exe ./cmd/vip
+Move-Item .\vip.exe "$env:USERPROFILE\bin\vip.exe"
 ```
 
-Move `vip.exe` to a directory in your PATH.
+---
+
+## Install with Go (all platforms)
+
+```bash
+go install github.com/nentgroup/viaplay-cli/cmd/vip@latest
+```
+
+This works on macOS, Linux, and Windows when Go is installed and the Go binary directory is on your `PATH`.
+
+---
+
+## Build from source
+
+When building from source, set the GitHub OAuth client ID used by device auth:
+
+```bash
+export GITHUB_CLIENT_ID="your-client-id"
+git clone https://github.com/nentgroup/viaplay-cli.git
+cd viaplay-cli
+go build -o vip ./cmd/vip
+```
+
+On PowerShell:
+
+```powershell
+$env:GITHUB_CLIENT_ID = "your-client-id"
+git clone https://github.com/nentgroup/viaplay-cli.git
+cd viaplay-cli
+go build -o vip.exe .\cmd\vip
+```
+
+Place the resulting binary in your `PATH`. This environment variable is required for `vip auth login` to work unless the client ID is embedded in a release build.
 
 ---
 

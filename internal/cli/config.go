@@ -53,7 +53,9 @@ Examples:
   vip config init
   vip config init team myteam --organization nentgroup
   vip config init source --organization nentgroup
+  vip config show
   vip config pull
+  vip config sync --dry-run
   vip config get default_team
 `,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -425,6 +427,189 @@ Examples:
 
 		// Get the specified key
 		return getConfigValue(args[0])
+	},
+}
+
+func printConfigTable(pairs map[string]string) {
+	if len(pairs) == 0 {
+		return
+	}
+
+	rows := make([][]string, 0, len(pairs))
+	keys := make([]string, 0, len(pairs))
+	for key := range pairs {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		rows = append(rows, []string{key, pairs[key]})
+	}
+
+	fmt.Print(output.Table([]string{tableKeyHeader, "Value"}, rows, 0))
+}
+
+// showCmd displays the active configuration in an easy-to-read summary.
+var showCmd = &cobra.Command{
+	Use:   "show",
+	Short: "Show the active configuration",
+	Long:  `Display the currently loaded configuration values and the active source settings.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := ensureConfigLoaded(); err != nil {
+			return err
+		}
+
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		output.Section("Active configuration")
+		settings := map[string]string{
+			"config_file":          cfg.ConfigFile,
+			"config_dir":           cfg.ConfigDir,
+			"default_team":         cfg.DefaultTeam,
+			"default_organization": cfg.DefaultOrganization,
+			"default_language":     cfg.DefaultLanguage,
+			"default_type":         cfg.DefaultType,
+			"default_visibility":   cfg.DefaultVisibility,
+			"cache_dir":            cfg.CacheDir,
+			"teams_dir":            cfg.TeamsDir,
+		}
+		if cfg.HasSource() {
+			settings["config_source.repository"] = cfg.Source.Repository
+			settings["config_source.branch"] = cfg.Source.Branch
+			settings["config_source.root"] = cfg.Source.Root
+		}
+		printConfigTable(settings)
+		return nil
+	},
+}
+
+// diffCmd provides a lightweight diff between the current config and the defaults.
+var diffCmd = &cobra.Command{
+	Use:   "diff",
+	Short: "Show a summary of config differences",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := ensureConfigLoaded(); err != nil {
+			return err
+		}
+
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		fmt.Println("Configuration summary:")
+		fmt.Printf("  active defaults: default_team=%q default_organization=%q default_language=%q\n",
+			cfg.DefaultTeam, cfg.DefaultOrganization, cfg.DefaultLanguage)
+		if cfg.HasSource() {
+			fmt.Printf("  shared source: repository=%q branch=%q root=%q\n",
+				cfg.Source.Repository, cfg.Source.Branch, cfg.Source.Root)
+		} else {
+			fmt.Println("  shared source: not configured")
+		}
+		return nil
+	},
+}
+
+// statusCmd reports the current configuration health.
+var statusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Report configuration status",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := ensureConfigLoaded(); err != nil {
+			return err
+		}
+
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		status := map[string]string{}
+		status["config_file"] = cfg.ConfigFile
+		status["default_team"] = cfg.DefaultTeam
+		status["default_organization"] = cfg.DefaultOrganization
+		if cfg.HasSource() {
+			status["shared_source"] = cfg.Source.Repository
+		} else {
+			status["shared_source"] = "not configured"
+		}
+		if cmd.Flag("json").Changed && cmd.Flag("json").Value.String() == "true" {
+			// Emit JSON-like output without a dependency on a JSON library.
+			keys := make([]string, 0, len(status))
+			for key := range status {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			fmt.Print("{\n")
+			for i, key := range keys {
+				fmt.Printf("  %q: %q", key, status[key])
+				if i < len(keys)-1 {
+					fmt.Println(",")
+				} else {
+					fmt.Println()
+				}
+			}
+			fmt.Println("}")
+			return nil
+		}
+
+		fmt.Println("Configuration status:")
+		for _, key := range []string{"config_file", "default_team", "default_organization", "shared_source"} {
+			fmt.Printf("  %s: %s\n", key, status[key])
+		}
+		return nil
+	},
+}
+
+// syncCmd synchronises the shared config source into the local checkout.
+var syncCmd = &cobra.Command{
+	Use:   "sync",
+	Short: "Sync the shared config repository",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfigWithSource()
+		if err != nil {
+			return err
+		}
+
+		dryRun, err := cmd.Flags().GetBool("dry-run")
+		if err != nil {
+			return fmt.Errorf("failed to get 'dry-run' flag: %w", err)
+		}
+		if dryRun {
+			fmt.Printf("Would sync shared config repository: %s (%s)\n", cfg.Source.Repository, cfg.Source.Branch)
+			return nil
+		}
+
+		root, err := cfg.SyncSourceRepository(cmd.Context())
+		if err != nil {
+			return fmt.Errorf("failed to sync shared config repository: %w", err)
+		}
+		fmt.Printf("Shared config synced to: %s\n", root)
+		return nil
+	},
+}
+
+// doctorCmd validates the active config and reports actionable issues.
+var doctorCmd = &cobra.Command{
+	Use:   "doctor",
+	Short: "Check configuration health",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		report := &configValidationReport{}
+		configFile := configuredConfigFilePath()
+		if err := validateMainConfig(configFile, report); err != nil {
+			printConfigValidationReport(report)
+			return err
+		}
+
+		if report.hasErrors() {
+			printConfigValidationReport(report)
+			return fmt.Errorf("configuration doctor check failed")
+		}
+		fmt.Println("Configuration looks healthy.")
+		return nil
 	},
 }
 
@@ -1527,13 +1712,27 @@ func initializeConfigFile(org, team string, override bool) error { //nolint:gofu
 	return nil
 }
 
-// showAllConfig displays all configuration values
+// showAllConfig displays all configuration values in a table for consistency with template listing.
 func showAllConfig() error {
+	output.Section("Current configuration")
 	allSettings := viper.AllSettings()
-	fmt.Println("Current configuration:")
-	for k, v := range allSettings {
-		fmt.Printf("  %s: %v\n", k, v)
+	rows := make([][]string, 0, len(allSettings))
+	keys := make([]string, 0, len(allSettings))
+	for key := range allSettings {
+		keys = append(keys, key)
 	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		rows = append(rows, []string{key, fmt.Sprintf("%v", allSettings[key])})
+	}
+
+	if len(rows) == 0 {
+		fmt.Println("No configuration values found")
+		return nil
+	}
+
+	fmt.Print(output.Table([]string{tableKeyHeader, "Value"}, rows, 0))
 	return nil
 }
 
@@ -1630,12 +1829,17 @@ func init() {
 
 	// Add all subcommands to the config command
 	configCmd.AddCommand(initCmd)
+	configCmd.AddCommand(showCmd)
+	configCmd.AddCommand(diffCmd)
+	configCmd.AddCommand(statusCmd)
+	configCmd.AddCommand(syncCmd)
 	configCmd.AddCommand(getCmd)
 	configCmd.AddCommand(editCmd)
 	configCmd.AddCommand(pathCmd)
 	configCmd.AddCommand(pathsCmd)
 	configCmd.AddCommand(pullCmd)
 	configCmd.AddCommand(validateCmd)
+	configCmd.AddCommand(doctorCmd)
 	initCmd.AddCommand(initTeamCmd)
 	initCmd.AddCommand(initSourceCmd)
 	pullCmd.AddCommand(pullTeamCmd)
@@ -1654,6 +1858,9 @@ func init() {
 	initSourceCmd.Flags().String("branch", "", "Branch to use from the shared config repository (defaults to current config or main)")
 	initSourceCmd.Flags().String("root", "", "Root path inside the shared config repository (defaults to current config or .)")
 	initSourceCmd.Flags().StringP("organization", "o", "", "Organization used to detect the conventional vip-shared-configs repository")
+
+	syncCmd.Flags().Bool("dry-run", false, "Print what would be synchronized without making changes")
+	statusCmd.Flags().Bool("json", false, "Emit machine-readable JSON")
 
 	pathCmd.Flags().StringP("team", "t", "", "Team name for the team config path (falls back to default_team)")
 	pathCmd.Flags().StringP("organization", "o", "", "Organization name for the team config path (falls back to default_organization)")

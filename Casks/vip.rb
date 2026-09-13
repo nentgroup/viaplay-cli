@@ -9,24 +9,24 @@ cask "vip" do
     on_arm do
       sha256 "4ab6d26845e45413f5c2e59b9666c5b9cd8cfc7b01cc9da227780762984d4a19"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_arm64.tar.gz",
-        using: GitHubPrivateRepositoryReleaseDownloadStrategy
+          using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
     on_intel do
       sha256 "3a47f24b3bfc88f6dd79c2431dcc555abd33321d1b31a52cd4e9288ace5033d0"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_darwin_amd64.tar.gz",
-        using: GitHubPrivateRepositoryReleaseDownloadStrategy
+          using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
   end
   on_linux do
     on_arm do
       sha256 "3417a7fb74f6b6f2d3ce75c3247b10db6802656840e3ef829c729d946bdb1077"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_arm64.tar.gz",
-        using: GitHubPrivateRepositoryReleaseDownloadStrategy
+          using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
     on_intel do
       sha256 "eb7bc79c09fd882319e2f518b75e610e152a1a04ff8486277b7cc9c76b29a7e1"
       url "https://github.com/nentgroup/viaplay-cli/releases/download/v#{version}/viaplay-cli_#{version}_linux_amd64.tar.gz",
-        using: GitHubPrivateRepositoryReleaseDownloadStrategy
+          using: GitHubPrivateRepositoryReleaseDownloadStrategy
     end
   end
 
@@ -47,8 +47,8 @@ cask "vip" do
   end
 
   uninstall delete: [
-      "/opt/homebrew/bin/vip",
-    ]
+    "/opt/homebrew/bin/vip",
+  ]
 
   # No zap stanza required
 

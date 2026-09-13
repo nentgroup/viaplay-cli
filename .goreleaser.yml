@@ -1,4 +1,5 @@
 version: 2
+project_name: vip
 builds:
   - id: main
     main: ./cmd/vip
@@ -20,13 +21,48 @@ builds:
       - -X github.com/nentgroup/viaplay-cli/internal/cli.Commit={{.Commit}}
       - -X github.com/nentgroup/viaplay-cli/internal/gh.defaultClientID={{.Env.CLIENT_ID}}
 archives:
-  -
+  - id: vip
+    ids:
+      - main
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     format_overrides:
       - goos: windows
         formats: ['zip']
+
+nfpms:
+  - package_name: vip
+    id: vip-linux
+    ids:
+      - main
+    formats:
+      - apk
+      - deb
+      - rpm
+    vendor: nentgroup
+    homepage: https://nentgroup.github.io/viaplay-cli
+    maintainer: Alessandro Coletti <alessandro.coletti@viaplaygroup.com>
+    description: "vip is a CLI for scaffolding projects, creating GitHub repos, and applying team standards."
+    license: MIT
+    section: utils
+    priority: optional
+    bindir: /usr/local/bin
+    file_name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Arch }}
+
+winget:
+  - publisher: nentgroup
+    package_identifier: nentgroup.vip
+    short_description: "vip is a CLI for scaffolding projects and GitHub automation"
+    license: MIT
+    homepage: https://nentgroup.github.io/viaplay-cli
+    repository:
+      owner: nentgroup
+      name: viaplay-cli
+      branch: main
+
 homebrew_casks:
-  -
-    name: vip
+  - name: vip
     caveats: "If you have an existing binary at /opt/homebrew/bin/vip, remove it before installing: rm /opt/homebrew/bin/vip"
     binary: vip
     uninstall:
@@ -46,15 +82,9 @@ homebrew_casks:
       email: alessandro.coletti@viaplaygroup.com
     directory: Casks
     homepage: "https://nentgroup.github.io/viaplay-cli"
-    description: "CLI tool for Gecko Generators."
+    description: "CLI tool for scaffolding projects and GitHub automation."
     url:
       template: "https://github.com/nentgroup/viaplay-cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-      using: "GitHubPrivateRepositoryReleaseDownloadStrategy"
-    custom_block: |
-      tap_path = File.expand_path("Library/Taps/nentgroup/homebrew-viaplay-cli/Casks/lib/custom_download_strategy.rb", ENV["HOMEBREW_PREFIX"])
-      require tap_path
-checksum:
-  name_template: 'checksums.txt'
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 changelog:

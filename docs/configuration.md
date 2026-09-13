@@ -1,12 +1,12 @@
 # Configuration
 
-This page covers how configuration works in viaplay-cli, including global, team, and project-specific settings.
+This page covers how configuration works in `vip`, including global, team, and project-specific settings.
 
 ---
 
 ## Configuration Overview
 
-viaplay-cli uses YAML configuration files to control default values, paths, team settings, template sources,
+`vip` uses YAML configuration files to control default values, paths, team settings, template sources,
 rulesets, secrets, and more. There are three main types of configuration:
 
 - **Global config:** `~/.config/viaplay/config.yaml` — User-wide defaults and settings.
@@ -18,11 +18,11 @@ rulesets, secrets, and more. There are three main types of configuration:
 
 ## Global Config Example (config.yaml)
 
-This file controls the default behaviour of viaplay-cli:
+This file controls the default behaviour of `vip`:
 
 ```yaml
-# viaplay-cli Configuration
-# This file controls the behaviour of the viaplay-cli tool
+# vip Configuration
+# This file controls the behaviour of the vip CLI
 # See https://github.com/nentgroup/viaplay-cli for documentation
 
 # -----------------------------------------------

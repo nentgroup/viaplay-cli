@@ -4,7 +4,7 @@
 
 ## What are Secrets?
 
-Secrets are sensitive values (such as API keys, tokens, or passwords) used by your repositories or CI/CD pipelines. viaplay-cli manages secrets at the team level and injects them into repositories or environments during project creation.
+Secrets are sensitive values (such as API keys, tokens, or passwords) used by your repositories or CI/CD pipelines. vip manages secrets at the team level and injects them into repositories or environments during project creation.
 
 ---
 
