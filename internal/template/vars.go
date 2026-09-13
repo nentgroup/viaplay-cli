@@ -59,34 +59,15 @@ type NodeInfo struct {
 	TypeScriptVersion string // TypeScript version
 }
 
-// LambdaInfo contains AWS Lambda-specific variables
-type LambdaInfo struct {
-	FunctionName      string // Name of the Lambda function
-	Handler           string // Handler path (e.g., "index.handler")
-	Runtime           string // Lambda runtime (e.g., "nodejs18.x", "go1.x", "python3.9")
-	Timeout           int    // Timeout in seconds
-	MemorySize        int    // Memory size in MB
-	Architecture      string // Architecture (e.g., "x86_64", "arm64")
-	Layers            string // Comma-separated list of layer ARNs
-	Environment       string // Environment variables as JSON string
-	IAMRole           string // IAM role ARN or name
-	Triggers          string // Comma-separated list of triggers (e.g., "apigateway,s3")
-	DeploymentPackage string // Deployment package path (e.g., ".zip" file)
-}
-
-// CloudInfo contains cloud provider specific information
+// CloudInfo contains cloud provider specific information.
 type CloudInfo struct {
-	Provider     string // Cloud provider name (e.g., "aws", "gcp", "azure")
-	AWSRegion    string // AWS region
-	AWSAccountID string // AWS account ID
+	Provider string // Cloud provider name (e.g., "aws", "gcp", "azure")
 }
 
-// DockerInfo contains Docker/Kubernetes variables
+// DockerInfo contains Docker variables.
 type DockerInfo struct {
-	ImageName    string // Docker image name
-	ImageTag     string // Docker image tag
-	Registry     string // Docker registry URL (e.g., "ghcr.io", "docker.io")
-	K8sNamespace string // Kubernetes namespace
+	ImageName string // Docker image name
+	ImageTag  string // Docker image tag
 }
 
 // OrgInfo contains organisational information
@@ -103,18 +84,15 @@ type EnvInfo struct {
 	Environments []string // List of supported environments
 }
 
-// DocInfo contains documentation links
-type DocInfo struct {
-	URL    string // URL to project documentation
-	APIURL string // URL to API documentation
-}
-
 // MetaInfo contains metadata about the project creation
 type MetaInfo struct {
 	CreatedAt time.Time // When the project was created
 	CreatedBy string    // Username of project creator
 	Year      int       // Current year (for license, copyright notices)
 }
+
+// DefaultCloudProvider is the default cloud provider supplied to templates.
+const DefaultCloudProvider = "aws"
 
 // Variables defines all variables that can be used in templates
 type Variables struct {
@@ -124,12 +102,10 @@ type Variables struct {
 	Go       GoInfo
 	Rust     RustInfo
 	Node     NodeInfo
-	Lambda   LambdaInfo
 	Cloud    CloudInfo
 	Docker   DockerInfo
 	Org      OrgInfo
 	Env      EnvInfo
-	Docs     DocInfo
 	Meta     MetaInfo
 	Features FeatureSet
 }
@@ -156,17 +132,10 @@ func NewTemplateVariables() *Variables {
 		Node: NodeInfo{
 			Version: "20",
 		},
-		Lambda: LambdaInfo{
-			Timeout:      30,  // 30 seconds default timeout
-			MemorySize:   512, // 512 MB default memory
-			Architecture: "arm64",
-			Runtime:      "nodejs22.x", // Default to current Node.js LTS
-		},
 		Cloud: CloudInfo{
-			Provider: "aws",
+			Provider: DefaultCloudProvider,
 		},
 		Docker: DockerInfo{
-			Registry: "ghcr.io",
 			ImageTag: "latest",
 		},
 		Org: OrgInfo{

@@ -1,6 +1,6 @@
 # Templates
 
-viaplay-cli uses project templates to scaffold new repositories. Templates can be local directories or remote Git repositories. During project creation, template files are copied and variables are replaced with values you provide.
+vip uses project templates to scaffold new repositories. Templates can be local directories or remote Git repositories. During project creation, template files are copied and variables are replaced with values you provide.
 
 ---
 
@@ -283,8 +283,8 @@ Template variables are replaced with actual values during project scaffolding. U
 
 Variables can be used in:
 - **File content** (e.g., `{{ .Project.Name }}`)
-- **Filenames** (e.g., `{{.Project.Name}}.md`, `{{.Service.Name}}-config.yaml`)
-- **Folder names** (e.g., `src/{{.Service.Name}}`, `{{kebab .Project.Name}}/lib`)
+- **Filenames** (e.g., `{{.Project.Name}}.md`, `{{kebab .Project.Name}}-config.yaml`)
+- **Folder names** (e.g., `src/{{kebab .Project.Name}}`, `{{kebab .Project.Name}}/lib`)
 
 ### Helper functions
 
@@ -294,7 +294,7 @@ Template rendering includes a small, explicit helper set for common string and I
 - `{{ camel "my-service-name" }}` / `{{ snake "MyService" }}` — common codegen conventions
 - `{{ pascal .Project.Name }}` / `{{ kebab .Project.Name }}` / `{{ title .Project.Name }}` — casing helpers
 - `{{ slug "My Service!!!" }}` — slugify to `my-service`
-- `{{ replace "." "-" .Service.Name }}` — string replacement, e.g. `my.service -> my-service`
+- `{{ replace "." "-" .Project.Name }}` — string replacement, e.g. `my.service -> my-service`
 - `{{ default "fallback" .Optional.Value }}` / `{{ coalesce .Optional.Value .Fallback }}` — fallback values
 - `{{ join "," .Tags }}` / `{{ split "," .CsvValue }}` — list/CSV handling
 - `{{ trim "  value  " }}` / `{{ trimSuffix "-" .Value }}` / `{{ trimPrefix "pre-" .Value }}` — cleanup helpers
@@ -303,12 +303,15 @@ Template rendering includes a small, explicit helper set for common string and I
 Example:
 
 ```go
-serviceName: {{ .Service.Name }}
+projectName: {{ .Project.Name }}
 slugged: {{ slug .Project.Name }}
-accountId: {{ default "unknown" .Account.ID }}
 resource: {{ replace "." "-" .Project.Name }}
 uniqueId: {{ uuid }}
 ```
+
+### Core template variables
+
+These are the default project variables kept in the public generator contract.
 
 ### Project Information
 - `{{ .Project.Name }}` — Name of the project/repository
@@ -324,72 +327,44 @@ uniqueId: {{ uuid }}
 - `{{ .Repo.SSHURL }}` — SSH URL for the repository
 - `{{ .Repo.IsPrivate }}` — Whether the repository is private
 
-### Service Information
-- `{{ .Service.Name }}` — Name of the service
-- `{{ .Service.Owner }}` — Owner/team responsible for the service
-- `{{ .Service.OwnerKey }}` — Key identifier for the service owner
-- `{{ .Service.Port }}` — Port the service listens on
-- `{{ .Service.Type }}` — Type of service (e.g., "http", "grpc", "worker")
+### Organization Information
+- `{{ .Org.Name }}` — Organization name
+- `{{ .Org.Team }}` — Team name
+- `{{ .Org.CIProvider }}` — CI provider (e.g., "github-actions", "jenkins")
+
+### Docker variables
+- `{{ .Docker.ImageName }}` — Docker image name
+- `{{ .Docker.ImageTag }}` — Docker image tag
+
+### Cloud information
+- `{{ .Cloud.Provider }}` — Cloud provider name (e.g., "aws", "gcp", "azure")
 
 ### Go-specific Variables
 - `{{ .Go.BinaryName }}` — Name of the compiled binary
 - `{{ .Go.ModulePath }}` — Go module path (e.g., "github.com/org/service")
-- `{{ .Go.Version }}` — Go version used (e.g., "1.21")
+- `{{ .Go.Version }}` — Go version used (e.g., "1.27")
 
 ### Rust-specific Variables
 - `{{ .Rust.BinaryName }}` — Name of the compiled binary
 - `{{ .Rust.CargoName }}` — Name in Cargo.toml (often uses underscores instead of dashes)
-- `{{ .Rust.Version }}` — Rust version used (e.g., "1.75")
-- `{{ .Rust.Edition }}` — Rust edition (e.g., "2021")
-
-### AWS Lambda-specific Variables
-- `{{ .Lambda.FunctionName }}` — Name of the Lambda function
-- `{{ .Lambda.Handler }}` — Handler path (e.g., "index.handler")
-- `{{ .Lambda.Runtime }}` — Lambda runtime (e.g., "nodejs18.x", "go1.x", "python3.9")
-- `{{ .Lambda.Timeout }}` — Timeout in seconds
-- `{{ .Lambda.MemorySize }}` — Memory size in MB
-- `{{ .Lambda.Architecture }}` — Architecture (e.g., "x86_64", "arm64")
-- `{{ .Lambda.Layers }}` — Comma-separated list of layer ARNs
-- `{{ .Lambda.Environment }}` — Environment variables as JSON string
-- `{{ .Lambda.IAMRole }}` — IAM role ARN or name
-- `{{ .Lambda.Triggers }}` — Event triggers (e.g., "apigateway,s3")
-- `{{ .Lambda.DeploymentPackage }}` — Deployment package path
+- `{{ .Rust.Version }}` — Rust version used (e.g., "1.88")
+- `{{ .Rust.Edition }}` — Rust edition (e.g., "2024")
 
 ### Node.js/TypeScript-specific Variables
 - `{{ .Node.Version }}` — Node.js version
 - `{{ .Node.PackageName }}` — Name in package.json
 - `{{ .Node.TypeScriptVersion }}` — TypeScript version
 
-### Cloud/AWS Information
-- `{{ .Cloud.Provider }}` — Cloud provider name (e.g., "aws", "gcp", "azure")
-- `{{ .Cloud.AWSRegion }}` — AWS region
-- `{{ .Cloud.AWSAccountID }}` — AWS account ID
-
-### Docker/Kubernetes Variables
-- `{{ .Docker.ImageName }}` — Docker image name
-- `{{ .Docker.ImageTag }}` — Docker image tag
-- `{{ .Docker.Registry }}` — Docker registry URL
-- `{{ .Docker.K8sNamespace }}` — Kubernetes namespace
-
-### Organization Information
-- `{{ .Org.Name }}` — Organization name
-- `{{ .Org.Team }}` — Team name
-- `{{ .Org.CIProvider }}` — CI provider (e.g., "github-actions", "jenkins")
-
 ### Environment Information
 - `{{ .Env.Default }}` — Default environment (e.g., "dev", "staging")
 - `{{ .Env.Environments }}` — List of supported environments
-
-### Documentation Links
-- `{{ .Docs.URL }}` — URL to project documentation
-- `{{ .Docs.APIURL }}` — URL to API documentation
 
 ### Metadata
 - `{{ .Meta.CreatedAt }}` — When the project was created
 - `{{ .Meta.CreatedBy }}` — Username of project creator
 - `{{ .Meta.Year }}` — Current year (for license, copyright notices)
 
-> **Note:** Some variables are language or platform specific and will only be set if relevant to your project type (e.g., Go, Node.js, AWS, Docker).
+> **Compatibility note:** `{{ .Service.* }}` remains available for older templates, but it is not the recommended public contract for new templates. Prefer `{{ .Project.Name }}` and template helpers such as `{{ kebab .Project.Name }}` for naming.
 
 ---
 
@@ -402,8 +377,8 @@ uniqueId: {{ uuid }}
 
 {{ .Project.Description }}
 
-Maintained by: {{ .Service.Owner }}
-Service port: {{ .Service.Port }}
+Maintained by: {{ .Org.Team }}
+Repository: {{ .Repo.URL }}
 ```
 
 ### Go
@@ -414,14 +389,14 @@ package main
 import "fmt"
 
 func main() {
-    fmt.Println("Service {{ .Service.Name }} ({{ .Service.Type }}) running on port {{ .Service.Port }}")
+    fmt.Println("{{ .Project.Name }} module: {{ .Go.ModulePath }}")
 }
 ```
 
 ### Node.js
 
 ```js
-console.log(`Service {{ .Service.Name }} ({{ .Service.Type }}) running on port {{ .Service.Port }}`);
+console.log(`Project {{ .Project.Name }} uses package {{ default "app" .Node.PackageName }}`);
 ```
 
 ---

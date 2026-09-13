@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	testGoVersion    = "1.21"
-	testProjectName  = "TestProject"
-	testProjectName2 = "MyProject"
+	testGoVersion     = "1.21"
+	testProjectName   = "TestProject"
+	testProjectName2  = "MyProject"
+	testCloudProvider = "aws"
 )
 
 func TestRenderer_VariableSubstitution(t *testing.T) {
@@ -69,15 +70,14 @@ func TestRenderer_VariableSubstitution(t *testing.T) {
 			expected: "Node: 18.0.0, NPM: my-npm-app",
 		},
 		{
-			name: "AWS-specific",
-			tmpl: "Region: {{.Cloud.AWSRegion}}, Account: {{.Cloud.AWSAccountID}}",
+			name: "Cloud provider",
+			tmpl: "Provider: {{.Cloud.Provider}}",
 			vars: &Variables{
 				Cloud: CloudInfo{
-					AWSRegion:    "eu-west-1",
-					AWSAccountID: "123456789012",
+					Provider: testCloudProvider,
 				},
 			},
-			expected: "Region: eu-west-1, Account: 123456789012",
+			expected: "Provider: " + testCloudProvider,
 		},
 	}
 
@@ -113,7 +113,7 @@ func TestRenderer_RenderString(t *testing.T) {
 				Version: testGoVersion,
 			},
 			Cloud: CloudInfo{
-				AWSRegion: "us-east-1",
+				Provider: testCloudProvider,
 			},
 			Docker: DockerInfo{
 				ImageName: "test/image",
@@ -153,9 +153,9 @@ func TestRenderer_RenderString(t *testing.T) {
 			expected: "Go version: 1.21",
 		},
 		{
-			name:     "AWSRegion variable",
-			input:    "Region: {{.Cloud.AWSRegion}}",
-			expected: "Region: us-east-1",
+			name:     "CloudProvider variable",
+			input:    "Provider: {{.Cloud.Provider}}",
+			expected: "Provider: " + testCloudProvider,
 		},
 		{
 			name:     "DockerImageName variable",
@@ -222,15 +222,11 @@ func TestRenderer_AllTemplateVariables(t *testing.T) {
 				TypeScriptVersion: "5.0",
 			},
 			Cloud: CloudInfo{
-				Provider:     "aws",
-				AWSRegion:    "eu-west-1",
-				AWSAccountID: "123456789012",
+				Provider: testCloudProvider,
 			},
 			Docker: DockerInfo{
-				ImageName:    "octocat/myproject",
-				ImageTag:     "latest",
-				Registry:     "ghcr.io",
-				K8sNamespace: "default",
+				ImageName: "octocat/myproject",
+				ImageTag:  "latest",
 			},
 			Org: OrgInfo{
 				Name:       "OctoOrg",
@@ -270,13 +266,9 @@ Go Version: {{.Go.Version}}
 Node Version: {{.Node.Version}}
 NPM Package Name: {{.Node.PackageName}}
 TypeScript Version: {{.Node.TypeScriptVersion}}
-AWS Region: {{.Cloud.AWSRegion}}
-AWS Account ID: {{.Cloud.AWSAccountID}}
 Cloud Provider: {{.Cloud.Provider}}
 Docker Image Name: {{.Docker.ImageName}}
 Docker Image Tag: {{.Docker.ImageTag}}
-Docker Registry: {{.Docker.Registry}}
-K8s Namespace: {{.Docker.K8sNamespace}}
 Organisation: {{.Org.Name}}
 Team: {{.Org.Team}}
 CI Provider: {{.Org.CIProvider}}
@@ -308,13 +300,9 @@ Go Version: 1.21
 Node Version: 18.0.0
 NPM Package Name: my-npm-app
 TypeScript Version: 5.0
-AWS Region: eu-west-1
-AWS Account ID: 123456789012
-Cloud Provider: aws
+Cloud Provider: ` + testCloudProvider + `
 Docker Image Name: octocat/myproject
 Docker Image Tag: latest
-Docker Registry: ghcr.io
-K8s Namespace: default
 Organisation: OctoOrg
 Team: backend-team
 CI Provider: github-actions

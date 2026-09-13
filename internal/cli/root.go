@@ -1,4 +1,4 @@
-// Package cli provides the command-line interface for viaplay-cli.
+// Package cli provides the command-line interface for vip.
 // It defines all commands, flags, and user interactions for the CLI application.
 package cli
 
@@ -16,6 +16,8 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/output"
 )
 
+const tableKeyHeader = "Key"
+
 var (
 	cfgFile     string
 	verboseFlag bool
@@ -24,9 +26,9 @@ var (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "vip",
-	Short: "Scaffold, configure, and manage Go projects and GitHub repositories for Viaplay teams.",
-	Long: `viaplay-cli is a developer tool for quickly scaffolding Go projects from templates, 
-creating and configuring GitHub repositories (organization or personal), and applying 
+	Short: "Scaffold, configure, and manage Go projects and GitHub repositories for team workflows.",
+	Long: `vip is a developer tool for quickly scaffolding projects from templates,
+creating and configuring GitHub repositories (organization or personal), and applying
 team or organization standards such as rulesets, secrets, and environments.
 `,
 }
@@ -131,9 +133,14 @@ func printBanner() {
 		"  ╚═══╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝         ╚═════╝╚══════╝╚═╝",
 	}
 
-	// Add the version as the last line of the banner
-	versionLine := fmt.Sprintf("                                                                v%s", Version)
-	bannerLines = append(bannerLines, versionLine, "\n")
+	// Add the product name, tagline, and version as the last lines of the banner.
+	bannerLines = append(
+		bannerLines,
+		"                                                                VIP",
+		"                                            For very important projects",
+		fmt.Sprintf("                                                                v%s", Version),
+		"\n",
+	)
 
 	p := termenv.ColorProfile()
 	colors := []string{"#e6007a", "#ff4e50"}

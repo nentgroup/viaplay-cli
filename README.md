@@ -1,6 +1,7 @@
-# viaplay-cli
+# vip
 
-**viaplay-cli** is a command-line tool for scaffolding projects, creating and configuring GitHub repositories, and applying team standards such as rulesets, secrets, and environments.
+**vip** is the CLI for scaffolding very important projects, creating and configuring GitHub repositories, and applying 
+team standards such as rulesets, secrets, and environments.
 
 <p align="center">
   <img src="./.github/assets/vip.png" alt="viaplay-cli screenshot" width="600">
@@ -52,51 +53,101 @@ vip auth status
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-install-dark.svg"><img src="./.github/assets/icon-install.svg" alt="Install" width="18" height="18" aria-label="Install"></picture> Installation
 
-### Homebrew (macOS & Linux)
+### macOS
 
 ```bash
-# Set your GitHub token for accessing private repositories
-export HOMEBREW_GITHUB_API_TOKEN=your_github_token
-
-# Tap the repository and install
 brew tap nentgroup/viaplay-cli https://github.com/nentgroup/viaplay-cli
-brew install --cask vip
+brew install --cask nentgroup/viaplay-cli/vip
 ```
 
-> **Note:** The `HOMEBREW_GITHUB_API_TOKEN` is required to access private repositories. You can generate a token with the `repo` scope at [GitHub Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens).
+### Linux
 
-### Manual Installation
+You can install `vip` on Linux in either of these ways:
 
-#### Download Binaries
+#### Option 1: Install from the package manager
 
-You can download pre-built binaries from the [releases page](https://github.com/nentgroup/viaplay-cli/releases).
+Download a package built by GoReleaser from the [GitHub Releases page](https://github.com/nentgroup/viaplay-cli/releases):
 
-##### macOS Security Bypass
+```bash
+# Debian / Ubuntu
+sudo dpkg -i vip_*.deb
+
+# RPM-based distros
+sudo rpm -i vip_*.rpm
+
+# Alpine / APK-based distros
+sudo apk add --allow-untrusted vip_*.apk
+```
+
+#### Option 2: Install from source or binary
+
+```bash
+go install github.com/nentgroup/viaplay-cli/cmd/vip@latest
+```
+
+Or download a release binary and place it on your PATH:
+
+```bash
+chmod +x ./vip
+sudo install ./vip /usr/local/bin/vip
+```
+
+### Windows
+
+You can install `vip` on Windows in either of these ways:
+
+#### Option 1: Install via winget
+
+```powershell
+winget install nentgroup.viaplay-cli
+```
+
+#### Option 2: Download a release binary
+
+Download the latest `vip.exe` from the [GitHub Releases page](https://github.com/nentgroup/viaplay-cli/releases), then place it in a folder already on your PATH.
+
+#### Option 3: Build from source
+
+```powershell
+git clone https://github.com/nentgroup/viaplay-cli.git
+cd viaplay-cli
+go build -o vip.exe ./cmd/vip
+Move-Item .\vip.exe "$env:USERPROFILE\bin\vip.exe"
+```
+
+### Cross-platform via Go
+
+```bash
+go install github.com/nentgroup/viaplay-cli/cmd/vip@latest
+```
+
+This works on macOS, Linux, and Windows when Go is installed and `$(go env GOPATH)/bin` (or `%USERPROFILE%\go\bin`) is on your PATH.
+
+### Building from Source
+
+When building from source, you must provide the GitHub OAuth client ID used by device auth:
+
+```bash
+export GITHUB_CLIENT_ID="your-client-id"
+go build -o vip ./cmd/vip
+```
+
+On PowerShell:
+
+```powershell
+$env:GITHUB_CLIENT_ID = "your-client-id"
+go build -o vip.exe .\cmd\vip
+```
+
+This value is required for `vip auth login` to work when you are not using a release build that embeds the client ID.
+
+### macOS Security Bypass
 
 When installing on macOS by downloading the binary directly, you may encounter security blocks. To bypass these:
 
 ```bash
-# After downloading the binary
 chmod +x ./vip
-
-# Remove the quarantine attribute
 xattr -dr com.apple.quarantine ./vip
-
-# Now you can move it to your PATH
-sudo mv vip /usr/local/bin/
-```
-
-#### Build from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/nentgroup/viaplay-cli.git
-cd viaplay-cli
-
-# Build the binary
-go build -o vip ./cmd/vip
-
-# Optionally, move to a directory in your PATH
 sudo mv vip /usr/local/bin/
 ```
 
@@ -107,7 +158,7 @@ Full documentation is available at **[nentgroup.github.io/viaplay-cli](https://n
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-dev-dark.svg"><img src="./.github/assets/icon-dev.svg" alt="Development" width="18" height="18" aria-label="Development"></picture> Development
 
 ### Prerequisites
-- Go 1.25 or later
+- Go 1.27 or later
 - [Task](https://taskfile.dev/) (optional, for easier scripts)
 
 ### Build the CLI
@@ -134,6 +185,17 @@ golangci-lint run --fix
 go test ./...
 ```
 
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup guidance, PR expectations, and contribution standards.
+
+## Security
+
+If you discover a security issue, please follow the disclosure process in [SECURITY.md](SECURITY.md). Please do not open a public issue for vulnerabilities.
+
+## Code of conduct
+
+Please review the [Code of Conduct](CODE_OF_CONDUCT.md) before participating in the project.
 
 ## License
 

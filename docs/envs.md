@@ -1,6 +1,6 @@
 # Environments Configuration
 
-Environments let you define deployment targets (such as staging, production, etc.) and set up environment-specific policies in your GitHub repositories.
+Environments let you define deployment targets (such as staging, production, etc.) and set up environment-specific policies in your GitHub repositories using `vip`.
 
 For detailed information about GitHub's Environment API, see the [GitHub Environments API documentation](https://docs.github.com/en/rest/deployments/environments?apiVersion=2022-11-28).
 

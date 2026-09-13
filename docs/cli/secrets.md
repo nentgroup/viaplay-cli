@@ -35,4 +35,4 @@ Secrets are stored securely in your system keyring and can be injected into your
 
 ---
 
-For more details on secrets management, see [Secrets in viaplay-cli](../secrets.md).
+For more details on secrets management, see [Secrets in vip](../secrets.md).

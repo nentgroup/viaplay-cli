@@ -5,7 +5,7 @@
 
 ## Overview
 
-viaplay-cli can scaffold new projects from templates and automate the creation of repositories on GitHub. The creation process supports applying organization settings like environments, rulesets, and secrets from team configurations.
+vip can scaffold new projects from templates and automate the creation of repositories on GitHub. The creation process supports applying organization settings like environments, rulesets, and secrets from team configurations.
 
 ---
 
