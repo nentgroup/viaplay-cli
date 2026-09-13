@@ -2,7 +2,7 @@
 
 The `skills` command group installs "skill" packs that teach AI coding
 agents (Claude Code, GitHub Copilot, Cursor, Codex CLI, ...) how to drive
-viaplay-cli workflows — for example, creating a project/repo for a team with
+`vip` workflows — for example, creating a project/repo for a team with
 the right template and standards — instead of the agent guessing or copying
 files by hand.
 

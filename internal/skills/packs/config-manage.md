@@ -1,11 +1,11 @@
 ---
-title: Manage viaplay-cli configuration and team config
+title: Manage vip configuration and team config
 description: Initialise, inspect, pull, edit, and validate global and team configuration.
 ---
 
-# viaplay-cli: configuration management
+# vip: configuration management
 
-Use `vip config` to set up and maintain viaplay-cli's own configuration: the main
+Use `vip config` to set up and maintain vip's own configuration: the main
 config file, personal (per-user) config, team config folders (environments, rulesets,
 secrets definitions, template overrides), and an optional shared read-only config source
 repository that teams pull from.
@@ -13,7 +13,7 @@ repository that teams pull from.
 ## When to use this
 
 Trigger this workflow when the user asks to:
-- "set up viaplay-cli for the first time" / "initialize vip config"
+- "set up vip for the first time" / "initialize vip config"
 - "scaffold a new team's config"
 - "what's my default team/organization"
 - "pull the latest shared team config / hooks"

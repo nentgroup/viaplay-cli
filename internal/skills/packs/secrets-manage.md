@@ -1,9 +1,9 @@
 ---
 title: Manage secrets in the system keyring
-description: Store, retrieve, list, and remove secrets used by viaplay-cli team configs and repo apply.
+description: Store, retrieve, list, and remove secrets used by vip team configs and repo apply.
 ---
 
-# viaplay-cli: secrets management
+# vip: secrets management
 
 Use `vip secrets` to manage secrets in the local system keyring. These secrets can be
 referenced by name from `vip repo apply secret` / `vip repo apply variable` when no

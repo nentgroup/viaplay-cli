@@ -1,6 +1,6 @@
-# Contributing to viaplay-cli
+# Contributing to vip
 
-Thanks for your interest in contributing to viaplay-cli.
+Thanks for your interest in contributing to vip.
 
 We welcome issues, feature ideas, bug fixes, docs improvements, and template contributions.
 

@@ -1,6 +1,6 @@
-# viaplay-cli Documentation
+# vip Documentation
 
-This documentation describes installation, configuration, and command usage for `viaplay-cli`.
+This documentation describes installation, configuration, and command usage for `vip`.
 
 ## Table of Contents
 

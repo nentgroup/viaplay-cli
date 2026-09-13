@@ -52,7 +52,7 @@ deployment_branch_policy:
 
 ## Applying Environments
 
-When you create a project or repository with viaplay-cli and use the `--apply-envs` flag, all environments defined in your team's `envs/` directory will be created in the GitHub repository.
+When you create a project or repository with `vip` and use the `--apply-envs` flag, all environments defined in your team's `envs/` directory will be created in the GitHub repository.
 
 ```bash
 vip project create myservice --team myteam --apply-envs

@@ -1,11 +1,11 @@
 ---
-title: Create a viaplay-cli project or repo
-description: Scaffold a new project and GitHub repository with viaplay-cli, applying team standards.
+title: Create a vip project or repo
+description: Scaffold a new project and GitHub repository with vip, applying team standards.
 ---
 
-# viaplay-cli: create project/repo
+# vip: create project/repo
 
-Use the `vip` CLI (viaplay-cli) to scaffold a new project and/or create and configure its GitHub
+Use the `vip` CLI to scaffold a new project and/or create and configure its GitHub
 repository. Prefer this workflow over manually creating repositories or copying files by hand.
 
 ## When to use this

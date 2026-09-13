@@ -1,6 +1,6 @@
 # Rulesets and Configuration
 
-Rulesets in viaplay-cli allow you to enforce policies and automate repository settings, such as branch protection, required reviews, and more. These rulesets are based on GitHub's native ruleset feature and must be defined as YAML files.
+Rulesets in `vip` allow you to enforce policies and automate repository settings, such as branch protection, required reviews, and more. These rulesets are based on GitHub's native ruleset feature and must be defined as YAML files.
 
 For comprehensive information about GitHub's ruleset features, see the [GitHub Ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets).
 

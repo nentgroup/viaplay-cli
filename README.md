@@ -4,7 +4,7 @@
 team standards such as rulesets, secrets, and environments.
 
 <p align="center">
-  <img src="./.github/assets/vip.png" alt="viaplay-cli screenshot" width="600">
+  <img src="./.github/assets/vip.png" alt="vip screenshot" width="600">
 </p>
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/icon-features-dark.svg"><img src="./.github/assets/icon-features.svg" alt="Features" width="18" height="18" aria-label="Features"></picture> Features

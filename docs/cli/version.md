@@ -1,6 +1,6 @@
 # version Command
 
-Show the current version of viaplay-cli.
+Show the current version of `vip`.
 
 ---
 

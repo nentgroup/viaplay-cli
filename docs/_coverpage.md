@@ -1,6 +1,6 @@
-<img src="assets/logo.png" alt="Viaplay CLI logo" style="max-width:90px;margin:1.5rem 0 1rem 0;border-radius:8px;display:block;" />
+<img src="assets/logo.png" alt="vip logo" style="max-width:90px;margin:1.5rem 0 1rem 0;border-radius:8px;display:block;" />
 
-# Viaplay CLI
+# vip
 
 Command-line tool for project scaffolding and GitHub repository configuration.
 

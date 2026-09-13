@@ -1,6 +1,6 @@
 # config Command
 
-The `vip config` command manages global, team, and project-specific configuration for viaplay-cli. Configuration files control default values, paths, team settings, and feature toggles.
+The `vip config` command manages global, team, and project-specific configuration for `vip`. Configuration files control default values, paths, team settings, and feature toggles.
 
 ---
 
@@ -96,11 +96,11 @@ Pull all shared hooks and all shared team config directories from the configured
 
 ## Example Config File
 
-Below is an example of a real viaplay-cli config file:
+Below is an example of a real `vip` config file:
 
 ```yaml
-# viaplay-cli Configuration
-# This file controls the behaviour of the viaplay-cli tool
+# vip Configuration
+# This file controls the behaviour of the vip tool
 # See https://github.com/nentgroup/viaplay-cli for documentation
 
 default_team: ""

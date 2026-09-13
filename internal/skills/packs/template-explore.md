@@ -3,7 +3,7 @@ title: Explore, test, and debug templates and hooks
 description: List/inspect/test local template copies and preview or validate post-install hooks.
 ---
 
-# viaplay-cli: template & hook exploration
+# vip: template & hook exploration
 
 Use `vip template` and `vip hooks` to discover available templates, test a template in
 isolation before scaffolding a real project, and preview or validate post-install hooks —

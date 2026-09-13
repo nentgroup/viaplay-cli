@@ -1,9 +1,9 @@
 ---
-title: viaplay-cli (vip) command overview
+title: vip command overview
 description: Short index of vip command groups and which skill pack or docs to use for each.
 ---
 
-# viaplay-cli (vip): command overview
+# vip: command overview
 
 `vip` scaffolds projects, creates/configures GitHub repositories, and applies team
 standards (rulesets, secrets, environments) for Viaplay teams. This is a short index —
@@ -14,7 +14,7 @@ prefer the more detailed skill pack listed for each area when actually performin
 | Scaffold a new project + create its repo | `vip project` | `project-create` |
 | Create/configure an existing repo (no scaffolding) | `vip repo` | `repo-manage` |
 | Store/retrieve secrets in the local keyring | `vip secrets` | `secrets-manage` |
-| Initialise/inspect/pull viaplay-cli config or team config | `vip config` | `config-manage` |
+| Initialise/inspect/pull vip config or team config | `vip config` | `config-manage` |
 | Explore/test templates, preview or debug hooks | `vip template`, `vip hooks` | `template-explore` |
 | Authenticate with GitHub | `vip auth` | _(see below)_ |
 | Install these skill packs for an agent | `vip skills` | _(this feature)_ |

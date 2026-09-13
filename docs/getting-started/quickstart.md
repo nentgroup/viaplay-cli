@@ -3,7 +3,7 @@
 
 ---
 
-## 1. Install viaplay-cli
+## 1. Install vip
 
 See the [installation guide](/getting-started/installation.md) for details.
 

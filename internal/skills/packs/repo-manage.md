@@ -3,7 +3,7 @@ title: Apply team standards to an existing GitHub repo
 description: Apply environments, rulesets, secrets, and variables to a repository that already exists.
 ---
 
-# viaplay-cli: repo management
+# vip: repo management
 
 Use `vip repo` to create or configure GitHub repositories directly, without scaffolding
 project code. This is the right tool when the repository already exists (or should be
