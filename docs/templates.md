@@ -8,10 +8,10 @@ vip uses project templates to scaffold new repositories. Templates can be local 
 
 The following official templates are available out of the box:
 
-| Language | Type | Repository |
-|----------|------|------------|
-| Go | service | [go-service-template](https://github.com/nentgroup/go-service-template) |
-| Node | service | [node-service-template](https://github.com/nentgroup/node-service-template) |
+| Language | Type    | Repository                                                                  |
+|----------|---------|-----------------------------------------------------------------------------|
+| Go       | service | [go-service-template](https://github.com/nentgroup/go-service-template)     |
+| Node     | service | [node-service-template](https://github.com/nentgroup/node-service-template) |
 
 More templates are planned. You can also register your own templates with `vip template add <source>` — see [Registering Templates](cli/template.md#registering-templates) — or add them manually in your `config.yaml` under the `templates` section — see [Configuration](configuration.md) for details.
 
@@ -201,14 +201,14 @@ files:
 
 `metadata` is optional but recommended:
 
-| Field | Description |
-|-------|-------------|
-| `name` | Display name shown by `vip template inspect` |
-| `description` | One-line description shown by `vip template inspect` |
-| `version` | Free-form version string, informational only |
-| `language` | Programming language (e.g. `go`, `node`) — used by `vip template add` to register the template under `templates.<language>.<type>` without needing `--language` |
-| `type` | Project type (e.g. `service`, `lambda`, `worker`) — used alongside `language` by `vip template add` |
-| `authors` | List of `{name, email}` maintainers, shown by `vip template inspect`. `email`, if set, must be a valid address. |
+| Field         | Description                                                                                                                                                     |
+|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `name`        | Display name shown by `vip template inspect`                                                                                                                    |
+| `description` | One-line description shown by `vip template inspect`                                                                                                            |
+| `version`     | Free-form version string, informational only                                                                                                                    |
+| `language`    | Programming language (e.g. `go`, `node`) — used by `vip template add` to register the template under `templates.<language>.<type>` without needing `--language` |
+| `type`        | Project type (e.g. `service`, `lambda`, `worker`) — used alongside `language` by `vip template add`                                                             |
+| `authors`     | List of `{name, email}` maintainers, shown by `vip template inspect`. `email`, if set, must be a valid address.                                                 |
 
 ### Options vs. Variables
 
@@ -226,15 +226,15 @@ The manifest supports two kinds of user input, both merged into the same
 
 Both support the following common fields:
 
-| Field | Description |
-|-------|-------------|
-| `key` | Identifier used as `.Features.<key>` in templates and with `--set key=value` |
-| `type` | `bool`/`boolean`, `select` (options only), or `string` (variables) |
-| `prompt` | Question shown to the user |
-| `description` | Extra context shown alongside the prompt/in `vip template inspect` |
-| `default` | Value used when not prompting (`--no-input`) or when the user presses enter |
-| `required` | If `true`, omitting the value (empty input, or missing `--set` under `--no-input`) is an error |
-| `choices` | (`options` with `type: select` only) list of `{value, label}` entries |
+| Field         | Description                                                                                    |
+|---------------|------------------------------------------------------------------------------------------------|
+| `key`         | Identifier used as `.Features.<key>` in templates and with `--set key=value`                   |
+| `type`        | `bool`/`boolean`, `select` (options only), or `string` (variables)                             |
+| `prompt`      | Question shown to the user                                                                     |
+| `description` | Extra context shown alongside the prompt/in `vip template inspect`                             |
+| `default`     | Value used when not prompting (`--no-input`) or when the user presses enter                    |
+| `required`    | If `true`, omitting the value (empty input, or missing `--set` under `--no-input`) is an error |
+| `choices`     | (`options` with `type: select` only) list of `{value, label}` entries                          |
 
 ### Validating variable input
 
@@ -288,17 +288,50 @@ Variables can be used in:
 
 ### Helper functions
 
-Template rendering includes a small, explicit helper set for common string and ID generation tasks. These are available everywhere templates are rendered, including path templates:
+Template rendering includes a small, explicit helper set for common string and ID generation tasks. These are available everywhere templates are rendered, including path templates.
 
-- `{{ lower .Project.Name }}` / `{{ upper .Project.Name }}` — normalize case
-- `{{ camel "my-service-name" }}` / `{{ snake "MyService" }}` — common codegen conventions
-- `{{ pascal .Project.Name }}` / `{{ kebab .Project.Name }}` / `{{ title .Project.Name }}` — casing helpers
-- `{{ slug "My Service!!!" }}` — slugify to `my-service`
-- `{{ replace "." "-" .Project.Name }}` — string replacement, e.g. `my.service -> my-service`
-- `{{ default "fallback" .Optional.Value }}` / `{{ coalesce .Optional.Value .Fallback }}` — fallback values
-- `{{ join "," .Tags }}` / `{{ split "," .CsvValue }}` — list/CSV handling
-- `{{ trim "  value  " }}` / `{{ trimSuffix "-" .Value }}` / `{{ trimPrefix "pre-" .Value }}` — cleanup helpers
-- `{{ uuid }}` / `{{ uuidv4 }}` / `{{ ulid }}` — UUID and ULID generation
+#### Casing
+
+| Helper | Example | Result |
+| --- | --- | --- |
+| `lower` | `{{ lower "My Service" }}` | `my service` |
+| `upper` | `{{ upper "My Service" }}` | `MY SERVICE` |
+| `title` | `{{ title "my service" }}` | `My Service` |
+| `camel` | `{{ camel "my-service-name" }}` | `myServiceName` |
+| `pascal` | `{{ pascal "my-service-name" }}` | `MyServiceName` |
+| `snake` | `{{ snake "MyService" }}` | `my_service` |
+| `kebab` | `{{ kebab "My Service" }}` | `my-service` |
+| `slug` | `{{ slug "My Service!!!" }}` | `my-service` |
+
+#### String manipulation
+
+| Helper | Example | Result |
+| --- | --- | --- |
+| `replace` | `{{ replace "." "-" "my.service" }}` | `my-service` |
+| `trim` | `{{ trim "  value  " }}` | `value` |
+| `trimPrefix` | `{{ trimPrefix "pre-" "pre-value" }}` | `value` |
+| `trimSuffix` | `{{ trimSuffix "-suf" "value-suf" }}` | `value` |
+
+#### Defaults & fallbacks
+
+| Helper | Example | Result |
+| --- | --- | --- |
+| `default` | `{{ default "fallback" .Optional.Value }}` | `.Optional.Value` if set, else `fallback` |
+| `coalesce` | `{{ coalesce .Optional.Value .Fallback }}` | first non-empty argument |
+
+#### Lists & CSV
+
+| Helper | Example | Result |
+| --- | --- | --- |
+| `join` | `{{ join "," .Tags }}` | `.Tags` joined with `,` |
+| `split` | `{{ split "," .CsvValue }}` | `.CsvValue` split into a list on `,` |
+
+#### Unique IDs
+
+| Helper | Example | Result |
+| --- | --- | --- |
+| `uuid` / `uuidv4` | `{{ uuid }}` | a random UUIDv4 string |
+| `ulid` | `{{ ulid }}` | a random ULID string |
 
 Example:
 
@@ -363,8 +396,6 @@ These are the default project variables kept in the public generator contract.
 - `{{ .Meta.CreatedAt }}` — When the project was created
 - `{{ .Meta.CreatedBy }}` — Username of project creator
 - `{{ .Meta.Year }}` — Current year (for license, copyright notices)
-
-> **Compatibility note:** `{{ .Service.* }}` remains available for older templates, but it is not the recommended public contract for new templates. Prefer `{{ .Project.Name }}` and template helpers such as `{{ kebab .Project.Name }}` for naming.
 
 ---
 

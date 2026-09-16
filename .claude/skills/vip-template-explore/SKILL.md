@@ -1,5 +1,5 @@
 ---
-title: Explore, test, and debug templates and hooks
+name: vip-template-explore
 description: List/inspect/test local template copies and preview or validate post-install hooks.
 ---
 

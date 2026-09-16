@@ -63,6 +63,18 @@ var Packs = []Pack{
 		Description: "List/inspect/test local template copies and preview or validate post-install hooks.",
 		file:        "template-explore.md",
 	},
+	{
+		ID:          "template-refresh",
+		Title:       "Refresh template from repo",
+		Description: "Compare a repo created from a template against the template and suggest updates to apply back to the template.",
+		file:        "template-refresh.md",
+	},
+	{
+		ID:          "template-apply",
+		Title:       "Apply template changes to repo",
+		Description: "Compare a template against a repo created from it and suggest updates to apply into the repo.",
+		file:        "template-apply.md",
+	},
 }
 
 // Find returns the pack with the given ID, or false if it doesn't exist.
