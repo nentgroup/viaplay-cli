@@ -317,12 +317,10 @@ func RenderWithLiteralUnknowns(templateString string, data interface{}) (string,
 		result = strings.ReplaceAll(result, expr, escaped)
 	}
 
-	// Define template functions
-	funcMap := template.FuncMap{
-		"pascal": ToPascalCase, // Add the PascalCase function as "pascal"
-		"kebab":  ToKebabCase,  // Add the KebabCase function as "kebab"
-		"title":  ToTitleCase,  // Add the TitleCase function as "title"
-	}
+	// Reuse the shared helper set so file content rendering supports the same
+	// functions as file/directory name rendering (pascal/kebab/title, plus
+	// case helpers and ID generators like uuid/uuidv4/ulid).
+	funcMap := FuncMap()
 
 	// Parse and execute the modified template with function map
 	tmpl, err := template.New("safe").Funcs(funcMap).Parse(result)

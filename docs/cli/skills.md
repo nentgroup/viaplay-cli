@@ -84,6 +84,10 @@ to preview the resolved paths before writing anything.
 - `template-explore` — list/inspect/test local template copies and preview or
   validate post-install hooks with `vip template` and `vip hooks`, without creating
   a real project or GitHub repository.
+- `template-refresh` — compare a repo created from a template against the template
+  and suggest changes to apply back into the template.
+- `template-apply` — compare a template against a repo created from it and suggest
+  changes to apply into the repo.
 
 Run `vip skills list` for the up-to-date list shipped with your installed
 version of `vip`.

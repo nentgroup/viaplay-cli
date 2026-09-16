@@ -8,5 +8,5 @@ Command-line tool for project scaffolding and GitHub repository configuration.
 - Creates repositories and applies team config
 - Manages environments, rulesets, and secrets
 
-[Read documentation](#/README)
+[Read documentation](#vip-documentation)
 [GitHub repository](https://github.com/nentgroup/viaplay-cli)

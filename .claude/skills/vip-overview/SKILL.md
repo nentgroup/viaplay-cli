@@ -1,5 +1,5 @@
 ---
-title: vip command overview
+name: vip-overview
 description: Short index of vip command groups and which skill pack or docs to use for each.
 ---
 
