@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.2](https://github.com/nentgroup/viaplay-cli/compare/v3.3.1...v3.3.2) (2026-09-16)
+
+
+### Bug Fixes
+
+* make functionmap available for files ([#211](https://github.com/nentgroup/viaplay-cli/issues/211)) ([8aa74fa](https://github.com/nentgroup/viaplay-cli/commit/8aa74fafb3ce041ec8be3c3393517c5bfbae51c9))
+
 ## [3.3.1](https://github.com/nentgroup/viaplay-cli/compare/v3.3.0...v3.3.1) (2026-09-13)
 
 
