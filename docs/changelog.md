@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.0](https://github.com/nentgroup/viaplay-cli/compare/v3.3.2...v3.4.0) (2026-09-17)
+
+
+### Features
+
+* add support for remote template hooks ([#213](https://github.com/nentgroup/viaplay-cli/issues/213)) ([a575ba2](https://github.com/nentgroup/viaplay-cli/commit/a575ba2a2ef8e821559d2a8462d9417ea7422249))
+
 ## [3.3.2](https://github.com/nentgroup/viaplay-cli/compare/v3.3.1...v3.3.2) (2026-09-16)
 
 
