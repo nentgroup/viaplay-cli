@@ -74,6 +74,8 @@ Use this for a complete project setup experience.`,
 	cmd.Flags().StringVar(&opts.BinaryName, "binary-name", "", "Name of the compiled binary (for compiled languages like Go and Rust)")
 	cmd.Flags().BoolVar(&opts.NoRepo, "no-repo", false, "Skip GitHub repository creation (local project only)")
 	cmd.Flags().BoolVar(&opts.NoHooks, "no-hooks", false, "Skip running post-installation hooks")
+	cmd.Flags().BoolVar(&opts.AllowTemplateHooks, "allow-template-hooks", false,
+		"Allow executing template-defined manifest hooks (hooks.post)")
 	cmd.Flags().BoolVar(&opts.NoCache, "no-cache", false, "Force update of template cache (ignore cached templates)")
 	return cmd
 }

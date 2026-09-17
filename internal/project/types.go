@@ -44,6 +44,9 @@ type Options struct {
 	Team        string
 	BinaryName  string // Name for compiled binary (for Go, Rust, etc.)
 	SkipHooks   bool   // Skip running post-installation hooks
+	// AllowTemplateHooks enables execution of commands declared in a template's
+	// own manifest (hooks.post). Disabled by default for safety.
+	AllowTemplateHooks bool
 
 	// Configuration options
 	ConfigDir      string

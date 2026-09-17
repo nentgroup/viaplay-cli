@@ -93,23 +93,16 @@ type ManifestFileRule struct {
 	When string `yaml:"when" json:"when,omitempty"`
 }
 
-// ManifestHooks defines hook commands.
+// ManifestHooks defines optional template-declared post-scaffold commands.
 //
-// NOTE: reserved for future use. Not currently read/executed anywhere during
-// scaffolding -- declaring hooks in a manifest has no effect today. Executing
-// commands declared by a template's own manifest (which may come from an
-// untrusted/arbitrary source, e.g. via 'template test'/'template add') is a
-// deliberate design gap, not an oversight: it would let any template source
-// run arbitrary commands on the user's machine without explicit opt-in. Use
-// config.PostInstallHook (templates.<language>.<type>.hooks in the CLI
-// config, defined by the user/team, not the template author) for working
-// post-scaffold automation.
+// Hooks are only executed when explicitly allowed by the caller (for example,
+// via --allow-template-hooks / allow_template_hooks). Without explicit opt-in,
+// declaring hooks in a manifest has no effect.
 type ManifestHooks struct {
 	Post []ManifestHook `yaml:"post" json:"post,omitempty"`
 }
 
-// ManifestHook defines a post-scaffold command. See ManifestHooks: not
-// currently executed by vip.
+// ManifestHook defines a post-scaffold command.
 type ManifestHook struct {
 	Name string `yaml:"name" json:"name,omitempty"`
 	Run  string `yaml:"run" json:"run"`

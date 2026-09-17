@@ -12,6 +12,17 @@ import (
 	"github.com/nentgroup/viaplay-cli/internal/template"
 )
 
+// RunTemplateManifestHooks runs post-install hooks declared in a template manifest.
+func (c *Factory) RunTemplateManifestHooks(ctx context.Context, projectPath string, manifest *template.Manifest,
+	templateVars *template.Variables,
+) error {
+	runHookFn := func(stdout, stderr io.Writer) error {
+		return template.ExecuteManifestHooks(ctx, projectPath, manifest, templateVars, stdout, stderr)
+	}
+	title := "Template Manifest Hooks"
+	return output.DisplayHookOutput(title, runHookFn)
+}
+
 // RunHooks runs the post-installation hooks for a project
 func (c *Factory) RunHooks(ctx context.Context, projectPath, language, projectType string,
 	templateVars *template.Variables,

@@ -113,8 +113,9 @@ Beyond the schema check above, `vip` validates a manifest's structure before
 using it: every `options`/`variables` entry must have a non-empty `key` and
 no key may be reused across both lists; `options[].type` must be `bool`,
 `boolean`, or `select`; a `select` option must declare at least one `choices`
-entry, each with a non-empty `value`; and any `validate.pattern` must compile
-as a valid regular expression.
+entry, each with a non-empty `value`; every `hooks.post[]` entry must declare
+a non-empty `run` command; and any `validate.pattern` must compile as a valid
+regular expression.
 
 - `vip template inspect <source>` reports validation issues (if any) alongside
   the manifest's options/variables — a manifest can be inspected even if
@@ -274,6 +275,32 @@ Use `vip template inspect <source>` to inspect a template's manifest, and `--set
 `--no-input` with `vip project create` or `vip template test` to set options and
 variables non-interactively. See [Template Commands](cli/template.md) for full
 command reference.
+
+### Manifest Hooks (`hooks.post`)
+
+Templates can declare optional post-scaffold hook commands in `.vip.yaml`:
+
+```yaml
+hooks:
+  post:
+    - name: install deps
+      run: npm ci
+      when: "node"
+```
+
+For safety, these hooks are **disabled by default** and run only when explicitly
+enabled via:
+
+- `vip project create ... --allow-template-hooks`
+- `vip template test ... --allow-template-hooks`
+- `allow_template_hooks: true` in config (default: `false`)
+
+When enabled, vip still requires an interactive **double confirmation** before
+executing manifest hooks. This prevents accidental execution when a template
+source changes unexpectedly.
+
+`when` uses the same condition language as file rules (`&&`, `||`, `!`, `==`,
+`!=`). Hooks run from the generated project directory, in declared order.
 
 ---
 

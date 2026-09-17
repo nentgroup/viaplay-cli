@@ -46,13 +46,14 @@ type Configuration struct {
 	}
 
 	// Default flags for project creation
-	ApplyEnvs      bool // Default for applying environments
-	ApplySecrets   bool // Default for applying secrets
-	ApplyRulesets  bool // Default for applying rulesets
-	CleanupOnError bool // Default for cleanup on error
-	NoHooks        bool // Default for skipping post-installation hooks
-	NoRepo         bool // Default for skipping repository creation
-	NoCache        bool // Default for disabling caching
+	ApplyEnvs          bool // Default for applying environments
+	ApplySecrets       bool // Default for applying secrets
+	ApplyRulesets      bool // Default for applying rulesets
+	CleanupOnError     bool // Default for cleanup on error
+	NoHooks            bool // Default for skipping post-installation hooks
+	AllowTemplateHooks bool // Default for executing template-defined manifest hooks
+	NoRepo             bool // Default for skipping repository creation
+	NoCache            bool // Default for disabling caching
 
 	// Template mappings, optionally overridden by team config.yaml.
 	Templates map[string]map[string]*TemplateDefinition
@@ -123,13 +124,14 @@ func LoadConfig() (*Configuration, error) {
 		DefaultOrganization: viper.GetString("default_organization"),
 
 		// Default flags for project creation
-		ApplyEnvs:      viper.GetBool("apply_envs"),
-		ApplySecrets:   viper.GetBool("apply_secrets"),
-		ApplyRulesets:  viper.GetBool("apply_rulesets"),
-		CleanupOnError: viper.GetBool("cleanup_on_error"),
-		NoHooks:        viper.GetBool("no_hooks"),
-		NoRepo:         viper.GetBool("no_repo"),
-		NoCache:        viper.GetBool("no_cache"),
+		ApplyEnvs:          viper.GetBool("apply_envs"),
+		ApplySecrets:       viper.GetBool("apply_secrets"),
+		ApplyRulesets:      viper.GetBool("apply_rulesets"),
+		CleanupOnError:     viper.GetBool("cleanup_on_error"),
+		NoHooks:            viper.GetBool("no_hooks"),
+		AllowTemplateHooks: viper.GetBool("allow_template_hooks"),
+		NoRepo:             viper.GetBool("no_repo"),
+		NoCache:            viper.GetBool("no_cache"),
 
 		Templates: make(map[string]map[string]*TemplateDefinition),
 		Source: SourceConfig{
@@ -210,6 +212,7 @@ func InitConfig(cfgFile string) error {
 	viper.SetDefault("default_language", "go")
 	viper.SetDefault("default_type", "service")
 	viper.SetDefault("default_visibility", "private")
+	viper.SetDefault("allow_template_hooks", false)
 	viper.SetDefault("config_source.branch", DefaultSourceBranch)
 	viper.SetDefault("config_source.root", ".")
 

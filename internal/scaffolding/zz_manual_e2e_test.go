@@ -29,7 +29,7 @@ func TestManualE2E_NoInputMissingRequiredLeavesNoDir(t *testing.T) {
 	destPath := filepath.Join(destRoot, "myproj")
 
 	vars := &templ.Variables{}
-	err := scaffolder.ScaffoldProjectWithOptions(context.Background(), destPath, "go", "service", "local@"+tplDir, vars, true, false, nil, true)
+	_, err := scaffolder.ScaffoldProjectWithOptions(context.Background(), destPath, "go", "service", "local@"+tplDir, vars, true, false, nil, true)
 	if err == nil {
 		t.Fatal("expected error due to missing required shortName")
 	}

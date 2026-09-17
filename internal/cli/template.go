@@ -27,6 +27,17 @@ type TestResult struct {
 	Error        string `json:"error,omitempty"`
 }
 
+type templateTestCommandOptions struct {
+	templatePath       string
+	forceRefresh       bool
+	projectName        string
+	projectOwner       string
+	jsonOutput         bool
+	templateSet        []string
+	noInput            bool
+	allowTemplateHooks bool
+}
+
 // createTempDir creates a temporary directory with the given prefix
 // and returns the path to that directory. The directory will be created
 // inside the OS's temporary directory.
@@ -110,15 +121,7 @@ func newTemplateCleanCommand() *cobra.Command {
 
 // newTemplateTestCommand creates a new test subcommand for the template command
 func newTemplateTestCommand() *cobra.Command {
-	var (
-		templatePath string
-		forceRefresh bool
-		projectName  string
-		projectOwner string
-		jsonOutput   bool
-		templateSet  []string
-		noInput      bool
-	)
+	opts := &templateTestCommandOptions{}
 
 	testCmd := &cobra.Command{
 		Use:   "test [source]",
@@ -136,159 +139,21 @@ an explicit local@/url@/git@ source. The --template-path flag is kept for
 backwards compatibility and is equivalent to passing <source>.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-
-			templateSource, err := resolveTestTemplateSource(args, templatePath)
-			if err != nil {
-				return err
-			}
-
-			// Initialise result object for potential JSON output
-			result := TestResult{
-				TemplatePath: templateSource,
-				Success:      false,
-			}
-
-			// Use a minimal configuration that's independent of user config
-			cfg, err := config.LoadConfig()
-			if err != nil {
-				result.Error = fmt.Sprintf("failed to load configuration: %v", err)
-				if jsonOutput {
-					printJSONResult(result)
-					return nil
-				}
-				return fmt.Errorf("failed to load configuration: %w", err)
-			}
-
-			// Initialise cache manager
-			cacheManager := cache.NewManager(cfg)
-			// Initialise project scaffolder
-			scaffolder := scaffolding.NewProjectScaffolder(cacheManager, cfg)
-
-			// Create a temporary directory for output
-			timestamp := time.Now().Format("20060102-150405")
-			tempDirPrefix := fmt.Sprintf("vip-template-test-%s-", timestamp)
-			outputPath, err := createTempDir(tempDirPrefix)
-			if err != nil {
-				result.Error = fmt.Sprintf("failed to create temporary directory: %v", err)
-				if jsonOutput {
-					printJSONResult(result)
-					return nil
-				}
-				return fmt.Errorf("failed to create temporary directory: %w", err)
-			}
-
-			// Update result with output path
-			result.OutputPath = outputPath
-
-			// Create template variables
-			vars := &template.Variables{
-				Project: template.ProjectInfo{
-					Name:        projectName,
-					Description: "test-description",
-				},
-				Repo: template.RepoInfo{
-					Name:  projectName,
-					Owner: projectOwner,
-				},
-				Service: template.ServiceInfo{
-					Name:  projectName,
-					Owner: projectOwner,
-					Port:  "8080",
-					Type:  "http",
-				},
-				Org: template.OrgInfo{
-					Name:       "test-org",
-					Team:       "test-team",
-					CIProvider: "github",
-				},
-				Meta: template.MetaInfo{
-					CreatedAt: time.Now(),
-					CreatedBy: "viaplay-cli",
-					Year:      time.Now().Year(),
-				},
-				Go: template.GoInfo{
-					Version:    "1.24",
-					ModulePath: fmt.Sprintf("github.com/%s/%s", projectOwner, projectName),
-					BinaryName: projectName,
-				},
-				Rust: template.RustInfo{
-					Version: "1.88",
-					Edition: "2024",
-				},
-				Node: template.NodeInfo{
-					Version: "20",
-				},
-				Cloud: template.CloudInfo{
-					Provider: template.DefaultCloudProvider,
-				},
-				Docker: template.DockerInfo{
-					ImageName: projectName,
-					ImageTag:  "latest",
-				},
-				Env: template.EnvInfo{
-					Default:      "dev",
-					Environments: []string{"dev", "staging", "production"},
-				},
-			}
-			// Get absolute path for output
-			absOutputPath, err := filepath.Abs(outputPath)
-			if err != nil {
-				result.Error = fmt.Sprintf("failed to get absolute path for output: %v", err)
-				if jsonOutput {
-					printJSONResult(result)
-					return nil
-				}
-				return fmt.Errorf("failed to get absolute path for output: %w", err)
-			}
-
-			// Print progress info based on mode
-			if !jsonOutput {
-				fmt.Fprintf(os.Stderr, "🧪 Testing template scaffolding...\n")
-				fmt.Fprintf(os.Stderr, "📁 Output directory: %s\n", outputPath)
-			}
-
-			// templateSource is expanded/normalised by cache.ParseSource (e.g. bare
-			// paths default to "local@", GitHub URLs are recognised automatically).
-
-			// Run the scaffolding. Manifest options (if any) are resolved interactively,
-			// unless overridden via --set or suppressed via --no-input.
-			err = scaffolder.ScaffoldProjectWithOptions(ctx, absOutputPath, "", "", templateSource, vars, true, forceRefresh,
-				templateSet, noInput)
-			if err != nil {
-				result.Error = fmt.Sprintf("failed to scaffold template: %v", err)
-				if jsonOutput {
-					printJSONResult(result)
-					return nil
-				}
-				return fmt.Errorf("failed to scaffold template: %w", err)
-			}
-
-			// Success!
-			result.Success = true
-
-			// Output in the appropriate format
-			if jsonOutput {
-				// JSON output always goes to stdout for piping to other tools
-				printJSONResult(result)
-			} else {
-				// Normal mode: print success message to stderr, path to stdout
-				fmt.Fprintf(os.Stderr, "✅ Template successfully scaffolded to: %s\n", absOutputPath)
-			}
-
-			return nil
+			return runTemplateTestCommand(cmd, args, opts)
 		},
 	}
 
 	// Add flags
-	testCmd.Flags().StringVar(&templatePath, "template-path", "",
+	testCmd.Flags().StringVar(&opts.templatePath, "template-path", "",
 		"Template source to test (deprecated; pass <source> as a positional argument instead)")
-	testCmd.Flags().BoolVar(&forceRefresh, "force", false, "Force refresh of local template copies")
-	testCmd.Flags().StringVar(&projectName, "name", "test-project", "Project name for template variables")
-	testCmd.Flags().StringVar(&projectOwner, "owner", "test-owner", "Project owner for template variables")
-	testCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format for scripting")
-	testCmd.Flags().StringArrayVar(&templateSet, "set", nil, "Set a template option using key=value")
-	testCmd.Flags().BoolVar(&noInput, "no-input", false, "Do not prompt for template options; use defaults/--set values")
+	testCmd.Flags().BoolVar(&opts.forceRefresh, "force", false, "Force refresh of local template copies")
+	testCmd.Flags().StringVar(&opts.projectName, "name", "test-project", "Project name for template variables")
+	testCmd.Flags().StringVar(&opts.projectOwner, "owner", "test-owner", "Project owner for template variables")
+	testCmd.Flags().BoolVar(&opts.jsonOutput, "json", false, "Output results in JSON format for scripting")
+	testCmd.Flags().StringArrayVar(&opts.templateSet, "set", nil, "Set a template option using key=value")
+	testCmd.Flags().BoolVar(&opts.noInput, "no-input", false, "Do not prompt for template options; use defaults/--set values")
+	testCmd.Flags().BoolVar(&opts.allowTemplateHooks, "allow-template-hooks", false,
+		"Allow executing template-defined manifest hooks (hooks.post)")
 	if err := testCmd.Flags().MarkDeprecated("template-path",
 		"pass <source> as a positional argument instead, e.g. 'vip template test <source>'"); err != nil {
 		panic(err)
@@ -299,6 +164,160 @@ backwards compatibility and is equivalent to passing <source>.`,
 	}
 
 	return testCmd
+}
+
+func runTemplateTestCommand(cmd *cobra.Command, args []string, opts *templateTestCommandOptions) error {
+	templateSource, err := resolveTestTemplateSource(args, opts.templatePath)
+	if err != nil {
+		return err
+	}
+
+	result := TestResult{TemplatePath: templateSource}
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return emitTemplateTestFailure(&result, opts.jsonOutput, "failed to load configuration: %v", err)
+	}
+
+	outputPath, absOutputPath, err := createTemplateTestOutputPath()
+	if err != nil {
+		return emitTemplateTestFailure(&result, opts.jsonOutput, "failed to create temporary directory: %v", err)
+	}
+	result.OutputPath = outputPath
+
+	if !opts.jsonOutput {
+		fmt.Fprintln(os.Stderr, "🧪 Testing template scaffolding...")
+		fmt.Fprintf(os.Stderr, "📁 Output directory: %s\n", outputPath)
+	}
+
+	vars := buildTemplateTestVariables(opts.projectName, opts.projectOwner)
+	scaffolder := scaffolding.NewProjectScaffolder(cache.NewManager(cfg), cfg)
+	manifest, err := scaffolder.ScaffoldProjectWithOptions(cmd.Context(), absOutputPath, "", "", templateSource, vars, false,
+		opts.forceRefresh, opts.templateSet, opts.noInput)
+	if err != nil {
+		return emitTemplateTestFailure(&result, opts.jsonOutput, "failed to scaffold template: %v", err)
+	}
+
+	if err := maybeRunTemplateTestManifestHooks(cmd, opts, &result, manifest, vars, absOutputPath); err != nil {
+		return err
+	}
+
+	result.Success = true
+	if opts.jsonOutput {
+		printJSONResult(result)
+		return nil
+	}
+	fmt.Fprintf(os.Stderr, "✅ Template successfully scaffolded to: %s\n", absOutputPath)
+	return nil
+}
+
+func emitTemplateTestFailure(result *TestResult, jsonOutput bool, format string, args ...any) error {
+	result.Error = fmt.Sprintf(format, args...)
+	if jsonOutput {
+		printJSONResult(*result)
+		return nil
+	}
+	return fmt.Errorf("%s", result.Error)
+}
+
+func createTemplateTestOutputPath() (string, string, error) {
+	timestamp := time.Now().Format("20060102-150405")
+	tempDirPrefix := fmt.Sprintf("vip-template-test-%s-", timestamp)
+	outputPath, err := createTempDir(tempDirPrefix)
+	if err != nil {
+		return "", "", err
+	}
+	absOutputPath, err := filepath.Abs(outputPath)
+	if err != nil {
+		return "", "", err
+	}
+	return outputPath, absOutputPath, nil
+}
+
+func maybeRunTemplateTestManifestHooks(
+	cmd *cobra.Command,
+	opts *templateTestCommandOptions,
+	result *TestResult,
+	manifest *template.Manifest,
+	vars *template.Variables,
+	absOutputPath string,
+) error {
+	if !opts.allowTemplateHooks || manifest == nil || len(manifest.Hooks.Post) == 0 {
+		return nil
+	}
+	if opts.noInput {
+		return emitTemplateTestFailure(result, opts.jsonOutput,
+			"template manifest hooks require interactive double confirmation; rerun without --no-input")
+	}
+
+	confirmed, err := template.ConfirmManifestHooksExecution(manifest, absOutputPath, os.Stdin, os.Stdout)
+	if err != nil {
+		return emitTemplateTestFailure(result, opts.jsonOutput,
+			"failed to read template manifest hook confirmation: %v", err)
+	}
+	if !confirmed {
+		if !opts.jsonOutput {
+			fmt.Fprintln(os.Stderr, "Skipping template manifest hooks: confirmation declined")
+		}
+		return nil
+	}
+
+	if err := template.ExecuteManifestHooks(cmd.Context(), absOutputPath, manifest, vars, os.Stdout, os.Stderr); err != nil {
+		return emitTemplateTestFailure(result, opts.jsonOutput, "failed to run template manifest hooks: %v", err)
+	}
+	return nil
+}
+
+func buildTemplateTestVariables(projectName, projectOwner string) *template.Variables {
+	now := time.Now()
+	return &template.Variables{
+		Project: template.ProjectInfo{
+			Name:        projectName,
+			Description: "test-description",
+		},
+		Repo: template.RepoInfo{
+			Name:  projectName,
+			Owner: projectOwner,
+		},
+		Service: template.ServiceInfo{
+			Name:  projectName,
+			Owner: projectOwner,
+			Port:  "8080",
+			Type:  "http",
+		},
+		Org: template.OrgInfo{
+			Name:       "test-org",
+			Team:       "test-team",
+			CIProvider: "github",
+		},
+		Meta: template.MetaInfo{
+			CreatedAt: now,
+			CreatedBy: "viaplay-cli",
+			Year:      now.Year(),
+		},
+		Go: template.GoInfo{
+			Version:    "1.24",
+			ModulePath: fmt.Sprintf("github.com/%s/%s", projectOwner, projectName),
+			BinaryName: projectName,
+		},
+		Rust: template.RustInfo{
+			Version: "1.88",
+			Edition: "2024",
+		},
+		Node: template.NodeInfo{
+			Version: "20",
+		},
+		Cloud: template.CloudInfo{
+			Provider: template.DefaultCloudProvider,
+		},
+		Docker: template.DockerInfo{
+			ImageName: projectName,
+			ImageTag:  "latest",
+		},
+		Env: template.EnvInfo{
+			Default:      "dev",
+			Environments: []string{"dev", "staging", "production"},
+		},
+	}
 }
 
 // resolveTestTemplateSource determines the template source for 'template test'
