@@ -74,6 +74,10 @@ cleanup_on_error: true
 # When true, post-installation scripts won't run unless explicitly enabled with --hooks
 no_hooks: false
 
+# Allow template-defined manifest hooks (hooks.post)
+# Disabled by default for safety: enabling this lets template sources execute commands.
+allow_template_hooks: false
+
 # Skip repository creation by default
 # When true, only scaffolds local project without creating GitHub repository
 no_repo: false

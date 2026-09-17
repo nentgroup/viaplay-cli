@@ -16,6 +16,7 @@ vip can scaffold new projects from templates and automate the creation of reposi
   - Creates a new GitHub repository (in an organization or your personal account)
   - Applies team/org settings (environments, rulesets, secrets)
   - Executes post-installation hooks (if defined and not skipped)
+  - Optionally executes template manifest hooks (`.vip.yaml` `hooks.post`) only when `--allow-template-hooks` is enabled
 
 - **Repository Creation:**
   - Creates a new GitHub repository (no code scaffolding)
@@ -61,4 +62,3 @@ The command takes one argument in the format `[owner/]<repo-name>`. For details 
 - For detailed usage, flags, and subcommands, see the [project command reference](cli/project.md).
 - For template details, see [Templates](templates.md).
 - For team/org configuration, see [Configuration](configuration.md).
-

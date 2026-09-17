@@ -214,7 +214,7 @@
     "hooks": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Reserved for future use. Not currently executed by vip during scaffolding -- declaring hooks here has no effect. For working post-scaffold automation, define a post-install hook in your CLI config (templates.<language>.<type>.hooks) instead; see docs/configuration.md.",
+      "description": "Optional post-scaffold hooks declared by the template. Executed only when explicitly enabled (e.g. --allow-template-hooks or allow_template_hooks=true).",
       "properties": {
         "post": {
           "type": "array",
@@ -226,7 +226,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["run"],
-      "description": "Reserved for future use; not currently executed by vip. See the 'hooks' description above.",
+      "description": "A template-defined post-scaffold command. See the 'hooks' description above for safety gating.",
       "properties": {
         "name": {
           "type": "string",

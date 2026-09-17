@@ -41,15 +41,16 @@ type CreateCommandOptions struct {
 	ApplySecrets  bool
 
 	// Project-specific options
-	Language       string
-	ProjectType    string
-	TemplateSource string
-	OutputDir      string
-	BinaryName     string
-	NoHooks        bool
-	NoCache        bool // Force template cache update
-	TemplateSet    []string
-	NoInput        bool
+	Language           string
+	ProjectType        string
+	TemplateSource     string
+	OutputDir          string
+	BinaryName         string
+	NoHooks            bool
+	AllowTemplateHooks bool
+	NoCache            bool // Force template cache update
+	TemplateSet        []string
+	NoInput            bool
 
 	// Error handling options
 	CleanupOnError bool // Clean up resources (delete folder/repo) if errors occur
@@ -77,75 +78,90 @@ func addCommonFlags(cmd *cobra.Command, opts *CreateCommandOptions) {
 
 	// Add a PreRun hook to set the defaults from Viper at runtime
 	originalPreRun := cmd.PreRunE
-	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
-		// Resolve apply-envs/rulesets/secrets defaults first, since whether we should
-		// silently fall back to default_team below depends on them.
-		if !cmd.Flags().Changed("apply-envs") {
-			opts.ApplyEnvs = viper.GetBool("apply_envs")
-		}
-		if !cmd.Flags().Changed("apply-rulesets") {
-			opts.ApplyRulesets = viper.GetBool("apply_rulesets")
-		}
-		if !cmd.Flags().Changed("apply-secrets") {
-			opts.ApplySecrets = viper.GetBool("apply_secrets")
-		}
-		if !cmd.Flags().Changed("cleanup-on-error") {
-			opts.CleanupOnError = viper.GetBool("cleanup_on_error")
-		}
+	cmd.PreRunE = createPreRunWithDefaults(opts, originalPreRun)
+}
 
-		// Only fall back to default_team when the team is actually going to be used, i.e.
-		// when at least one of apply-envs/apply-rulesets/apply-secrets is enabled. Otherwise
-		// leave Team empty so a personal/team-independent repo doesn't get silently
-		// associated with default_team.
-		if !cmd.Flags().Changed("team") {
-			if opts.ApplyEnvs || opts.ApplyRulesets || opts.ApplySecrets {
-				if defaultTeam := viper.GetString("default_team"); defaultTeam != "" {
-					opts.Team = defaultTeam
-					output.WarningMessage(fmt.Sprintf(
-						"No --team specified; using default_team '%s' from config to apply team configuration. "+
-							"Pass --team explicitly, or disable with --apply-envs=false --apply-rulesets=false --apply-secrets=false to opt out.",
-						defaultTeam))
-				}
-			} else {
-				opts.Team = ""
-			}
-		}
-
-		// Handle repository visibility with priority order:
-		// 1. --public flag (highest priority)
-		// 2. --private flag (second priority)
-		// 3. default_visibility from config (lowest priority)
-		isPrivateSet, _ := cmd.Flags().GetBool("private") //nolint:errcheck
-
-		// If neither flag is explicitly set, use the default_visibility from config
-		if !cmd.Flags().Changed("public") && !cmd.Flags().Changed("private") {
-			visibility := viper.GetString("default_visibility")
-			opts.Public = visibility == "public"
-		} else if cmd.Flags().Changed("public") && opts.Public {
-			// --public is set to true, which takes precedence
-			opts.Public = true
-		} else if cmd.Flags().Changed("private") && isPrivateSet {
-			// --private is set to true, make Public = false
-			opts.Public = false
-		}
-		// In case of conflict (both flags set), --public takes precedence
-
-		// Add the project-specific flag defaults from Viper
-		if !cmd.Flags().Changed("no-repo") {
-			opts.NoRepo = viper.GetBool("no_repo")
-		}
-		if !cmd.Flags().Changed("no-hooks") {
-			opts.NoHooks = viper.GetBool("no_hooks")
-		}
-		if !cmd.Flags().Changed("no-cache") {
-			opts.NoCache = viper.GetBool("no_cache")
-		}
-
-		// Run the original PreRun if it exists
+func createPreRunWithDefaults(opts *CreateCommandOptions, originalPreRun func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		applyCreateRuntimeDefaults(cmd, opts)
 		if originalPreRun != nil {
 			return originalPreRun(cmd, args)
 		}
 		return nil
+	}
+}
+
+func applyCreateRuntimeDefaults(cmd *cobra.Command, opts *CreateCommandOptions) {
+	applyTeamConfigFlagDefaults(cmd, opts)
+	applyDefaultTeamFallback(cmd, opts)
+	applyVisibilityDefaults(cmd, opts)
+	applyProjectBehaviorDefaults(cmd, opts)
+}
+
+func applyTeamConfigFlagDefaults(cmd *cobra.Command, opts *CreateCommandOptions) {
+	if !cmd.Flags().Changed("apply-envs") {
+		opts.ApplyEnvs = viper.GetBool("apply_envs")
+	}
+	if !cmd.Flags().Changed("apply-rulesets") {
+		opts.ApplyRulesets = viper.GetBool("apply_rulesets")
+	}
+	if !cmd.Flags().Changed("apply-secrets") {
+		opts.ApplySecrets = viper.GetBool("apply_secrets")
+	}
+	if !cmd.Flags().Changed("cleanup-on-error") {
+		opts.CleanupOnError = viper.GetBool("cleanup_on_error")
+	}
+}
+
+func applyDefaultTeamFallback(cmd *cobra.Command, opts *CreateCommandOptions) {
+	if cmd.Flags().Changed("team") {
+		return
+	}
+
+	if !opts.ApplyEnvs && !opts.ApplyRulesets && !opts.ApplySecrets {
+		opts.Team = ""
+		return
+	}
+
+	defaultTeam := viper.GetString("default_team")
+	if defaultTeam == "" {
+		return
+	}
+
+	opts.Team = defaultTeam
+	output.WarningMessage(fmt.Sprintf(
+		"No --team specified; using default_team '%s' from config to apply team configuration. "+
+			"Pass --team explicitly, or disable with --apply-envs=false --apply-rulesets=false --apply-secrets=false to opt out.",
+		defaultTeam))
+}
+
+func applyVisibilityDefaults(cmd *cobra.Command, opts *CreateCommandOptions) {
+	isPublicChanged := cmd.Flags().Changed("public")
+	isPrivateChanged := cmd.Flags().Changed("private")
+	isPrivateSet, _ := cmd.Flags().GetBool("private") //nolint:errcheck
+
+	switch {
+	case !isPublicChanged && !isPrivateChanged:
+		opts.Public = viper.GetString("default_visibility") == "public"
+	case isPublicChanged && opts.Public:
+		opts.Public = true
+	case isPrivateChanged && isPrivateSet:
+		opts.Public = false
+	}
+}
+
+func applyProjectBehaviorDefaults(cmd *cobra.Command, opts *CreateCommandOptions) {
+	if !cmd.Flags().Changed("no-repo") {
+		opts.NoRepo = viper.GetBool("no_repo")
+	}
+	if !cmd.Flags().Changed("no-hooks") {
+		opts.NoHooks = viper.GetBool("no_hooks")
+	}
+	if !cmd.Flags().Changed("allow-template-hooks") {
+		opts.AllowTemplateHooks = viper.GetBool("allow_template_hooks")
+	}
+	if !cmd.Flags().Changed("no-cache") {
+		opts.NoCache = viper.GetBool("no_cache")
 	}
 }
 
@@ -380,11 +396,12 @@ func executeProjectCreation(ctx context.Context, ghClient *gh.GitHubClient, cfg 
 		SkipRepo:        opts.NoRepo,  // Skip GitHub repository creation if --no-repo is set
 
 		// Project options
-		Language:    opts.Language,
-		ProjectType: opts.ProjectType,
-		Team:        params.team,
-		BinaryName:  opts.BinaryName, // Set the binary name from flag
-		SkipHooks:   opts.NoHooks,    // Skip running post-installation hooks if flag is set
+		Language:           opts.Language,
+		ProjectType:        opts.ProjectType,
+		Team:               params.team,
+		BinaryName:         opts.BinaryName, // Set the binary name from flag
+		SkipHooks:          opts.NoHooks,    // Skip running post-installation hooks if flag is set
+		AllowTemplateHooks: opts.AllowTemplateHooks,
 
 		// Configuration options
 		ConfigDir: cfg.ConfigDir,

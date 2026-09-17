@@ -38,7 +38,11 @@ vip project create [owner/]<repo-name> [flags]
 - `--no-repo`: Do not create a GitHub repository (only scaffold locally)
 - `--no-cache`: Force update of the template cache before scaffolding the project
 - `--no-hooks`: Skip execution of post-installation hooks defined in the config file
+- `--allow-template-hooks`: Allow execution of `hooks.post` commands declared in the template manifest (`.vip.yaml`)
 - `--verbose`: Enable verbose output (prints detailed progress and debug info)
+
+When `--allow-template-hooks` is set and a manifest defines hooks, vip asks for
+an interactive double confirmation before running them.
 
 ---
 

@@ -25,7 +25,7 @@ func NewProjectScaffolder(cacheManager *cache.Manager, cfg *config.Configuration
 
 // ScaffoldProject applies a template using default (interactive) manifest option resolution.
 // Use ScaffoldProjectWithOptions to control --set overrides and --no-input behaviour.
-func (ps *ProjectScaffolder) ScaffoldProject(ctx context.Context, destPath, language, projectType, templateSource string, opts interface{}, skipHooks, forceUpdate bool) error {
+func (ps *ProjectScaffolder) ScaffoldProject(ctx context.Context, destPath, language, projectType, templateSource string, opts interface{}, skipHooks, forceUpdate bool) (*templ.Manifest, error) {
 	return ps.ScaffoldProjectWithOptions(ctx, destPath, language, projectType, templateSource, opts, skipHooks, forceUpdate, nil, false)
 }
 
@@ -33,16 +33,16 @@ func (ps *ProjectScaffolder) ScaffoldProject(ctx context.Context, destPath, lang
 // overrides (templateSet) and/or interactive prompts (unless noInput is true).
 func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(ctx context.Context, destPath, language, projectType, templateSource string,
 	opts interface{}, skipHooks, forceUpdate bool, templateSet []string, noInput bool,
-) error {
+) (*templ.Manifest, error) {
 	templatePath, manifest, cleanup, err := ps.resolveTemplateManifest(ctx, language, projectType, templateSource, forceUpdate)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer cleanup()
 
 	templateVars, ok := opts.(*templ.Variables)
 	if !ok {
-		return fmt.Errorf("opts must be of type *template.Variables")
+		return nil, fmt.Errorf("opts must be of type *template.Variables")
 	}
 
 	// Resolve manifest options/prompts before touching the filesystem, so a
@@ -50,15 +50,18 @@ func (ps *ProjectScaffolder) ScaffoldProjectWithOptions(ctx context.Context, des
 	// leaving behind an empty destination directory that would need cleanup.
 	if manifest != nil {
 		if err := templ.ResolveManifestSelections(manifest, templateVars, templateSet, noInput); err != nil {
-			return fmt.Errorf("failed to resolve template options: %w", err)
+			return nil, fmt.Errorf("failed to resolve template options: %w", err)
 		}
 	}
 
 	if err := os.MkdirAll(destPath, 0o755); err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
+		return nil, fmt.Errorf("failed to create destination directory: %w", err)
 	}
 	renderer := templ.NewRenderer(templateVars)
-	return ps.copyTemplateFiles(templatePath, destPath, renderer, manifest)
+	if err := ps.copyTemplateFiles(templatePath, destPath, renderer, manifest); err != nil {
+		return nil, err
+	}
+	return manifest, nil
 }
 
 // GetTemplateManifest ensures the template is available locally and loads its manifest,

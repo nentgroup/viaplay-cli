@@ -70,6 +70,13 @@ func ValidateManifest(manifest *Manifest) []string {
 		}
 	}
 
+	for i, hook := range manifest.Hooks.Post {
+		label := fmt.Sprintf("hooks.post[%d]", i)
+		if strings.TrimSpace(hook.Run) == "" {
+			issues = append(issues, fmt.Sprintf("%s: run is required", label))
+		}
+	}
+
 	return issues
 }
 

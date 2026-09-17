@@ -32,6 +32,7 @@ type creationContext struct {
 	CreatedRepo       bool
 	AuthenticatedUser string
 	TemplateVars      *template.Variables
+	TemplateManifest  *template.Manifest
 }
 
 // Factory manages the project creation workflow
@@ -281,7 +282,8 @@ func (c *Factory) scaffoldIfNeeded(ctx context.Context, cctx *creationContext) e
 	// harmless no-op, so this is safe even when setUp fails before creating
 	// anything on disk.
 	cctx.CreatedProjectDir = cctx.ProjectPath
-	if err := c.setUp(ctx, cctx.opts, cctx.TemplateVars); err != nil {
+	manifest, err := c.setUp(ctx, cctx.opts, cctx.TemplateVars)
+	if err != nil {
 		if cctx.opts.CleanupOnError {
 			cctx.Cleanup()
 			cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to scaffold project: %v", err))
@@ -290,6 +292,7 @@ func (c *Factory) scaffoldIfNeeded(ctx context.Context, cctx *creationContext) e
 		cctx.CreatedProjectDir = ""
 		return fmt.Errorf("failed to scaffold project: %w", err)
 	}
+	cctx.TemplateManifest = manifest
 	c.Reporter.Complete("Scaffolding project", "complete!")
 	return nil
 }
@@ -348,34 +351,80 @@ func (c *Factory) configureGitHub(ctx context.Context, cctx *creationContext) er
 func (c *Factory) runHooksAndPublish(ctx context.Context, cctx *creationContext) {
 	willPublish := cctx.opts.Scaffold && !cctx.opts.SkipRepo && cctx.CreatedRepo
 
-	// Initialise the local git repository first (if we're going to publish) so that any
-	// post-installation hooks which wire up git hooks (lefthook, commitlint, etc.) find a
-	// valid .git directory instead of warning that scaffolding isn't yet a git repository.
-	if willPublish {
-		c.Reporter.Start("Initializing Git repository", "")
-		if err := git.InitRepository(ctx, cctx.ProjectPath); err != nil {
-			c.Reporter.Failed("Git repository initialization", err, "")
-			cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to initialize Git repository: %v", err))
-			willPublish = false
-		} else {
-			c.Reporter.Complete("Git repository initialization", "")
-		}
+	willPublish = c.initialiseGitBeforeHooks(ctx, cctx, willPublish)
+	c.runPostInstallHooks(ctx, cctx)
+	c.publishIfNeeded(ctx, cctx, willPublish)
+}
+
+func (c *Factory) initialiseGitBeforeHooks(ctx context.Context, cctx *creationContext, willPublish bool) bool {
+	if !willPublish {
+		return false
 	}
 
-	// Run post-installation hooks if scaffolding was done and hooks aren't skipped
-	if cctx.opts.Scaffold && !cctx.opts.SkipHooks { //nolint:nestif
-		c.Reporter.Start("Running post-installation hooks \n", "")
-		if err := c.RunHooks(ctx, cctx.ProjectPath, cctx.opts.Language, cctx.opts.ProjectType,
-			cctx.TemplateVars); err != nil {
-			cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to run post-installation hooks: %v", err))
-		} else {
-			c.Reporter.Complete("Running post-installation hooks", "complete!")
-		}
-	} else if cctx.opts.SkipHooks {
+	c.Reporter.Start("Initializing Git repository", "")
+	if err := git.InitRepository(ctx, cctx.ProjectPath); err != nil {
+		c.Reporter.Failed("Git repository initialization", err, "")
+		cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to initialize Git repository: %v", err))
+		return false
+	}
+	c.Reporter.Complete("Git repository initialization", "")
+	return true
+}
+
+func (c *Factory) runPostInstallHooks(ctx context.Context, cctx *creationContext) {
+	if !cctx.opts.Scaffold {
+		return
+	}
+	if cctx.opts.SkipHooks {
 		c.Reporter.Skip("Running post-installation hooks", "Skipped as per user request")
+		return
 	}
 
-	// Commit and push to GitHub repository if both scaffolding is done and repo was created
+	c.runTemplateManifestHooksIfAllowed(ctx, cctx)
+
+	c.Reporter.Start("Running post-installation hooks \n", "")
+	if err := c.RunHooks(ctx, cctx.ProjectPath, cctx.opts.Language, cctx.opts.ProjectType, cctx.TemplateVars); err != nil {
+		cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to run post-installation hooks: %v", err))
+		return
+	}
+	c.Reporter.Complete("Running post-installation hooks", "complete!")
+}
+
+func (c *Factory) runTemplateManifestHooksIfAllowed(ctx context.Context, cctx *creationContext) {
+	hasTemplateManifestHooks := cctx.TemplateManifest != nil && len(cctx.TemplateManifest.Hooks.Post) > 0
+	if !hasTemplateManifestHooks {
+		return
+	}
+	if !cctx.opts.AllowTemplateHooks {
+		c.Reporter.Skip("Running template manifest hooks", "Skipped for safety (pass --allow-template-hooks to enable)")
+		return
+	}
+	if cctx.opts.NoInput {
+		c.Reporter.Skip("Running template manifest hooks",
+			"Skipped: --no-input disables the required interactive safety confirmation")
+		return
+	}
+
+	confirmed, err := template.ConfirmManifestHooksExecution(cctx.TemplateManifest, cctx.ProjectPath, os.Stdin, os.Stdout)
+	if err != nil {
+		cctx.Summary.Errors = append(cctx.Summary.Errors,
+			fmt.Sprintf("Failed to read template manifest hook confirmation: %v", err))
+		return
+	}
+	if !confirmed {
+		c.Reporter.Skip("Running template manifest hooks", "Skipped: confirmation declined")
+		return
+	}
+
+	c.Reporter.Start("Running template manifest hooks", "")
+	if err := c.RunTemplateManifestHooks(ctx, cctx.ProjectPath, cctx.TemplateManifest, cctx.TemplateVars); err != nil {
+		cctx.Summary.Errors = append(cctx.Summary.Errors, fmt.Sprintf("Failed to run template manifest hooks: %v", err))
+		return
+	}
+	c.Reporter.Complete("Running template manifest hooks", "complete!")
+}
+
+func (c *Factory) publishIfNeeded(ctx context.Context, cctx *creationContext, willPublish bool) {
 	if willPublish {
 		c.Reporter.Start("Committing and pushing to GitHub", "")
 
@@ -388,9 +437,14 @@ func (c *Factory) runHooksAndPublish(ctx context.Context, cctx *creationContext)
 		} else {
 			c.Reporter.Complete("Git repository initialization", "Successfully pushed project to GitHub")
 		}
-	} else if cctx.opts.SkipRepo {
+		return
+	}
+
+	if cctx.opts.SkipRepo {
 		c.Reporter.Skip("Git repository initialization", "Skipped as no GitHub repository was created")
-	} else if !cctx.opts.Scaffold {
+		return
+	}
+	if !cctx.opts.Scaffold {
 		c.Reporter.Skip("Git repository initialization", "Skipped as no local project was scaffolded")
 	}
 }
@@ -415,7 +469,7 @@ func (c *Factory) Publish(ctx context.Context, projectPath, repoURL string) erro
 }
 
 // setUp scaffolds a project locally with pre-populated template variables
-func (c *Factory) setUp(ctx context.Context, opts Options, templateVars *template.Variables) error {
+func (c *Factory) setUp(ctx context.Context, opts Options, templateVars *template.Variables) (*template.Manifest, error) {
 	// Convert project name to kebab-case for directory name
 	kebabName := tmpl.ToKebabCase(opts.RepoName)
 
@@ -425,7 +479,7 @@ func (c *Factory) setUp(ctx context.Context, opts Options, templateVars *templat
 		// If no output directory is specified, use current directory
 		currentDir, err := os.Getwd()
 		if err != nil {
-			return fmt.Errorf("failed to get current directory: %w", err)
+			return nil, fmt.Errorf("failed to get current directory: %w", err)
 		}
 		// Create a subdirectory with the kebab-case project name
 		outputDir = filepath.Join(currentDir, kebabName)
@@ -436,7 +490,7 @@ func (c *Factory) setUp(ctx context.Context, opts Options, templateVars *templat
 
 	// Ensure the output directory exists
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
+		return nil, fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	templateSource := opts.TemplateSource
@@ -444,17 +498,18 @@ func (c *Factory) setUp(ctx context.Context, opts Options, templateVars *templat
 		// Use the default template for the specified language and project type
 		templatef, err := c.TemplateRegistry.GetTemplate(opts.Language, opts.ProjectType)
 		if err != nil {
-			return fmt.Errorf("failed to find template for %s/%s: %w", opts.Language, opts.ProjectType, err)
+			return nil, fmt.Errorf("failed to find template for %s/%s: %w", opts.Language, opts.ProjectType, err)
 		}
 		templateSource = templatef.Source
 	}
 
-	if err := c.Scaffolder.ScaffoldProjectWithOptions(ctx, outputDir, opts.Language, opts.ProjectType, templateSource, templateVars,
-		opts.SkipHooks, opts.NoCache, opts.TemplateSet, opts.NoInput); err != nil {
-		return fmt.Errorf("failed to scaffold project: %w", err)
+	manifest, err := c.Scaffolder.ScaffoldProjectWithOptions(ctx, outputDir, opts.Language, opts.ProjectType, templateSource,
+		templateVars, opts.SkipHooks, opts.NoCache, opts.TemplateSet, opts.NoInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scaffold project: %w", err)
 	}
 
-	return nil
+	return manifest, nil
 }
 
 // optsToTemplateVars converts project creation options to template variables

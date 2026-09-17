@@ -141,6 +141,23 @@ func TestValidateManifest_ValidAuthorEmailHasNoIssues(t *testing.T) {
 	}
 }
 
+func TestValidateManifest_HookWithoutRun(t *testing.T) {
+	t.Parallel()
+
+	manifest := &Manifest{
+		Hooks: ManifestHooks{
+			Post: []ManifestHook{
+				{Name: "missing-run"},
+			},
+		},
+	}
+
+	issues := ValidateManifest(manifest)
+	if !containsIssue(issues, "hooks.post[0]: run is required") {
+		t.Fatalf("expected missing hook run issue, got: %v", issues)
+	}
+}
+
 func TestValidateManifest_AuthorWithoutEmailHasNoIssues(t *testing.T) {
 	t.Parallel()
 

@@ -99,6 +99,7 @@ vip template test <source> [flags]
 | `--owner` | Project owner for template variables | `test-owner` |
 | `--set` | Set a template manifest option or variable using `key=value` (repeatable) | none |
 | `--no-input` | Do not prompt for manifest options/variables; use `--set` values/defaults | `false` |
+| `--allow-template-hooks` | Allow execution of manifest `hooks.post` commands while testing | `false` |
 
 ### Examples
 
@@ -195,6 +196,10 @@ vip template test ./my-template \
   for its options and variables interactively, unless overridden with `--set` and/or `--no-input`.
   See [Interactive Templates (Manifest)](../templates.md#interactive-templates-manifest) for
   details on manifest structure, options vs. variables, and validation.
+- Manifest `hooks.post` commands are only executed when `--allow-template-hooks`
+  is explicitly set.
+- When hooks are detected, vip asks for an interactive double confirmation
+  before executing them. With `--no-input`, hook execution is refused.
 
 ### `vip template inspect <source>`
 
