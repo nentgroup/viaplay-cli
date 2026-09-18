@@ -8,6 +8,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/go-github/v91 v91.0.0
+	github.com/google/go-github/v92 v92.0.0
 	github.com/invopop/yaml v0.3.1
 	github.com/manifoldco/promptui v0.9.0
 	github.com/muesli/termenv v0.16.0
