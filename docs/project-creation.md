@@ -17,6 +17,7 @@ vip can scaffold new projects from templates and automate the creation of reposi
   - Applies team/org settings (environments, rulesets, secrets)
   - Executes post-installation hooks (if defined and not skipped)
   - Optionally executes template manifest hooks (`.vip.yaml` `hooks.post`) only when `--allow-template-hooks` is enabled
+  - Creates the initial Git commit and pushes it to GitHub (the automated initial commit uses `--no-verify` so local git hooks do not block bootstrap)
 
 - **Repository Creation:**
   - Creates a new GitHub repository (no code scaffolding)

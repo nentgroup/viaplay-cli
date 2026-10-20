@@ -41,6 +41,10 @@ vip project create [owner/]<repo-name> [flags]
 - `--allow-template-hooks`: Allow execution of `hooks.post` commands declared in the template manifest (`.vip.yaml`)
 - `--verbose`: Enable verbose output (prints detailed progress and debug info)
 
+When `--apply-envs=false`, any secret/variable entries scoped to a GitHub environment
+(`env: <name>` in `secrets.yaml`) are skipped, because the target environments are not
+created in that run.
+
 When `--allow-template-hooks` is set and a manifest defines hooks, vip asks for
 an interactive double confirmation before running them.
 

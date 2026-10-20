@@ -146,7 +146,7 @@ func (c *Factory) ApplyRulesets(ctx context.Context, owner, repo, configDir, tea
 // ApplySecrets applies secrets to an existing repository
 func (c *Factory) ApplySecrets(ctx context.Context, owner, repo, configDir, team string) error {
 	teamDir := filepath.Join(configDir, "teams", team)
-	return c.applySecrets(ctx, owner, repo, teamDir, true, true)
+	return c.applySecrets(ctx, owner, repo, teamDir, true, true, true)
 }
 
 // ApplyRepoSecrets applies repository-specific secrets to an existing repository
@@ -452,7 +452,7 @@ func (c *Factory) publishIfNeeded(ctx context.Context, cctx *creationContext, wi
 // Publish commits all files in the project directory, adds the remote, and pushes to it.
 // The git repository itself must already be initialised (see runHooksAndPublish) before calling this.
 func (c *Factory) Publish(ctx context.Context, projectPath, repoURL string) error {
-	if err := git.CommitAll(ctx, projectPath, "chore: initial commit"); err != nil {
+	if err := git.CommitAllWithOptions(ctx, projectPath, "chore: initial commit", git.CommitOptions{SkipHooks: true}); err != nil {
 		return fmt.Errorf("failed to commit files: %w", err)
 	}
 	if err := git.AddRemote(ctx, projectPath, "origin", repoURL); err != nil {
