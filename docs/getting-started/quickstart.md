@@ -68,6 +68,7 @@ vip project create username/my-service --language rust --type service
 ```
 
 The CLI will automatically initialise a Git repository, make an initial commit, and push it to GitHub.
+To keep project bootstrapping reliable, this automated initial commit bypasses local git hooks (`--no-verify`).
 
 ---
 

@@ -54,7 +54,8 @@ func (c *Factory) applyConfigurations(ctx context.Context, opts Options) error {
 	}
 
 	if opts.ApplySecrets || opts.ApplyVariables {
-		if err := c.applySecrets(ctx, opts.RepoOwner, opts.RepoName, configDir, opts.ApplySecrets, opts.ApplyVariables); err != nil {
+		if err := c.applySecrets(ctx, opts.RepoOwner, opts.RepoName, configDir,
+			opts.ApplySecrets, opts.ApplyVariables, opts.ApplyEnvs); err != nil {
 			return fmt.Errorf("failed to apply secrets: %w", err)
 		}
 	}
@@ -425,110 +426,28 @@ func (c *Factory) applyRulesets(ctx context.Context, owner, repo, teamDir string
 }
 
 // applySecrets applies secrets and/or variables defined in the team directory.
-func (c *Factory) applySecrets(ctx context.Context, owner, repo, teamDir string, applySecrets, applyVariables bool) error {
+func (c *Factory) applySecrets(ctx context.Context, owner, repo, teamDir string,
+	applySecrets, applyVariables, allowEnvironmentTargets bool,
+) error {
 	mainOperation := "Applying secrets"
 	c.Reporter.Start(mainOperation, "")
 
-	// Expand tilde in path if it exists
-	if strings.HasPrefix(teamDir, "~") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			c.Reporter.Failed(mainOperation, err, "Failed to get user home directory")
-			return fmt.Errorf("failed to get user home directory: %w", err)
-		}
-		teamDir = filepath.Join(home, teamDir[1:])
+	expandedTeamDir, err := c.expandTeamDir(mainOperation, teamDir)
+	if err != nil {
+		return err
 	}
 
-	secretsPath := filepath.Join(teamDir, "secrets.yaml")
-	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
-		c.Reporter.Skip(mainOperation, "No secrets.json file found")
+	secretsConfig, err := c.loadSecretsConfig(mainOperation, expandedTeamDir)
+	if err != nil {
+		return err
+	}
+	if secretsConfig == nil {
 		return nil
 	}
 
-	data, err := os.ReadFile(secretsPath)
-	if err != nil {
-		c.Reporter.Failed(mainOperation, err, "Failed to read secrets file")
-		return fmt.Errorf("failed to read secrets file: %w", err)
-	}
-
-	// Create a renderer with the template variables
-	renderer := c.getTemplateRenderer()
-	c.Reporter.Debug("Rendering secrets.json with template variables")
-
-	// Render the secrets.json content with template variables
-	renderedData, err := renderer.RenderString(string(data))
-	if err != nil {
-		c.Reporter.Failed(mainOperation, err, "Failed to render secrets.yaml with template variables")
-		return fmt.Errorf("failed to render secrets.json with template variables: %w", err)
-	}
-
-	var secretsConfig secrets.Config
-
-	// Parse the rendered JSON
-	if err := yaml.Unmarshal([]byte(renderedData), &secretsConfig); err != nil {
-		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to parse YAML in %s", secretsPath))
-		return fmt.Errorf("failed to parse secrets JSON: %w", err)
-	}
-
-	// First pass to collect all secret values
-	secretValues := make(map[string]string)
-	for _, s := range secretsConfig.Secrets {
-		// Skip if name is empty
-		if s.Name == "" {
-			c.Reporter.Skip("Secret processing", "Skipping secret with missing name")
-			continue
-		}
-
-		secretValue, sourceType, sourceKey, err := secrets.ResolveSecretValue(s.Value, s.Name)
-		if err != nil {
-			c.Reporter.Warning("Secret resolution", fmt.Sprintf("Error resolving secret value for '%s': %v", s.Name, err))
-			continue
-		}
-
-		// Store the secret value for potential references
-		secretValues[s.Name] = secretValue
-
-		// Debug info about resolution
-		if sourceType != "config" {
-			c.Reporter.Debug(fmt.Sprintf("Resolved '%s' from %s: '%s'", s.Name, sourceType, sourceKey))
-		}
-	}
-
-	// Second pass to apply secrets, including those with references
-	appliedCount := 0
-	for _, secret := range secretsConfig.Secrets {
-		if secret.Name == "" {
-			continue // Skip again
-		}
-
-		if !shouldApplySecretEntry(secret, applySecrets, applyVariables) {
-			continue
-		}
-
-		secretValue, valueSource, ok := secrets.GetSecretValueAndSource(secret, secretValues)
-		if !ok {
-			if secret.Reference != "" {
-				c.Reporter.Warning("Secret reference", fmt.Sprintf("Referenced secret '%s' not found for '%s'", secret.Reference, secret.Name))
-			}
-			continue
-		}
-
-		if secretValue == "" {
-			c.Reporter.Skip("Secret processing", fmt.Sprintf("Skipping secret '%s' with empty value", secret.Name))
-			continue
-		}
-
-		isVariable := secret.Type == secretTypeVariable
-		if err := c.applySecretOrVariable(ctx, isVariable, owner, repo, secret.Name, secretValue, secret.Env,
-			valueSource); err != nil {
-			c.Reporter.Warning("Secret application", fmt.Sprintf("Failed to apply %s '%s': %v",
-				secret.Type, secret.Name, err))
-		} else {
-			c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Applied %s: %s (env: %s, source: %s)",
-				valueOrEmpty(secret.Type, secretTypeSecret), secret.Name, valueOrEmpty(secret.Env, "repo"), valueSource))
-			appliedCount++
-		}
-	}
+	secretValues := c.resolveSecretValues(*secretsConfig)
+	appliedCount := c.applyResolvedSecrets(ctx, owner, repo, *secretsConfig, secretValues, applySecrets, applyVariables,
+		allowEnvironmentTargets, mainOperation)
 
 	if appliedCount > 0 {
 		c.Reporter.Complete(mainOperation, fmt.Sprintf("Applied %d secrets/variables", appliedCount))
@@ -545,6 +464,120 @@ func shouldApplySecretEntry(secret secrets.Secret, applySecrets, applyVariables 
 		return applyVariables
 	}
 	return applySecrets
+}
+
+func (c *Factory) loadSecretsConfig(mainOperation, teamDir string) (*secrets.Config, error) {
+	secretsPath := filepath.Join(teamDir, "secrets.yaml")
+	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
+		c.Reporter.Skip(mainOperation, "No secrets.json file found")
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(secretsPath)
+	if err != nil {
+		c.Reporter.Failed(mainOperation, err, "Failed to read secrets file")
+		return nil, fmt.Errorf("failed to read secrets file: %w", err)
+	}
+
+	renderer := c.getTemplateRenderer()
+	c.Reporter.Debug("Rendering secrets.json with template variables")
+
+	renderedData, err := renderer.RenderString(string(data))
+	if err != nil {
+		c.Reporter.Failed(mainOperation, err, "Failed to render secrets.yaml with template variables")
+		return nil, fmt.Errorf("failed to render secrets.json with template variables: %w", err)
+	}
+
+	var secretsConfig secrets.Config
+	if err := yaml.Unmarshal([]byte(renderedData), &secretsConfig); err != nil {
+		c.Reporter.Failed(mainOperation, err, fmt.Sprintf("Failed to parse YAML in %s", secretsPath))
+		return nil, fmt.Errorf("failed to parse secrets JSON: %w", err)
+	}
+
+	return &secretsConfig, nil
+}
+
+func (c *Factory) resolveSecretValues(config secrets.Config) map[string]string {
+	secretValues := make(map[string]string)
+
+	for _, s := range config.Secrets {
+		if s.Name == "" {
+			c.Reporter.Skip("Secret processing", "Skipping secret with missing name")
+			continue
+		}
+
+		secretValue, sourceType, sourceKey, err := secrets.ResolveSecretValue(s.Value, s.Name)
+		if err != nil {
+			c.Reporter.Warning("Secret resolution", fmt.Sprintf("Error resolving secret value for '%s': %v", s.Name, err))
+			continue
+		}
+
+		secretValues[s.Name] = secretValue
+		if sourceType != "config" {
+			c.Reporter.Debug(fmt.Sprintf("Resolved '%s' from %s: '%s'", s.Name, sourceType, sourceKey))
+		}
+	}
+
+	return secretValues
+}
+
+func (c *Factory) applyResolvedSecrets(ctx context.Context, owner, repo string, config secrets.Config,
+	secretValues map[string]string, applySecrets, applyVariables, allowEnvironmentTargets bool, mainOperation string,
+) int {
+	appliedCount := 0
+
+	for _, secret := range config.Secrets {
+		if !c.shouldApplyResolvedSecret(ctx, owner, repo, secret, secretValues, applySecrets, applyVariables,
+			allowEnvironmentTargets, mainOperation, &appliedCount) {
+			continue
+		}
+	}
+
+	return appliedCount
+}
+
+func (c *Factory) shouldApplyResolvedSecret(ctx context.Context, owner, repo string, secret secrets.Secret,
+	secretValues map[string]string, applySecrets, applyVariables, allowEnvironmentTargets bool,
+	mainOperation string, appliedCount *int,
+) bool {
+	if secret.Name == "" || !shouldApplySecretEntry(secret, applySecrets, applyVariables) {
+		return false
+	}
+
+	secretValue, valueSource, ok := secrets.GetSecretValueAndSource(secret, secretValues)
+	if !ok {
+		if secret.Reference != "" {
+			c.Reporter.Warning("Secret reference", fmt.Sprintf("Referenced secret '%s' not found for '%s'",
+				secret.Reference, secret.Name))
+		}
+		return false
+	}
+
+	if secretValue == "" {
+		c.Reporter.Skip("Secret processing", fmt.Sprintf("Skipping secret '%s' with empty value", secret.Name))
+		return false
+	}
+
+	if secret.Env != "" && !allowEnvironmentTargets {
+		c.Reporter.Skip("Secret application", fmt.Sprintf(
+			"Skipping %s '%s': environment '%s' target requires --apply-envs=true",
+			valueOrEmpty(secret.Type, secretTypeSecret), secret.Name, secret.Env,
+		))
+		return false
+	}
+
+	isVariable := secret.Type == secretTypeVariable
+	if err := c.applySecretOrVariable(ctx, isVariable, owner, repo, secret.Name, secretValue, secret.Env,
+		valueSource); err != nil {
+		c.Reporter.Warning("Secret application", fmt.Sprintf("Failed to apply %s '%s': %v",
+			secret.Type, secret.Name, err))
+		return false
+	}
+
+	c.Reporter.Progress(mainOperation, 0, fmt.Sprintf("Applied %s: %s (env: %s, source: %s)",
+		valueOrEmpty(secret.Type, secretTypeSecret), secret.Name, valueOrEmpty(secret.Env, "repo"), valueSource))
+	(*appliedCount)++
+	return true
 }
 
 // applyRepoSecrets applies repository-specific secrets from a JSON string

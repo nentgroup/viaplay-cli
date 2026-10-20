@@ -300,6 +300,17 @@ func AddRemote(ctx context.Context, directory, name, url string) error {
 
 // CommitAll commits all changes in a Git repository
 func CommitAll(ctx context.Context, directory, message string) error {
+	return CommitAllWithOptions(ctx, directory, message, CommitOptions{})
+}
+
+// CommitOptions controls how CommitAllWithOptions runs git commit.
+type CommitOptions struct {
+	// SkipHooks disables git commit hooks by passing --no-verify.
+	SkipHooks bool
+}
+
+// CommitAllWithOptions commits all changes in a Git repository with optional flags.
+func CommitAllWithOptions(ctx context.Context, directory, message string, opts CommitOptions) error {
 	// Verify the directory exists and is a git repository
 	if !IsGitRepository(directory) {
 		return fmt.Errorf("not a git repository: %s", directory)
@@ -328,11 +339,20 @@ func CommitAll(ctx context.Context, directory, message string) error {
 	}
 
 	// Commit
-	commitCmd := exec.CommandContext(ctx, "git", "commit", "-m", message)
-	if err := commitCmd.Run(); err != nil {
-		// Check if there's nothing to commit
-		if strings.Contains(err.Error(), "nothing to commit") {
+	commitArgs := []string{"commit", "-m", message}
+	if opts.SkipHooks {
+		commitArgs = append(commitArgs, "--no-verify")
+	}
+	commitCmd := exec.CommandContext(ctx, "git", commitArgs...)
+	commitOutput, err := commitCmd.CombinedOutput()
+	if err != nil {
+		output := strings.TrimSpace(string(commitOutput))
+		// Check if there's nothing to commit.
+		if strings.Contains(output, "nothing to commit") {
 			return nil // No error if there's nothing to commit
+		}
+		if output != "" {
+			return fmt.Errorf("failed to commit changes: %w: %s", err, output)
 		}
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
