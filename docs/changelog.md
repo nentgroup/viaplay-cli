@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.1](https://github.com/nentgroup/viaplay-cli/compare/v3.4.0...v3.4.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* respect --apply flags ([#221](https://github.com/nentgroup/viaplay-cli/issues/221)) ([4d2e0fc](https://github.com/nentgroup/viaplay-cli/commit/4d2e0fcc1e7d53afeb06acd8c27ff7786d334b3b))
+
 ## [3.4.0](https://github.com/nentgroup/viaplay-cli/compare/v3.3.2...v3.4.0) (2026-09-17)
 
 
